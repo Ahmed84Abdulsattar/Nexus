@@ -23,7 +23,8 @@
       "Edit(./.env.local)",
       "Edit(./apps/**/.env)",
       "Edit(./packages/**/.env)",
-      "Bash(git push --force *)"
+      "Bash(git push --force *)",
+      "PowerShell(git push --force *)"
     ]
   }
 }
