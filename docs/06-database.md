@@ -55,7 +55,7 @@ erDiagram
 7. **Rollups instead of continuous aggregates (ADR 0007).** The `refresh_rollup_5m()` and `refresh_rollup_combine()` functions are safe to run again for any time window. In phase 1 they are the **only** rollup path. The worker runs `refresh_rollup_5m` **once per closed 5-minute bucket**, `rollup.close_grace_intervals` (2) poll intervals after the bucket ends, and again only for closed buckets that receive late packets. It never runs over a sliding window or every minute. Daily buckets are **local days in Asia/Dubai**. Each rollup row stores `packets`, the number of samples Nexus stored, which the API reports as data coverage.
 8. **BIM-ready spatial model.** `building → level → zone`, with nullable `building_id / level_id / zone_id` on `core.asset` and `events.event`, and `bim_ref` jsonb for IFC GUIDs, APS URNs or ArcGIS I3S layer ids. `building`, `level` and `zone` each have nullable `source_system` + `external_id` (unique together) and `retired_at`, so a BIM model or another platform can feed them later with the same identity and never-delete rules as assets.
 9. **Access is data.** Entra groups map to roles in `group_role`. Project scope sits in `project_access` (per user or per group). Roles with `all_projects = true` (admin, leadership) skip the project filter.
-10. **Asset kind (ADR 0009).** `core.asset.kind` is `equipment` for physical sensored items of any category (including DGs, solar and mains) or `site_metric` for site-level values as the source reports them, such as energy site totals. **Every equipment list, count, map layer and view filters `kind = 'equipment'`.** `v_asset_live` and `v_project_asset_counts` already do. Site-level values are read through `v_site_metric_live`.
+10. **Asset kind (ADR 0009).** `core.asset.kind` is `physical` for physical sensored items of any category (including DGs, solar and mains) or `site_metric` for site-level values as the source reports them, such as energy site totals. **Every equipment list, count, map layer and view filters `kind = 'physical'`.** `v_asset_live` and `v_project_asset_counts` already do. Site-level values are read through `v_site_metric_live`.
 11. **Read state that doesn't grow with users × events.** "Mark all read" moves one row in `events.read_marker` (per user, either global or per project). `events.event_read` holds only events read one by one after the marker. It is partitioned by `occurred_at` like `events.event` and dropped with it. Unread = events in scope with `occurred_at` later than the user's latest applicable marker and no `event_read` row.
 
 ## 4. Write paths (worker)
@@ -71,7 +71,7 @@ Bulk writes use multi-row `INSERT … SELECT FROM unnest(...)` or `COPY`, one tr
 
 ## 5. Read paths (API): examples
 ```sql
--- Project page markers (one query, ~ms). Equipment only (the view filters kind = 'equipment').
+-- Project page markers (one query, ~ms). Equipment only (the view filters kind = 'physical').
 -- The marker list does not select latest_values (live messages are slim; the asset panel fetches values).
 SELECT asset_id, name, asset_type, category, icon, status_display, status_source_value,
        last_packet_at, latitude, longitude

@@ -7,7 +7,7 @@
 4. **Never colour alone.** Status always shows text or an icon next to the colour (accessibility).
 5. **Units and numbers.** Format with `Intl.NumberFormat('en-AE')`. Keep the source precision up to 2 decimals for display. Use the unit from the API exactly as given.
 6. **Label what Nexus observed.** The status timeline is labelled **"observed by Nexus"** (status changes seen in polls, accurate to about one poll interval; ADR 0007).
-7. **Equipment only.** Equipment tables, counts and map markers show only what the API returns (`kind = 'equipment'`). Site-level records appear only in the energy box and ribbon (ADR 0009).
+7. **Equipment only.** Equipment tables, counts and map markers show only what the API returns (`kind = 'physical'`). Site-level records appear only in the energy box and ribbon (ADR 0009).
 
 ## Status and state tokens (`styles/tokens.css`)
 | Token | Use | Colour |

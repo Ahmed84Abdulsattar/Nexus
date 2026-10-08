@@ -243,11 +243,11 @@ CREATE TABLE core.asset (
   building_id      uuid REFERENCES core.building(id),
   level_id         uuid REFERENCES core.level(id),
   zone_id          uuid REFERENCES core.zone(id),
-  -- docs/adr/0009: 'equipment' = a physical sensored item of any category (incl. DGs, solar, mains);
+  -- docs/adr/0009: 'physical' = a physical sensored item of any category (incl. DGs, solar, mains);
   -- 'site_metric' = values for a whole site as the source reports them (e.g. energy site totals).
-  -- Every equipment list, count, map layer and view filters kind = 'equipment'.
+  -- Every equipment list, count, map layer and view filters kind = 'physical'.
   -- Set by the connector from source data (rule lives in packages/datoms-client/src/mapping.ts).
-  kind             text NOT NULL DEFAULT 'equipment' CHECK (kind IN ('equipment','site_metric')),
+  kind             text NOT NULL DEFAULT 'physical' CHECK (kind IN ('physical','site_metric')),
   name             text NOT NULL,
   source_type_name text,                                   -- type exactly as the source names it
   make             text,
@@ -702,7 +702,7 @@ CREATE INDEX audit_user_time_idx ON audit.log (user_id, at DESC);
 
 -- =====================================================================
 -- READ VIEWS (used by API modules that own no tables: equipment, energy, portfolio tiles)
--- Equipment views include kind = 'equipment' only (docs/adr/0009).
+-- Equipment views include kind = 'physical' only (docs/adr/0009).
 -- =====================================================================
 CREATE OR REPLACE VIEW core.v_asset_live AS
 SELECT a.id               AS asset_id,
@@ -726,7 +726,7 @@ LEFT JOIN telemetry.status_map m            ON m.source_system = a.source_system
 LEFT JOIN telemetry.latest_packet lp        ON lp.asset_id = a.id
 LEFT JOIN telemetry.asset_location_current l ON l.asset_id = a.id
 WHERE a.retired_at IS NULL
-  AND a.kind = 'equipment';
+  AND a.kind = 'physical';
 
 -- Info box 2 / equipment counts per project, type and display status (equipment only, via v_asset_live)
 CREATE OR REPLACE VIEW core.v_project_asset_counts AS

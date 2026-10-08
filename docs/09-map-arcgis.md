@@ -65,7 +65,7 @@ export interface MapViewProps {
   - **Satellite:** `MapView` + `arcgis/imagery` (or `arcgis/imagery/standard` with labels).
   - **3D (simple, ADR 0008):** `SceneView` + `arcgis/imagery` basemap + `ground: 'world-elevation'`, plus a 3D buildings scene layer where available (Esri / OSM 3D buildings from Living Atlas). Keep the camera tilted (~60°) over the site. Assets use the **same icons** as 2D. There are no callouts, vertical offsets or pulse in 3D.
   - When switching modes, keep the same layer data and move only the view. Destroy the old view to free memory.
-- **Assets layer:** a client-side `FeatureLayer` with fields `id`, `assetType`, `status`, `name`. It holds equipment only (`kind = 'equipment'`, ADR 0009); site-level records are never drawn.
+- **Assets layer:** a client-side `FeatureLayer` with fields `id`, `assetType`, `status`, `name`. It holds equipment only (`kind = 'physical'`, ADR 0009); site-level records are never drawn.
   - Symbol: an icon per `assetType` (SVG from `assets/icons/asset-types/`, `PictureMarkerSymbol` or `CIMSymbol`).
   - Colour ring or background per `status`: running green, idle amber, maintenance red, off grey, unknown neutral. In 3D, use `IconSymbol3DLayer` with the same icons (no callouts).
 - **Blink or pulse (2D only):** when a live update changes an asset's status, add a short pulsing graphic (`GraphicsLayer` with an animated CIM symbol or a CSS-animated HTML overlay) for 10 s. Never blink everything all the time. Q19 asks Innovo whether "blinkers" on the structure sheet means a constant blink.

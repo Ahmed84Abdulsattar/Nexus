@@ -16,7 +16,7 @@
   - 422: validation.
   - 429: rate-limited.
 - **Freshness:** every live value carries `ts` (the source time), `receivedAt` and `stale: boolean`. `stale` uses the DATOMS rule when known; otherwise it uses the interim `display.stale_after_seconds`, but never less than twice the asset type's poll interval (Q8, ADR 0006). Responses that hold live data include `X-Data-Lag-Seconds`. A field the DATOMS bulk response doesn't carry is returned as absent (`null`), and the UI shows "no data yet" (ADR 0010).
-- **Equipment only:** every equipment list, count and marker endpoint returns `kind = 'equipment'` assets only (ADR 0009).
+- **Equipment only:** every equipment list, count and marker endpoint returns `kind = 'physical'` assets only (ADR 0009).
 - **Versioning:** a breaking change goes to `/v2`. Additive fields are allowed in v1. The OpenAPI diff is checked in CI.
 - **No source-specific names in the API.** Use `externalId`, not `datomsId`.
 - **Decorators:** every handler has exactly one of `@RequirePermission('key')`, `@AnySignedIn()` (any valid Nexus user: `/me`, `/config`, `/live/token`, `/live/subscriptions`; the last checks permission and scope per project inside) or `@Public()` (only `/health/*`). A test fails if a handler has none.

@@ -2,7 +2,7 @@
 
 > Read-only copy for agents. The spreadsheet is the source and tracks status. Regenerate this file when the sheet changes.
 > Map decided: Esri ArcGIS (docs/adr/0002). Database: PostgreSQL 16 without TimescaleDB (docs/adr/0003). Where a task disagrees with docs/, docs/ wins.
-> **Edited on 2026-10-08, ahead of the spreadsheet (architecture review 1, ADRs 0005–0010).** Changed: the sprint table dependencies, S0-04, S2-02, S3-01, S3-03, S3-04, S4-01, S4-02, S4-03, S4-05, S5-01, S5-02, S5-03, S6-01, S6-02, S6-03, S6-04, S9-02. Apply the same edits to `Nexus_Phase1_Sprint_Plan.xlsx`, then regenerate.
+> Regenerated from the spreadsheet on 2026-10-08 after architecture review 1 (ADRs 0005–0010). Changed rows: the sprint dependencies for S2–S6, S0-04, S2-02, S3-01, S3-03, S3-04 (on hold), S4-01, S4-02, S4-03, S4-05, S5-01, S5-02, S5-03, S6-01, S6-02, S6-03, S6-04, S9-02.
 
 ## Sprints
 
@@ -408,7 +408,6 @@
 - **Sprint:** S3
 - **Week:** W2
 - **Work package:** DATOMS connector
-- **Status:** ON HOLD. The bulk endpoint has no history (ADR 0010). Using a DATOMS history feed needs a decision and a new ADR (Q12). Until then, gaps stay gaps and charts show coverage (ADR 0007).
 - **Steps (how to do it):** 1. On first run, copy all past data from DATOMS (since Jul 2026 for GHAFWOODS).
   2. Record the last time synced per device.
   3. After an outage, fetch the missing time range.
@@ -417,8 +416,9 @@
 - **Now done by:** You (backend)
 - **Requirement:** Brief: trends
 - **Depends on:** S3-03
-- **External blocker:** A DATOMS history feed (Q12) + a decision to use it (ADR)
+- **External blocker:** ON HOLD (decided 2026-10-08). The bulk endpoint has no history (ADR 0010); Nexus builds its own history from polls from day one. Needs a DATOMS history feed (Q12) and a new ADR to use it. Until then, gaps stay gaps and charts show coverage (ADR 0007).
 - **Estimate (days):** 2
+- **Status:** Blocked
 - **Acceptance check:** GHAFWOODS history since Jul 2026 loaded; gaps refilled after a forced outage
 
 ### S3-05 · Device linking to-do list
@@ -495,7 +495,7 @@
 - **Week:** W1–W2
 - **Work package:** Project page
 - **Steps (how to do it):** 1. Endpoints GET /projects/{id}/equipment/summary (Box 2) and GET /projects/{id}/energy/summary (Box 3), as in docs/10.
-  2. Fill them from the latest DATOMS values: equipment counts from kind = 'equipment' assets; energy site totals from site_metric records when DATOMS provides them. Manpower and materials are not built (slots only).
+  2. Fill them from the latest DATOMS values: equipment counts from kind = 'physical' assets; energy site totals from site_metric records when DATOMS provides them. Manpower and materials are not built (slots only).
 - **Output when done:** The project page loads its boxes
 - **Now done by:** You (backend)
 - **Requirement:** Sheet: L1 Info boxes
@@ -521,7 +521,7 @@
 - **Sprint:** S4
 - **Week:** W1–W2
 - **Work package:** Project page
-- **Steps (how to do it):** 1. Draw one pin per equipment asset (kind = 'equipment') at its DATOMS location; no location = "Not on map".
+- **Steps (how to do it):** 1. Draw one pin per equipment asset (kind = 'physical') at its DATOMS location; no location = "Not on map".
   2. Icon by type: tower crane, hoist, equipment, generator; unknown types use the generic icon.
   3. Colour by DATOMS status: Running green, Idle amber, Maintenance red, Off grey.
   4. Turn on clustering and a Map/Satellite switch. 3D uses the same icons with no callouts or pulse (ADR 0008).
@@ -668,7 +668,7 @@
 - **Sprint:** S6
 - **Week:** W1
 - **Work package:** Equipment
-- **Steps (how to do it):** 1. Endpoint listing equipment per project (kind = 'equipment' only): ID, name, type, make/model, current status, plus extra nameplate fields as optional columns.
+- **Steps (how to do it):** 1. Endpoint listing equipment per project (kind = 'physical' only): ID, name, type, make/model, current status, plus extra nameplate fields as optional columns.
   2. Every parameter DATOMS sends for a device is available from GET /assets/{id} (device card). The list endpoint carries no live values (ADR 0008).
 - **Output when done:** Data for the equipment table
 - **Now done by:** You (backend)
@@ -694,7 +694,7 @@
 - **Sprint:** S6
 - **Week:** W2
 - **Work package:** Equipment
-- **Steps (how to do it):** 1. Counts per project (kind = 'equipment' only): tower cranes total/idle, hoists total/idle, all equipment total/idle, using DATOMS statuses.
+- **Steps (how to do it):** 1. Counts per project (kind = 'physical' only): tower cranes total/idle, hoists total/idle, all equipment total/idle, using DATOMS statuses.
   2. Add to the project summary (S5-03).
 - **Output when done:** Numbers for info box 2
 - **Now done by:** You (backend)

@@ -12,7 +12,12 @@
       "Bash(pnpm --filter *)",
       "Bash(git status)",
       "Bash(git diff *)",
-      "Bash(git log *)"
+      "Bash(git log *)",
+      "PowerShell(git checkout -b docs/architecture-review-1)",
+      "PowerShell(\\(Get-Command python -ErrorAction SilentlyContinue\\).Source; \\(Get-Command py -ErrorAction SilentlyContinue\\).Source; \\(Get-Command gh -ErrorAction SilentlyContinue\\).Source; try { python -c \"import sys, openpyxl; print\\(sys.version, openpyxl.__version__\\)\" } catch { \"python check failed\" })",
+      "PowerShell(python -m pip install --user --quiet openpyxl)",
+      "PowerShell(python -c \"import openpyxl; print\\(openpyxl.__version__\\)\")",
+      "PowerShell(python -I \"C:\\\\Users\\\\AHMED~1.ELM\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\c--Users-ahmed-elmahdy-Desktop-Projects-Nexus\\\\a26d0c2e-e6d7-4571-a0eb-81d91cb36f23\\\\scratchpad\\\\rename_kind.py\" \"C:\\\\Users\\\\ahmed.elmahdy\\\\Desktop\\\\Projects\\\\Nexus\")"
     ],
     "deny": [
       "Read(./.env)",

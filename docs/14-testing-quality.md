@@ -27,7 +27,7 @@
 ## Code review checklist
 - [ ] Nothing outside `datoms-client` / `connectors/datoms` knows DATOMS details. DATOMS field names appear only in `packages/datoms-client/src/mapping.ts`.
 - [ ] Telemetry comes only from the bulk endpoint; `data/latest` only in CLI scripts (ADR 0010).
-- [ ] Equipment lists, counts, map layers and views filter `kind = 'equipment'` (ADR 0009).
+- [ ] Equipment lists, counts, map layers and views filter `kind = 'physical'` (ADR 0009).
 - [ ] Live push messages carry no parameter values, and nothing project-specific goes to `portfolio` (ADR 0008).
 - [ ] No per-poll writes beyond packets, latest values and real changes (`06` §4).
 - [ ] No hard-coded sites, asset types, parameters or statuses.
