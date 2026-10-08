@@ -1,0 +1,1041 @@
+# Phase 1 backlog (markdown copy of Nexus_Phase1_Sprint_Plan.xlsx → Backlog)
+
+> Read-only copy for agents. The spreadsheet is the source and tracks status. Regenerate this file when the sheet changes.
+> Map decided: Esri ArcGIS (docs/adr/0002). Database: PostgreSQL 16 without TimescaleDB (docs/adr/0003). Where a task disagrees with docs/, docs/ wins.
+
+## Sprints
+
+| Sprint | Name | Weeks | Goal | External dependency |
+|---|---|---|---|---|
+| S0 | Setup + map decision | 1–2 | Repos, Azure dev environment, Microsoft sign-in skeleton, design tokens, ArcGIS map wrapper skeleton | Azure and Entra access; map decision |
+| S1 | Foundation | 3–4 | Data model, permissions in the API, app shell, responsive layout | Nothing |
+| S2 | Portfolio map + access | 5–6 | Top-level map of all DATOMS sites; DATOMS client; users and roles API | DATOMS API docs |
+| S3 | DATOMS sync + admin | 7–8 | Live DATOMS data flowing; device linking, sync health, users and roles screens | DATOMS API docs + key |
+| S4 | Project page | 9–10 | Level 1 page with live asset pins and equipment / energy boxes | Asset location + status in API |
+| S5 | Energy | 11–12 | Info box 3 and energy detail page; load-test harness | Site totals in API |
+| S6 | Equipment + notifications | 13–14 | Info box 2, equipment detail, device card, DATOMS notifications | Notifications in API |
+| S7 | Explorer + hardening | 15–16 | All DATOMS data explorer, security hardening, production environment, mobile polish | Nothing |
+| S8 | Load and security | 17–18 | Load test at 100+ sites, backups and alerts, penetration test, user guide | Pen-test slot |
+| S9 | Pilot (GHAFWOODS) | 19–20 | Testing with pilot users, fixes, runbook | Pilot users |
+| S10 | Rollout | 21–22 | All DATOMS sites live, onboarding, plan the next scope | Nothing |
+
+## Tasks
+
+### S0-01 · Monorepo: apps/web, apps/api, apps/worker, packages/shared (types). Branching and review rules
+- **Sprint:** S0
+- **Week:** W1
+- **Work package:** Setup
+- **Steps (how to do it):** 1. Create the Git repository (GitHub or Azure DevOps).
+  2. Set up folders: apps/web, apps/api, apps/worker, packages/shared.
+  3. Add a root README with how to run everything.
+  4. Agree rules: main branch protected, every change via pull request reviewed by the other person.
+- **Output when done:** Repo both of you can clone and run
+- **Now done by:** You (backend)
+- **Requirement:** Foundation
+- **Estimate (days):** 1
+- **Acceptance check:** Both devs clone, build and run all apps locally with one command
+
+### S0-02 · Azure dev environment as code (Bicep): Container Apps, PostgreSQL Flexible Server 16, Blob Storage, Key Vault, Web PubSub, Application Insights
+- **Sprint:** S0
+- **Week:** W1
+- **Work package:** Setup
+- **Steps (how to do it):** 1. Create a resource group in Azure UAE North for 'nexus-dev'.
+  2. Write Bicep files for: PostgreSQL Flexible Server 16 (no TimescaleDB; see docs/adr/0003), Blob Storage, Key Vault, Web PubSub, Container Apps environment, Application Insights.
+  3. Deploy with one command and check each resource exists.
+  4. Store the database password in Key Vault, not in code.
+- **Output when done:** Working dev environment in Azure, built from code
+- **Now done by:** You (backend)
+- **Requirement:** Foundation
+- **External blocker:** Azure subscription access
+- **Estimate (days):** 3
+- **Acceptance check:** Environment created from code in one run; no secrets in the repo
+
+### S0-03 · CI/CD pipelines for API and worker (build, test, deploy to dev)
+- **Sprint:** S0
+- **Week:** W2
+- **Work package:** Setup
+- **Steps (how to do it):** 1. Create a pipeline that runs on every pull request: install, lint, test.
+  2. On merge to main: build Docker images for api and worker, push to Azure Container Registry, deploy to Container Apps (dev).
+  3. Test by merging a small change and seeing it live.
+- **Output when done:** Merge to main = deployed to dev
+- **Now done by:** You (backend)
+- **Requirement:** Foundation
+- **Depends on:** S0-02
+- **Estimate (days):** 2
+- **Acceptance check:** Merge to main deploys to dev automatically
+
+### S0-04 · Entra ID app registrations (API + web app), app roles, Nexus security groups
+- **Sprint:** S0
+- **Week:** W1
+- **Work package:** Setup
+- **Steps (how to do it):** 1. In Entra ID, register two apps: 'Nexus API' and 'Nexus Web'.
+  2. On Nexus API, define app roles: Admin, Leadership, ProjectDirector, ProjectManager, HSE, Plant, Procurement.
+  3. Create security groups (e.g. Nexus-Admins) and assign them to the roles.
+  4. Turn on 'assignment required' so only group members can sign in.
+  5. Share client IDs with the frontend.
+- **Output when done:** Sign-in apps and roles ready; test users in each group
+- **Now done by:** You (backend)
+- **Requirement:** Innovo: permissions
+- **External blocker:** Entra admin consent
+- **Estimate (days):** 1
+- **Acceptance check:** Test users in each group can get a token with the right role
+
+### S0-05 · React + TypeScript app shell (Vite), routing, linting
+- **Sprint:** S0
+- **Week:** W1
+- **Work package:** Setup
+- **Steps (how to do it):** 1. Create the React + TypeScript app with Vite in apps/web.
+  2. Add routing with empty pages: Portfolio, Project, Admin.
+  3. Add ESLint and Prettier.
+  4. Run locally.
+- **Output when done:** Empty app with page routes
+- **Now done by:** Colleague (frontend)
+- **Requirement:** Foundation
+- **Depends on:** S0-01
+- **Estimate (days):** 2
+- **Acceptance check:** App runs locally and in dev
+
+### S0-06 · Design tokens and base components from the brief mockups (colours, type, cards, tags, tables)
+- **Sprint:** S0
+- **Week:** W1–W2
+- **Work package:** Setup
+- **Steps (how to do it):** 1. From the brief mockups, list colours, fonts, spacing, corner radius.
+  2. Create them as design tokens (CSS variables).
+  3. Build base components: button, card, info box, tag (RES, HOSP...), table, side panel, tabs.
+  4. Make a 'components' page showing them all.
+- **Output when done:** Reusable UI building blocks matching the mockups
+- **Now done by:** Colleague (frontend)
+- **Requirement:** Brief: platform experience
+- **Estimate (days):** 3
+- **Acceptance check:** Component page shows every base component on desktop and mobile
+
+### S0-07 · CI/CD to Azure Static Web Apps
+- **Sprint:** S0
+- **Week:** W2
+- **Work package:** Setup
+- **Steps (how to do it):** 1. Create Azure Static Web App for dev.
+  2. Add a pipeline: on merge to main, build and deploy apps/web.
+  3. Check the dev URL works.
+- **Output when done:** Web app auto-deploys to dev
+- **Now done by:** You (backend)
+- **Requirement:** Foundation
+- **Depends on:** S0-05
+- **Estimate (days):** 1
+- **Acceptance check:** Merge to main deploys web app to dev
+
+### S0-08 · Microsoft sign-in skeleton (MSAL)
+- **Sprint:** S0
+- **Week:** W2
+- **Work package:** Setup
+- **Steps (how to do it):** 1. Install MSAL React.
+  2. Use the 'Nexus Web' client ID from S0-04.
+  3. Sign-in button redirects to Microsoft; after sign-in show the user's name.
+  4. Test with a user outside the Nexus groups: they must be refused.
+- **Output when done:** Users sign in with their Innovo Microsoft account
+- **Now done by:** Colleague (frontend)
+- **Requirement:** Innovo: permissions
+- **Depends on:** S0-04
+- **Estimate (days):** 1
+- **Acceptance check:** User signs in with Innovo account; others are refused
+
+### S0-09 · ArcGIS map setup (provider decided: Esri ArcGIS, ADR 0002): account and API key, MapView wrapper skeleton with the ArcGIS adapter
+- **Sprint:** S0
+- **Week:** W1
+- **Work package:** Map
+- **Steps (how to do it):** 1. Ask Innovo IT whether Innovo has an ArcGIS Online / Enterprise organisation (open question Q4).
+  2. Create the ArcGIS API key (basemaps + elevation), restrict it by referrer to the Nexus domains, store it in Key Vault.
+  3. Serve the key to the web app through /v1/config (stub until the API exists).
+  4. Build components/map/types.ts, MapView.tsx and the arcgis/ adapter: lazy-loaded @arcgis/core, a UAE map with 10 sample markers, 2D / satellite / 3D switch.
+  5. Add the lint rule that blocks @arcgis imports outside components/map.
+- **Output when done:** ArcGIS key in Key Vault; MapView wrapper with ArcGIS adapter showing a UAE map in 2D, satellite and 3D; ready for S2
+- **Now done by:** Colleague (frontend)
+- **Requirement:** Brief: interactive map; Sheet: Top level
+- **External blocker:** ArcGIS account / licence (Q4)
+- **Estimate (days):** 3
+- **Acceptance check:** UAE map renders in 2D, satellite and 3D through <MapView>; no @arcgis import outside components/map; key not in the repo
+
+### S1-01 · Core data model and migrations from db/schema.sql: project, building, level, zone, asset type, asset, parameter dictionary, latest + raw packets (daily partitions), rollups, status, location, events, access, audit
+- **Sprint:** S1
+- **Week:** W1
+- **Work package:** Foundation
+- **Steps (how to do it):** 1. Use Kysely + plain SQL migrations (node-pg-migrate), per docs/04-tech-stack.md.
+  2. Turn db/schema.sql into migration 0001_init.sql (up + down); add db/roles.sql grants.
+  3. Raw telemetry is telemetry.packet: one jsonb row per asset packet, daily partitions (no TimescaleDB).
+  4. Every asset has project_id and optional building/level/zone ids (what BIM links to later).
+  5. Add pnpm db:migrate / db:check / db:seed; run the 100-site seed and record query timings.
+- **Output when done:** Database structure in place
+- **Now done by:** You (backend)
+- **Requirement:** Foundation (BIM-ready)
+- **Depends on:** S0-02
+- **Estimate (days):** 3
+- **Acceptance check:** Migrations run clean; every asset links to project and optional zone
+
+### S1-02 · Auth in API: token validation, role guards, project-scope filter on every query
+- **Sprint:** S1
+- **Week:** W1–W2
+- **Work package:** Foundation
+- **Steps (how to do it):** 1. Add token validation in NestJS for Entra ID tokens.
+  2. Read the user's roles from the token.
+  3. Add a guard that blocks endpoints by role.
+  4. Add a project-scope filter: every query only returns projects the user is assigned to (unless role = all projects).
+  5. Write tests: user A must never see project B.
+- **Output when done:** Every API call is permission-checked
+- **Now done by:** You (backend)
+- **Requirement:** Innovo: permissions
+- **Depends on:** S0-04
+- **Estimate (days):** 3
+- **Acceptance check:** Automated test: a user never receives a project outside their scope
+
+### S1-03 · OpenAPI contract published; typed client generated for the web app
+- **Sprint:** S1
+- **Week:** W2
+- **Work package:** Foundation
+- **Steps (how to do it):** 1. Turn on NestJS Swagger/OpenAPI generation.
+  2. Publish the spec at /api/docs on dev.
+  3. Generate a TypeScript client into packages/shared.
+  4. Show the frontend how to use it.
+- **Output when done:** Shared API contract the frontend codes against
+- **Now done by:** You (backend)
+- **Requirement:** Foundation
+- **Estimate (days):** 1
+- **Acceptance check:** Frontend imports generated client; build fails on contract mismatch
+
+### S1-04 · Audit log: sign-ins, data exports, settings changes
+- **Sprint:** S1
+- **Week:** W2
+- **Work package:** Foundation
+- **Steps (how to do it):** 1. Create an audit service in the API.
+  2. Log sign-ins, settings changes, permission changes, exports: who, what, when.
+  3. Add an admin-only endpoint to read the log.
+- **Output when done:** Audit log recording key actions
+- **Now done by:** You (backend)
+- **Requirement:** Innovo: security
+- **Estimate (days):** 1
+- **Acceptance check:** Each action writes user, time and action
+
+### S1-05 · App shell: header, global search box, notifications bell, user menu
+- **Sprint:** S1
+- **Week:** W1
+- **Work package:** Foundation
+- **Steps (how to do it):** 1. Build the top header from the mockup: Innovo/Nexus logo, search box, UAE label, bell, user avatar.
+  2. User menu shows name and sign-out.
+  3. Search and bell are placeholders for now.
+- **Output when done:** App frame visible on every page
+- **Now done by:** Colleague (frontend)
+- **Requirement:** Brief mockups
+- **Depends on:** S0-06
+- **Estimate (days):** 2
+- **Acceptance check:** Matches mockup header on desktop
+
+### S1-06 · Responsive layout for desktop, tablet and mobile
+- **Sprint:** S1
+- **Week:** W1–W2
+- **Work package:** Foundation
+- **Steps (how to do it):** 1. Desktop: list panel left, map centre, details panel right (as mockup).
+  2. Tablet: list panel collapses to a button.
+  3. Mobile: map full width, panels open as bottom drawers.
+  4. Test at 1440, 1024 and 390 px wide.
+- **Output when done:** Layout works on desktop, tablet and phone
+- **Now done by:** Colleague (frontend)
+- **Requirement:** Innovo: devices
+- **Estimate (days):** 2
+- **Acceptance check:** No horizontal scroll at 390 px; side panel becomes a drawer on mobile
+
+### S1-07 · Loading, error and empty states using the generated API client
+- **Sprint:** S1
+- **Week:** W2
+- **Work package:** Foundation
+- **Steps (how to do it):** 1. Connect the generated API client from S1-03.
+  2. Make shared components for: loading spinner, 'no data yet', error with retry.
+  3. Use them on every page.
+- **Output when done:** Consistent loading, empty and error states
+- **Now done by:** Colleague (frontend)
+- **Requirement:** Foundation
+- **Depends on:** S1-03
+- **Estimate (days):** 2
+- **Acceptance check:** Every page shows a clear state when data is loading, missing or failed
+
+### S1-08 · Navigation filtered by role
+- **Sprint:** S1
+- **Week:** W2
+- **Work package:** Foundation
+- **Steps (how to do it):** 1. Read the user's roles from the sign-in token.
+  2. Hide Admin menu for non-admins.
+  3. Hide pages the role cannot open.
+- **Output when done:** Menus match the user's role
+- **Now done by:** Colleague (frontend)
+- **Requirement:** Innovo: permissions
+- **Depends on:** S1-02
+- **Estimate (days):** 1
+- **Acceptance check:** Admin console hidden for non-admins
+
+### S2-01 · Projects API: list, filter (status, type, district), search, scoped to user
+- **Sprint:** S2
+- **Week:** W1
+- **Work package:** Portfolio map
+- **Steps (how to do it):** 1. Create GET /projects with filters: status, type, district, search text.
+  2. Apply the project-scope filter from S1-02.
+  3. Return the fields DATOMS provides for each site (name, location, type, status).
+  4. Add seed data for 5 sample sites so the frontend can work before DATOMS is connected.
+- **Output when done:** Projects list endpoint the map uses
+- **Now done by:** You (backend)
+- **Requirement:** Sheet: Top level
+- **Depends on:** S1-02
+- **Estimate (days):** 2
+- **Acceptance check:** Returns only the user's projects; search under 300 ms
+
+### S2-02 · DATOMS API client: auth, paging, retries, rate-limit handling
+- **Sprint:** S2
+- **Week:** W2
+- **Work package:** DATOMS connector
+- **Steps (how to do it):** 1. Read the DATOMS API docs (once received).
+  2. Build a DATOMS client module: login/token, list sites, list devices, get values.
+  3. Handle paging, retries and rate limits.
+  4. Test against GHAFWOODS on dev.
+  If docs are not here yet: build with a mock and swap later.
+- **Output when done:** Code that can talk to DATOMS
+- **Now done by:** You (backend)
+- **Requirement:** Brief: energy, crane utilisation
+- **External blocker:** DATOMS API docs + read-only key
+- **Estimate (days):** 3
+- **Acceptance check:** Client reads GHAFWOODS sites and devices in dev
+
+### S2-03 · Portfolio map (chosen provider, through the map wrapper): one pin per DATOMS site, coloured Active green, Central Store blue, Finished grey, In bid yellow where DATOMS gives the status
+- **Sprint:** S2
+- **Week:** W1–W2
+- **Work package:** Portfolio map
+- **Steps (how to do it):** 1. Use the MapView wrapper with the ArcGIS adapter from S0-09.
+  2. Show a UAE map.
+  3. Call GET /projects and draw one pin per project.
+  4. Colour pins: Active green, Central Store blue, Finished grey, In bid yellow (structure sheet).
+  5. Click a pin = zoom to that project.
+- **Output when done:** Top-level portfolio map
+- **Now done by:** Colleague (frontend)
+- **Requirement:** Sheet: Top level
+- **Depends on:** S0-09
+- **Estimate (days):** 3
+- **Acceptance check:** All projects shown; colours match the sheet; click zooms to project
+
+### S2-04 · Project list panel and summary tiles (projects, districts)
+- **Sprint:** S2
+- **Week:** W2
+- **Work package:** Portfolio map
+- **Steps (how to do it):** 1. Left panel: list of sites with the details DATOMS provides (name, location, type, status).
+  2. Two summary tiles at the top: number of projects, number of districts.
+  3. Click a project in the list = same as clicking its pin.
+- **Output when done:** Project list beside the map
+- **Now done by:** Colleague (frontend)
+- **Requirement:** Brief mockups
+- **Depends on:** S2-01
+- **Estimate (days):** 2
+- **Acceptance check:** List matches mockup: name, district, type tag, client, consultant, PM
+
+### S2-05 · Search and filters
+- **Sprint:** S2
+- **Week:** W2
+- **Work package:** Portfolio map
+- **Steps (how to do it):** 1. Search box filters the list and pins by name.
+  2. Filter chips: status, type, district.
+  3. Filters call GET /projects with parameters.
+- **Output when done:** Users can find any project fast
+- **Now done by:** Colleague (frontend)
+- **Requirement:** Brief mockups
+- **Depends on:** S2-01
+- **Estimate (days):** 2
+- **Acceptance check:** Filter by status, type, district; search by name
+
+### S2-06 · Users and roles API: group-to-role mapping, project assignment, extra permissions
+- **Sprint:** S2
+- **Week:** W2
+- **Work package:** Admin console
+- **Steps (how to do it):** 1. Endpoint listing Entra groups and their Nexus role.
+  2. Endpoints to assign users to projects. Keep room for extra permissions that later modules will need.
+  3. Admin only; every change goes to the audit log.
+- **Output when done:** Backend for managing access
+- **Now done by:** You (backend)
+- **Requirement:** Innovo: permissions
+- **Depends on:** S1-02
+- **Estimate (days):** 2
+- **Acceptance check:** Changes take effect on next request
+
+### S3-01 · Catalogue sync (hourly): sites, devices, parameters, units
+- **Sprint:** S3
+- **Week:** W1
+- **Work package:** DATOMS connector
+- **Steps (how to do it):** 1. Scheduled job in apps/worker, every hour.
+  2. Read all DATOMS sites, devices and parameters (name, unit).
+  3. Insert new ones, update changed ones in the database.
+- **Output when done:** Nexus always knows every DATOMS site and device
+- **Now done by:** You (backend)
+- **Requirement:** Innovo: show all DATOMS data
+- **Depends on:** S2-02
+- **External blocker:** DATOMS API docs + read-only key
+- **Estimate (days):** 2
+- **Acceptance check:** New DATOMS site appears in Nexus within 1 hour
+
+### S3-02 · Auto-link new sites and devices on exact match; others to admin to-do list
+- **Sprint:** S3
+- **Week:** W1
+- **Work package:** DATOMS connector
+- **Steps (how to do it):** 1. When a new DATOMS site appears, link it to a Nexus project if the name matches exactly.
+  2. Otherwise add it to an 'unlinked' list for admins.
+  3. Same for devices → assets.
+- **Output when done:** New sites appear automatically, no guessing
+- **Now done by:** You (backend)
+- **Requirement:** Innovo: sites added automatically
+- **Depends on:** S3-01
+- **Estimate (days):** 2
+- **Acceptance check:** No guessed links; unmatched items listed
+
+### S3-03 · Live sync (every minute): latest values and statuses to readings + latest value table
+- **Sprint:** S3
+- **Week:** W1–W2
+- **Work package:** DATOMS connector
+- **Steps (how to do it):** 1. Job every minute: get latest values and statuses for all devices.
+  2. Write them to 'reading' (history) and 'latest_value' (current).
+  3. Insert in batches.
+  4. Log how long each run takes.
+- **Output when done:** Live DATOMS data in Nexus within 60 seconds
+- **Now done by:** You (backend)
+- **Requirement:** Brief: real-time visibility
+- **Depends on:** S3-01
+- **Estimate (days):** 2
+- **Acceptance check:** Value in Nexus within 60 s of DATOMS
+
+### S3-04 · History backfill and gap repair after outages
+- **Sprint:** S3
+- **Week:** W2
+- **Work package:** DATOMS connector
+- **Steps (how to do it):** 1. On first run, copy all past data from DATOMS (since Jul 2026 for GHAFWOODS).
+  2. Record the last time synced per device.
+  3. After an outage, fetch the missing time range.
+  4. Test by stopping the worker for an hour.
+- **Output when done:** Full history, no gaps after outages
+- **Now done by:** You (backend)
+- **Requirement:** Brief: trends
+- **Depends on:** S3-03
+- **Estimate (days):** 2
+- **Acceptance check:** GHAFWOODS history since Jul 2026 loaded; gaps refilled after a forced outage
+
+### S3-05 · Device linking to-do list
+- **Sprint:** S3
+- **Week:** W1–W2
+- **Work package:** Admin console
+- **Steps (how to do it):** 1. Page listing unlinked DATOMS sites/devices (from S4-02).
+  2. Admin picks the project/asset to link each one to.
+- **Output when done:** Admins link anything not matched automatically
+- **Now done by:** Colleague (frontend)
+- **Requirement:** Innovo: sites added automatically
+- **Depends on:** S3-02
+- **Estimate (days):** 2
+- **Acceptance check:** Admin links an unmatched device to a project
+
+### S3-06 · Integration health page: last sync, errors, delay
+- **Sprint:** S3
+- **Week:** W2
+- **Work package:** Admin console
+- **Steps (how to do it):** 1. Page showing: last successful sync time, number of errors, delay in minutes.
+  2. Red warning if the sync has stopped.
+- **Output when done:** Admins see if DATOMS data is flowing
+- **Now done by:** Colleague (frontend)
+- **Requirement:** Risks: DATOMS outage
+- **Depends on:** S3-03
+- **Estimate (days):** 1
+- **Acceptance check:** Shows a stopped sync clearly
+
+### S3-07 · Users and roles screen: group-to-role mapping, project assignment
+- **Sprint:** S3
+- **Week:** W2
+- **Work package:** Admin console
+- **Steps (how to do it):** 1. Page listing groups and roles (from S3-09).
+  2. Assign users to projects.
+  3. Show each user's role and projects.
+- **Output when done:** Admins manage who sees what
+- **Now done by:** Colleague (frontend)
+- **Requirement:** Innovo: permissions
+- **Depends on:** S2-06
+- **Estimate (days):** 2
+- **Acceptance check:** Admin assigns a user to a project
+
+### S4-01 · Chart summaries (5-minute, 1-hour, 1-day) as Nexus rollup tables
+- **Sprint:** S4
+- **Week:** W1
+- **Work package:** Project page
+- **Steps (how to do it):** 1. Use the rollup functions in db/schema.sql: telemetry.refresh_rollup_5m and refresh_rollup_combine (1 h, 1 day in Asia/Dubai).
+  2. Worker rollups job runs every minute for the recent window and re-runs for late data.
+  3. Check a 30-day query returns in under 1 second.
+- **Output when done:** Fast data for every chart
+- **Now done by:** You (backend)
+- **Requirement:** Brief: trends
+- **Depends on:** S3-03
+- **Estimate (days):** 1
+- **Acceptance check:** 30-day chart query under 1 s
+
+### S4-02 · Live push: status changes sent to open browsers (Web PubSub)
+- **Sprint:** S4
+- **Week:** W1
+- **Work package:** Project page
+- **Steps (how to do it):** 1. When the worker sees a status or value change, publish a message to Azure Web PubSub (per project channel).
+  2. API gives the browser a Web PubSub token for only the projects it may see.
+- **Output when done:** Changes pushed to browsers live
+- **Now done by:** You (backend)
+- **Requirement:** Brief: real-time visibility
+- **Depends on:** S3-03
+- **Estimate (days):** 2
+- **Acceptance check:** Pin colour changes without refresh
+
+### S4-03 · Project summary API for the equipment and energy info boxes
+- **Sprint:** S4
+- **Week:** W1–W2
+- **Work package:** Project page
+- **Steps (how to do it):** 1. Endpoint GET /projects/{id}/summary returning the equipment and energy info boxes.
+  2. Fill them from latest DATOMS values. Manpower and materials are added later once their source is known.
+- **Output when done:** One call loads the project page
+- **Now done by:** You (backend)
+- **Requirement:** Sheet: L1 Info boxes
+- **Depends on:** S3-03
+- **Estimate (days):** 2
+- **Acceptance check:** One call returns all four boxes
+
+### S4-04 · Project page layout: site map, side panel, equipment and energy info boxes (space kept for manpower and materials later)
+- **Sprint:** S4
+- **Week:** W1
+- **Work package:** Project page
+- **Steps (how to do it):** 1. Project page: site map in the centre, equipment and energy info boxes on the right (as structure sheet level 1); leave space for manpower and materials.
+  2. Load data from S5-03.
+  3. Back button returns to the portfolio map.
+- **Output when done:** Level 1 project page
+- **Now done by:** Colleague (frontend)
+- **Requirement:** Sheet: Level 1
+- **Depends on:** S4-03
+- **Estimate (days):** 2
+- **Acceptance check:** Matches structure sheet level 1
+
+### S4-05 · Asset pins: icon per type, colour per DATOMS status, clustering, map/satellite switch
+- **Sprint:** S4
+- **Week:** W1–W2
+- **Work package:** Project page
+- **Steps (how to do it):** 1. Draw one pin per asset at its DATOMS location.
+  2. Icon by type: tower crane, hoist, equipment, generator.
+  3. Colour by DATOMS status: Running green, Idle amber, Maintenance red, Off grey.
+  4. Turn on clustering and a Map/Satellite switch.
+- **Output when done:** Live equipment pins on the site map
+- **Now done by:** Colleague (frontend)
+- **Requirement:** Sheet: L1 blinkers on map
+- **Depends on:** S3-03
+- **External blocker:** DATOMS: does API return location + status?
+- **Estimate (days):** 2
+- **Acceptance check:** Running green, Idle amber, Maintenance red, Off grey as reported
+
+### S4-06 · Live updates on pins and boxes (WebSocket)
+- **Sprint:** S4
+- **Week:** W2
+- **Work package:** Project page
+- **Steps (how to do it):** 1. Connect to Web PubSub with the token from the API.
+  2. When a message arrives, update that pin's colour and the info box numbers without reloading.
+- **Output when done:** Map and boxes update live
+- **Now done by:** Colleague (frontend)
+- **Requirement:** Brief: real-time visibility
+- **Depends on:** S4-02
+- **Estimate (days):** 1
+- **Acceptance check:** Update visible within a minute
+
+### S4-07 · Asset side panel: live readings, faults, last run
+- **Sprint:** S4
+- **Week:** W2
+- **Work package:** Project page
+- **Steps (how to do it):** 1. Click a pin = side panel with the asset's latest readings, faults and last run.
+  2. Link to the equipment detail page.
+- **Output when done:** Asset details on click
+- **Now done by:** Colleague (frontend)
+- **Requirement:** DATOMS parity
+- **Depends on:** S4-03
+- **Estimate (days):** 1
+- **Acceptance check:** Opens on pin click
+
+### S5-01 · Energy API: generators, solar, mains, loads by area, site totals and CO2 as reported by DATOMS
+- **Sprint:** S5
+- **Week:** W1
+- **Work package:** Energy
+- **Steps (how to do it):** 1. Endpoint returning per project: generators (running/total), solar generation, mains, total load, loads by area, site totals and CO2 exactly as DATOMS gives them.
+  2. Compare with the DATOMS Site View for GHAFWOODS; numbers must match.
+- **Output when done:** Energy data for box 3 and the energy page
+- **Now done by:** You (backend)
+- **Requirement:** Brief: energy monitoring; Sheet: L2 Energy
+- **Depends on:** S3-03
+- **External blocker:** DATOMS: are site totals in the API?
+- **Estimate (days):** 3
+- **Acceptance check:** Figures match DATOMS Site View for GHAFWOODS
+
+### S5-02 · Energy equipment table data incl. owned / hired
+- **Sprint:** S5
+- **Week:** W1
+- **Work package:** Energy
+- **Steps (how to do it):** 1. Endpoint listing energy equipment: DG ID, description, type (DG/solar/mains), status, owned or hired.
+  2. Ownership comes from the Nexus asset register.
+- **Output when done:** Data for the energy table
+- **Now done by:** You (backend)
+- **Requirement:** Sheet: L2 Energy
+- **Depends on:** S5-01
+- **Estimate (days):** 1
+- **Acceptance check:** DG ID, description, status, ownership returned
+
+### S5-03 · Trend endpoints: day, week, month, year from summaries
+- **Sprint:** S5
+- **Week:** W2
+- **Work package:** Energy
+- **Steps (how to do it):** 1. Endpoints for trends by day, week, month, year.
+  2. Read from the summaries in S5-01, never raw readings.
+- **Output when done:** Trend data for charts
+- **Now done by:** You (backend)
+- **Requirement:** Sheet: L2 trend graphs
+- **Depends on:** S4-01
+- **Estimate (days):** 2
+- **Acceptance check:** Each range under 1 s
+
+### S5-04 · Load-test harness: simulate 100+ sites and 1,000 users
+- **Sprint:** S5
+- **Week:** W2
+- **Work package:** Scale
+- **Steps (how to do it):** 1. Write a script (e.g. k6) that simulates 100+ sites of data and 1,000 users opening pages.
+  2. Run it against dev and record response times.
+- **Output when done:** Repeatable load test
+- **Now done by:** You (backend)
+- **Requirement:** Innovo: scalable
+- **Estimate (days):** 2
+- **Acceptance check:** Repeatable test script in repo
+
+### S5-05 · Info box 3 Energy
+- **Sprint:** S5
+- **Week:** W1
+- **Work package:** Energy
+- **Steps (how to do it):** 1. Info box 3 on the project page: DGs running/total, total energy load, solar generation, main:solar ratio (structure sheet).
+  2. Click = open energy detail.
+- **Output when done:** Energy info box
+- **Now done by:** Colleague (frontend)
+- **Requirement:** Sheet: L1 Info box 3
+- **Depends on:** S4-03
+- **Estimate (days):** 1
+- **Acceptance check:** DG running state, energy load, solar, main:solar ratio
+
+### S5-06 · Energy detail: top ribbon of metrics
+- **Sprint:** S5
+- **Week:** W1
+- **Work package:** Energy
+- **Steps (how to do it):** 1. Top ribbon on the energy page with the key energy numbers.
+  2. Data from S6-01.
+- **Output when done:** Energy summary ribbon
+- **Now done by:** Colleague (frontend)
+- **Requirement:** Sheet: L2 Energy
+- **Depends on:** S5-01
+- **Estimate (days):** 1
+- **Acceptance check:** Matches sheet
+
+### S5-07 · Energy equipment table
+- **Sprint:** S5
+- **Week:** W1–W2
+- **Work package:** Energy
+- **Steps (how to do it):** 1. Table: DG ID, description, status, ownership (owned/hired), running/off.
+  2. Sort and filter.
+- **Output when done:** Energy equipment table
+- **Now done by:** Colleague (frontend)
+- **Requirement:** Sheet: L2 Energy
+- **Depends on:** S5-02
+- **Estimate (days):** 2
+- **Acceptance check:** Sortable; status live
+
+### S5-08 · Energy charts: load trends, distribution, solar trends
+- **Sprint:** S5
+- **Week:** W2
+- **Work package:** Energy
+- **Steps (how to do it):** 1. Charts: load trend, load distribution, solar trend.
+  2. Range buttons: day, week, month, year.
+  3. Data from S6-03.
+- **Output when done:** Energy charts
+- **Now done by:** Colleague (frontend)
+- **Requirement:** Sheet: L2 Energy
+- **Depends on:** S5-03
+- **Estimate (days):** 3
+- **Acceptance check:** Range switch day/week/month/year
+
+### S6-01 · Equipment API: ID, name, type, make/model, status + native DATOMS fields
+- **Sprint:** S6
+- **Week:** W1
+- **Work package:** Equipment
+- **Steps (how to do it):** 1. Endpoint listing equipment per project: ID, name, type, make/model, current status.
+  2. Include every extra parameter DATOMS sends for that device.
+- **Output when done:** Data for the equipment table
+- **Now done by:** You (backend)
+- **Requirement:** Brief: crane utilisation, asset tracking; Sheet: L2 Equipment
+- **Depends on:** S3-03
+- **Estimate (days):** 2
+- **Acceptance check:** All DATOMS parameters available per asset
+
+### S6-02 · Device card API: latest values, today's running timeline
+- **Sprint:** S6
+- **Week:** W1–W2
+- **Work package:** Equipment
+- **Steps (how to do it):** 1. Endpoint for one device: latest values of every parameter.
+  2. Today's timeline of status changes (running, idle, off) from DATOMS events.
+- **Output when done:** Data for the device card
+- **Now done by:** You (backend)
+- **Requirement:** Sheet: L2 Equipment
+- **Depends on:** S6-01
+- **Estimate (days):** 2
+- **Acceptance check:** Timeline matches DATOMS events
+
+### S6-03 · Info box 2 counts: tower cranes, hoists, all equipment (total / idle)
+- **Sprint:** S6
+- **Week:** W2
+- **Work package:** Equipment
+- **Steps (how to do it):** 1. Counts per project: tower cranes total/idle, hoists total/idle, all equipment total/idle, using DATOMS statuses.
+  2. Add to the project summary (S5-03).
+- **Output when done:** Numbers for info box 2
+- **Now done by:** You (backend)
+- **Requirement:** Sheet: L1 Info box 2
+- **Depends on:** S6-01
+- **Estimate (days):** 1
+- **Acceptance check:** Counts follow DATOMS statuses
+
+### S6-04 · Notifications sync from DATOMS and API (filter by site, asset, type)
+- **Sprint:** S6
+- **Week:** W2
+- **Work package:** Notifications
+- **Steps (how to do it):** 1. Worker job every minute: fetch DATOMS notifications and faults.
+  2. Store them; endpoint to list with filters: site, asset, type, date.
+  3. Show them exactly as DATOMS sends them.
+- **Output when done:** Notifications in Nexus
+- **Now done by:** You (backend)
+- **Requirement:** Innovo: alerts as they come
+- **Depends on:** S3-01
+- **External blocker:** DATOMS: notifications in API?
+- **Estimate (days):** 2
+- **Acceptance check:** Same notifications as DATOMS, newest first
+
+### S6-05 · Info box 2 component
+- **Sprint:** S6
+- **Week:** W1
+- **Work package:** Equipment
+- **Steps (how to do it):** 1. Info box 2: tower cranes count/idle, hoists count/idle, total equipment/idle (structure sheet).
+  2. Click = open equipment detail.
+- **Output when done:** Equipment info box
+- **Now done by:** Colleague (frontend)
+- **Requirement:** Sheet: L1 Info box 2
+- **Depends on:** S6-03
+- **Estimate (days):** 1
+- **Acceptance check:** Count / idle per type
+
+### S6-06 · Equipment detail table: sort, filter by type and status
+- **Sprint:** S6
+- **Week:** W1
+- **Work package:** Equipment
+- **Steps (how to do it):** 1. Table with Equipment ID, Name, Type, Model/Make, Current Status + extra DATOMS fields.
+  2. Filter by type and status; sort; search.
+- **Output when done:** Equipment detail page
+- **Now done by:** Colleague (frontend)
+- **Requirement:** Sheet: L2 Equipment
+- **Depends on:** S6-01
+- **Estimate (days):** 2
+- **Acceptance check:** All sheet columns plus native fields
+
+### S6-07 · Device card
+- **Sprint:** S6
+- **Week:** W2
+- **Work package:** Equipment
+- **Steps (how to do it):** 1. Card opened from a table row or a map pin.
+  2. Shows all latest values and today's timeline.
+- **Output when done:** Device card
+- **Now done by:** Colleague (frontend)
+- **Requirement:** Sheet: L2 Equipment
+- **Depends on:** S6-02
+- **Estimate (days):** 2
+- **Acceptance check:** Opens from table row or pin
+
+### S6-08 · Notifications bell and list with filters
+- **Sprint:** S6
+- **Week:** W2
+- **Work package:** Notifications
+- **Steps (how to do it):** 1. Bell in header shows unread count.
+  2. Click = list of notifications, newest first, with filters.
+- **Output when done:** Notifications in the header
+- **Now done by:** Colleague (frontend)
+- **Requirement:** Innovo: alerts as they come
+- **Depends on:** S6-04
+- **Estimate (days):** 2
+- **Acceptance check:** Unread count; filter by site and asset
+
+### S7-01 · Explorer API: any device, any parameter, time range, min / avg / max, compare
+- **Sprint:** S7
+- **Week:** W1
+- **Work package:** DATOMS explorer
+- **Steps (how to do it):** 1. Endpoint: for any device, list its parameters.
+  2. Endpoint: values for chosen parameters and time range, with min / average / max.
+  3. Works for any new parameter without code changes.
+- **Output when done:** Data for 'all DATOMS data'
+- **Now done by:** You (backend)
+- **Requirement:** Innovo: show all DATOMS data
+- **Depends on:** S4-01
+- **Estimate (days):** 2
+- **Acceptance check:** New parameter types appear with no code change
+
+### S7-02 · Security hardening: private endpoints, key rotation, firewall rules
+- **Sprint:** S7
+- **Week:** W2
+- **Work package:** Security
+- **Steps (how to do it):** 1. Put PostgreSQL and Blob behind private endpoints.
+  2. Rotate keys in Key Vault.
+  3. Firewall: only Container Apps can reach the database.
+- **Output when done:** Data not reachable from the internet
+- **Now done by:** You (backend)
+- **Requirement:** Innovo: security
+- **Estimate (days):** 2
+- **Acceptance check:** Databases unreachable from internet
+
+### S7-03 · Explorer screens: site and device picker, parameter tiles, chart with ranges and compare
+- **Sprint:** S7
+- **Week:** W1–W2
+- **Work package:** DATOMS explorer
+- **Steps (how to do it):** 1. Pick site, then device.
+  2. Tiles with latest value of every parameter.
+  3. Click a parameter = chart with ranges (24 h, 7 days, 30 days, custom) and min/avg/max.
+  4. Compare several parameters on one chart.
+- **Output when done:** Explorer showing all DATOMS data
+- **Now done by:** Colleague (frontend)
+- **Requirement:** Innovo: show all DATOMS data
+- **Depends on:** S7-01
+- **Estimate (days):** 3
+- **Acceptance check:** Matches DATOMS parameter view
+
+### S7-04 · Automated permission tests for every role
+- **Sprint:** S7
+- **Week:** W1
+- **Work package:** Hardening
+- **Steps (how to do it):** 1. Create a test user for each role.
+  2. Automated tests: each role can open what it should, and is refused everything else.
+- **Output when done:** Permissions proven by tests
+- **Now done by:** You (backend)
+- **Requirement:** Innovo: permissions
+- **Depends on:** S2-06
+- **Estimate (days):** 2
+- **Acceptance check:** Every role's allowed and denied paths covered
+
+### S7-05 · Production environment from code
+- **Sprint:** S7
+- **Week:** W2
+- **Work package:** Hardening
+- **Steps (how to do it):** 1. Deploy 'nexus-prod' from the same Bicep files.
+  2. Separate keys and Entra settings for production.
+- **Output when done:** Production environment ready
+- **Now done by:** You (backend)
+- **Requirement:** Foundation
+- **Depends on:** S0-02
+- **Estimate (days):** 1
+- **Acceptance check:** Prod built from the same Bicep files
+
+### S7-06 · Tablet and mobile polish
+- **Sprint:** S7
+- **Week:** W1
+- **Work package:** Hardening
+- **Steps (how to do it):** 1. Test every screen on a phone and a tablet.
+  2. Fix layouts, touch targets, drawers.
+- **Output when done:** Polished tablet and mobile
+- **Now done by:** Colleague (frontend)
+- **Requirement:** Innovo: devices
+- **Estimate (days):** 2
+- **Acceptance check:** All screens usable on phone and tablet
+
+### S7-07 · Stale and missing data states: last updated, gaps shown as gaps
+- **Sprint:** S7
+- **Week:** W1
+- **Work package:** Hardening
+- **Steps (how to do it):** 1. Show 'last updated' on every live box.
+  2. Show missing data as a gap in charts, never as zero.
+  3. Grey 'offline' state when DATOMS reports it.
+- **Output when done:** Users can trust what they see
+- **Now done by:** Colleague (frontend)
+- **Requirement:** Risks: data quality
+- **Estimate (days):** 2
+- **Acceptance check:** No zeros shown for missing data
+
+### S8-01 · Load test 100+ sites and 1,000 users; fix bottlenecks
+- **Sprint:** S8
+- **Week:** W1
+- **Work package:** Hardening
+- **Steps (how to do it):** 1. Run the S6-04 load test at 100+ sites and 1,000 users.
+  2. Find slow endpoints; add indexes or caching.
+  3. Re-run until pages load in under 2 seconds.
+- **Output when done:** Proven performance at scale
+- **Now done by:** You (backend)
+- **Requirement:** Innovo: scalable
+- **Depends on:** S5-04
+- **Estimate (days):** 3
+- **Acceptance check:** Pages under 2 s at target load
+
+### S8-02 · Backups, restore test, monitoring alerts (sync stopped, error spikes)
+- **Sprint:** S8
+- **Week:** W2
+- **Work package:** Hardening
+- **Steps (how to do it):** 1. Turn on daily database backups; do one restore test.
+  2. Alerts in Application Insights: sync stopped, error spike, slow responses.
+- **Output when done:** Backups and alerts working
+- **Now done by:** You (backend)
+- **Requirement:** Risks
+- **Estimate (days):** 2
+- **Acceptance check:** Restore proven; alert fires on stopped sync
+
+### S8-03 · Accessibility and performance pass
+- **Sprint:** S8
+- **Week:** W2
+- **Work package:** Hardening
+- **Steps (how to do it):** 1. Keyboard navigation and visible focus.
+  2. Check contrast.
+  3. Reduce bundle size; lazy-load heavy pages.
+- **Output when done:** Accessible and fast
+- **Now done by:** Colleague (frontend)
+- **Requirement:** Quality
+- **Estimate (days):** 2
+- **Acceptance check:** Keyboard navigation; fast first load
+
+### S8-04 · Report a data issue link
+- **Sprint:** S8
+- **Week:** W2
+- **Work package:** Hardening
+- **Steps (how to do it):** 1. 'Report a data issue' link on data boxes.
+  2. Sends the site, asset and description to the site/technical team contact.
+- **Output when done:** Data problems reach the right team
+- **Now done by:** Colleague (frontend)
+- **Requirement:** Risks: data quality
+- **Estimate (days):** 1
+- **Acceptance check:** Sends issue to site/technical team contact
+
+### S8-05 · Penetration test and fixes
+- **Sprint:** S8
+- **Week:** W1
+- **Work package:** Pilot
+- **Steps (how to do it):** 1. Book an external penetration test.
+  2. Fix all high and critical findings.
+  3. Re-test.
+- **Output when done:** Security signed off
+- **Now done by:** You (backend)
+- **Requirement:** Innovo: security
+- **Depends on:** S7-05
+- **External blocker:** External pen-test slot
+- **Estimate (days):** 3
+- **Acceptance check:** No high or critical findings open
+
+### S8-06 · Short user guide
+- **Sprint:** S8
+- **Week:** W2
+- **Work package:** Pilot
+- **Steps (how to do it):** 1. One-page guide per role: how to find a project, read the boxes, open details.
+- **Output when done:** User guide
+- **Now done by:** Both
+- **Requirement:** Adoption
+- **Estimate (days):** 2
+- **Acceptance check:** One-page guide per role
+
+### S9-01 · Runbook and handover docs
+- **Sprint:** S9
+- **Week:** W2
+- **Work package:** Pilot
+- **Steps (how to do it):** 1. Write: how to deploy, how to restore, how to add a new data source, who to call when DATOMS is down.
+- **Output when done:** Runbook so anyone can operate Nexus
+- **Now done by:** You (backend)
+- **Requirement:** Risks: knowledge
+- **Estimate (days):** 2
+- **Acceptance check:** New developer can deploy from the docs
+
+### S9-02 · User acceptance testing on GHAFWOODS with pilot users
+- **Sprint:** S9
+- **Week:** W1
+- **Work package:** Pilot
+- **Steps (how to do it):** 1. Give pilot users access on GHAFWOODS.
+  2. Walk through each screen with them.
+  3. Record issues in the backlog.
+- **Output when done:** Pilot feedback list
+- **Now done by:** Both
+- **Requirement:** Brief objectives
+- **External blocker:** Pilot users' time
+- **Estimate (days):** 2
+- **Acceptance check:** Pilot users sign off each screen
+
+### S9-03 · Bug fixes from pilot (backend)
+- **Sprint:** S9
+- **Week:** W1–W2
+- **Work package:** Pilot
+- **Steps (how to do it):** 1. Fix backend issues from the pilot, most important first.
+- **Output when done:** Backend pilot issues closed
+- **Now done by:** You (backend)
+- **Depends on:** S9-02
+- **Estimate (days):** 3
+- **Acceptance check:** All pilot blockers fixed
+
+### S9-04 · Bug fixes from pilot (frontend)
+- **Sprint:** S9
+- **Week:** W1–W2
+- **Work package:** Pilot
+- **Steps (how to do it):** 1. Fix frontend issues from the pilot, most important first.
+- **Output when done:** Frontend pilot issues closed
+- **Now done by:** Colleague (frontend)
+- **Depends on:** S9-02
+- **Estimate (days):** 3
+- **Acceptance check:** All pilot blockers fixed
+
+### S10-01 · Connect all DATOMS sites to production; verify auto-linking
+- **Sprint:** S10
+- **Week:** W1
+- **Work package:** Rollout
+- **Steps (how to do it):** 1. Point production at all DATOMS sites.
+  2. Check every site links to the right project; clear the admin to-do list.
+- **Output when done:** All sites live
+- **Now done by:** You (backend)
+- **Requirement:** Innovo: many sites
+- **Depends on:** S9-03
+- **Estimate (days):** 3
+- **Acceptance check:** Every DATOMS site visible with correct project
+
+### S10-02 · Production monitoring and cost review
+- **Sprint:** S10
+- **Week:** W1–W2
+- **Work package:** Rollout
+- **Steps (how to do it):** 1. Set Azure cost alerts.
+  2. Review first month's cost and performance.
+- **Output when done:** Running costs under control
+- **Now done by:** You (backend)
+- **Requirement:** Risks: cost
+- **Estimate (days):** 2
+- **Acceptance check:** Cost alerts set; first monthly review done
+
+### S10-03 · Onboarding sessions with site teams
+- **Sprint:** S10
+- **Week:** W1–W2
+- **Work package:** Rollout
+- **Steps (how to do it):** 1. Short session per site team.
+  2. Name a champion per site.
+- **Output when done:** Site teams using Nexus
+- **Now done by:** Both
+- **Requirement:** Adoption
+- **Estimate (days):** 2
+- **Acceptance check:** Each site has a champion trained
+
+### S10-04 · Phase 2 backlog grooming (reporting feed, BIM, AI)
+- **Sprint:** S10
+- **Week:** W2
+- **Work package:** Rollout
+- **Steps (how to do it):** 1. List phase 2 items (reporting feed, BIM, AI).
+  2. Estimate and order them.
+- **Output when done:** Phase 2 backlog ready
+- **Now done by:** Both
+- **Requirement:** Future
+- **Estimate (days):** 1
+- **Acceptance check:** Phase 2 backlog estimated
+
+### S10-05 · UI fixes from rollout feedback
+- **Sprint:** S10
+- **Week:** W1–W2
+- **Work package:** Rollout
+- **Steps (how to do it):** 1. Fix UI feedback from rollout, most important first.
+- **Output when done:** Rollout feedback closed
+- **Now done by:** Colleague (frontend)
+- **Estimate (days):** 3
+- **Acceptance check:** Feedback items closed

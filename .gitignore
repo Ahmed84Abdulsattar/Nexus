@@ -1,0 +1,28 @@
+# dependencies and builds
+node_modules/
+dist/
+build/
+coverage/
+.turbo/
+*.tsbuildinfo
+
+# secrets: never commit
+.env
+.env.local
+**/.env
+.env.*
+!.env.example
+*.pem
+*.pfx
+
+# Claude Code personal settings (shared settings are .claude/settings.json)
+.claude/settings.local.json
+
+# editors / OS
+.DS_Store
+Thumbs.db
+.idea/
+
+# generated
+playwright-report/
+test-results/
