@@ -12,7 +12,7 @@
 | Level | Tool | What |
 |---|---|---|
 | Unit | Vitest | datoms-client (paging, 422 halving, 429 Retry-After, budget windows, mapping), access logic, formatting, map marker mapping |
-| Integration | Vitest + Testcontainers (Postgres 16) + supertest | Every API endpoint, including a **403/404 out-of-scope test for every endpoint**; worker pipeline writing fixtures to the DB; rollup functions; partition maintenance |
+| Integration | Vitest + Testcontainers (Postgres 16) + supertest | Every API endpoint, including a **403/404 out-of-scope test for every endpoint**; live subscriptions refuse out-of-scope projects and connections are closed on revocation; worker pipeline writing fixtures to the DB; closed-bucket rollups and late packets; safe catalogue retire; partition maintenance |
 | Contract | zod schemas vs live DATOMS (nightly, read-only) and vs fixtures (every PR) | DATOMS response shapes |
 | Component | Vitest + Testing Library + MSW | Info boxes, tables, side panel, states (loading, empty, error, stale) |
 | End-to-end | Playwright (desktop + phone viewports) | Sign in (test tenant or mocked MSAL), portfolio → project → asset, equipment table, energy page, notifications, admin access change |
@@ -25,7 +25,11 @@
 - Never use production data in tests.
 
 ## Code review checklist
-- [ ] Nothing outside `datoms-client` / `connectors/datoms` knows DATOMS details.
+- [ ] Nothing outside `datoms-client` / `connectors/datoms` knows DATOMS details. DATOMS field names appear only in `packages/datoms-client/src/mapping.ts`.
+- [ ] Telemetry comes only from the bulk endpoint; `data/latest` only in CLI scripts (ADR 0010).
+- [ ] Equipment lists, counts, map layers and views filter `kind = 'equipment'` (ADR 0009).
+- [ ] Live push messages carry no parameter values, and nothing project-specific goes to `portfolio` (ADR 0008).
+- [ ] No per-poll writes beyond packets, latest values and real changes (`06` §4).
 - [ ] No hard-coded sites, asset types, parameters or statuses.
 - [ ] Every endpoint has `@RequirePermission`, and project data goes through `withProjectScope`.
 - [ ] No status, threshold or alert invented by Nexus.

@@ -54,26 +54,30 @@ timings of the queries in docs/06-database.md section 5. Generate Kysely types i
 ### Prompt 3: DATOMS client and API testing (S2-02)
 ```
 Use the datoms-integration agent. Build packages/datoms-client exactly as docs/07-datoms-integration.md section 4
-(paging, budget tracker with all windows and the monthly allowance, adaptive interval, 422 halving with the resume formula,
-429 Retry-After, backoff, timeouts, X-RateLimit-Unit handling, logging without the token, mapping to Source* types).
+(paging, budget tracker with all windows, budget.max_share and the monthly allowance, adaptive interval, 422 halving with
+the resume formula and learned page size, 429 Retry-After, backoff, timeouts, X-RateLimit-Unit handling, logging without
+the token, mapping to Source* types ONLY in src/mapping.ts, built against the v4 PDF shape until the DATOMS sample (Q21) arrives).
 Implement packages/connectors/datoms (SourceConnector). Add CLI scripts: check, assets, latest <id>, bulk, poll --minutes N, record.
 Fixtures by default; live only with DATOMS_LIVE=true. Full unit tests with fixtures.
 ```
 Then run the scripts yourself with your token to test the real API and record real fixtures.
 
-### Prompt 4: worker (S3-01 – S3-04, S4-01)
+### Prompt 4: worker (S3-01 – S3-03, S4-01; S3-04 is on hold, ADR 0010)
 ```
 Use the datoms-integration agent. Build apps/worker as docs/07 section 5 and docs/06 section 4:
-leader lock; catalogue-sync (hourly, auto-link, retire, link_todo); live-poll (60 s adaptive, change detection,
-packets/latest/status/location, publish to Web PubSub per project with the docs/10 message format);
-rollups (every minute); maintenance (daily partitions and retention); sync_run and api_call records; OpenTelemetry metrics.
-Integration test with Testcontainers. Replay test at 5,000 assets showing poll + writes under 30 s.
+leader lock; catalogue-sync (hourly, auto-link, safe retire, link_todo); live-poll (bulk endpoint only, per-type
+intervals, env subset and budget share, change detection, packets/latest/status/location/alerts, no per-poll
+bookkeeping writes, slim Web PubSub messages per project in the docs/10 format);
+rollups (SQL once per CLOSED 5-minute bucket, 2 poll intervals after it ends; then 1 h and 1 d; ADR 0007);
+maintenance (daily partitions and retention); sync_run and api_call records; OpenTelemetry metrics.
+Integration test with Testcontainers. Replay test at 5,000 assets showing poll + writes under 30 s and the
+closed-bucket refresh under 30 s.
 ```
 
 ### Prompt 5: auth and access (S0-04, S1-02, S2-06)
 ```
 Use the backend-api agent. Implement docs/08-auth-and-access.md in apps/api: EntraJwtGuard (jose), app_user upsert,
-AccessContext (cached 5 min, Graph group overage), @RequirePermission with a test that fails if any handler lacks it,
+AccessContext (cached 5 min; groups claim = groups assigned to the app, no Graph, ADR 0008), @RequirePermission with a test that fails if any handler lacks it,
 ProjectScopeGuard (404 when out of scope), withProjectScope() for repositories, /v1/me, /v1/config, audit logging,
 and the admin endpoints for group-roles and project-access. Integration tests for every role.
 ```
@@ -99,7 +103,8 @@ Generate the API client from apps/api/openapi.json and add MSW mocks.
 ```
 Use the frontend agent. Implement docs/09-map-arcgis.md: components/map/types.ts, MapView.tsx, and the arcgis/ adapter
 (lazy-loaded @arcgis/core, API key from /v1/config, MapView for 2D/satellite and SceneView for 3D, client-side FeatureLayer,
-UniqueValueRenderer from tokens, clustering, asset-type icons, pulse on change, applyEdits for live updates, destroy on unmount).
+UniqueValueRenderer from tokens, clustering, asset-type icons, pulse on change in 2D only, simple 3D with the same icons and no
+callouts, applyEdits for live updates, destroy on unmount).
 Then build the portfolio map (S2-03), the project list and filters (S2-04/05), and the project site map with the mode switch (S4-04/05).
 ```
 
@@ -111,7 +116,7 @@ Use the generated API client and TanStack Query hooks; live updates via LiveProv
 
 ### Prompt 10: infrastructure (S0-02, S0-03, S0-07, S7-05)
 ```
-Use the devops agent. Write infra/ Bicep for dev/test/prod per docs/04 and docs/12 section 5, the deploy workflows
+Use the devops agent. Write infra/ Bicep for dev and prod (no test environment, ADR 0008) per docs/04 and docs/12 section 5, the deploy workflows
 (dev on merge, prod on approval, migrations before rollout), dashboards and alerts listed in your instructions, and runbooks.
 ```
 

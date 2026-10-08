@@ -63,13 +63,13 @@ export interface MapViewProps {
 - **Mode switch** (radio): 2D, Satellite or 3D.
   - **2D:** `MapView` + `arcgis/navigation` (or `arcgis/topographic`).
   - **Satellite:** `MapView` + `arcgis/imagery` (or `arcgis/imagery/standard` with labels).
-  - **3D:** `SceneView` + `arcgis/imagery` basemap + `ground: 'world-elevation'`, plus a 3D buildings scene layer where available (Esri / OSM 3D buildings from Living Atlas). Keep the camera tilted (~60°) over the site.
+  - **3D (simple, ADR 0008):** `SceneView` + `arcgis/imagery` basemap + `ground: 'world-elevation'`, plus a 3D buildings scene layer where available (Esri / OSM 3D buildings from Living Atlas). Keep the camera tilted (~60°) over the site. Assets use the **same icons** as 2D. There are no callouts, vertical offsets or pulse in 3D.
   - When switching modes, keep the same layer data and move only the view. Destroy the old view to free memory.
-- **Assets layer:** a client-side `FeatureLayer` with fields `id`, `assetType`, `status`, `name`.
+- **Assets layer:** a client-side `FeatureLayer` with fields `id`, `assetType`, `status`, `name`. It holds equipment only (`kind = 'equipment'`, ADR 0009); site-level records are never drawn.
   - Symbol: an icon per `assetType` (SVG from `assets/icons/asset-types/`, `PictureMarkerSymbol` or `CIMSymbol`).
-  - Colour ring or background per `status`: running green, idle amber, maintenance red, off grey, unknown neutral. In 3D, use `IconSymbol3DLayer` with the same icons and `verticalOffset` callouts.
-- **Blink or pulse:** when a live update changes an asset's status, add a short pulsing graphic (`GraphicsLayer` with an animated CIM symbol or a CSS-animated HTML overlay) for 10 s. Never blink everything all the time.
-- **Live updates:** apply changes with `layer.applyEdits({ updateFeatures })` from `useLiveProject`. Do not rebuild the layer.
+  - Colour ring or background per `status`: running green, idle amber, maintenance red, off grey, unknown neutral. In 3D, use `IconSymbol3DLayer` with the same icons (no callouts).
+- **Blink or pulse (2D only):** when a live update changes an asset's status, add a short pulsing graphic (`GraphicsLayer` with an animated CIM symbol or a CSS-animated HTML overlay) for 10 s. Never blink everything all the time. Q19 asks Innovo whether "blinkers" on the structure sheet means a constant blink.
+- **Live updates:** apply the slim `asset.updated` changes (status, location) with `layer.applyEdits({ updateFeatures })` from `useLiveProject`. Do not rebuild the layer.
 - **Site boundary:** if the source provides a boundary, draw it as a polygon `GraphicsLayer` and fit the view to it. Otherwise fit to the asset markers.
 - **Click:** opens the asset side panel. The map does not navigate away.
 - **Assets without coordinates:** listed in the side panel under "Not on map". They are never placed at a made-up position.
@@ -79,6 +79,7 @@ export interface MapViewProps {
 - The map chunk is ≤ 2 MB gzipped and is lazy-loaded.
 - Only one map view exists at a time. Views are destroyed on unmount (`view.destroy()`).
 - Basemap sessions: one map load per page view. Do not re-create views on every re-render (keep them in refs).
+- Licence usage at scale (basemap, elevation and 3D requests at up to 5,000 users) is planned in `12-scalability.md` §2 and measured in App Insights.
 
 ## 6. Future (do not build now)
 - **BIM:** in the same `SceneView`, add a `BuildingSceneLayer` (I3S from Revit/IFC, published to ArcGIS) or an `IntegratedMeshLayer` from drone surveys. Assets link to model elements through `core.zone.bim_ref` and `bim.element_link`. The alternative is an Autodesk APS viewer route; decide by ADR in phase 3.

@@ -19,9 +19,23 @@ These docs are the single source of truth for people **and** for Claude Code age
 | 12 | `12-scalability.md` | Targets, triggers and actions for growth, load tests |
 | 13 | `13-roadmap-future.md` | Future phases, and the hooks phase 1 must leave |
 | 14 | `14-testing-quality.md` | Definition of done, test pyramid, review checklist |
-| — | `adr/` | Decisions and their reasons |
+| — | `adr/` | Decisions and their reasons (list below) |
 | — | `source/` | Client brief, structure sheet, DATOMS API PDF, sprint sheet (inputs; read-only). Agents read the markdown copies: `brief.md`, `structure.md`, `backlog.md`. |
-| — | `open-questions.md` | Questions waiting on Innovo or DATOMS (Q1–Q8). Never guess these into code. |
+| — | `open-questions.md` | Questions waiting on Innovo or DATOMS (Q1–Q22, including items DATOMS has promised). Never guess these into code. |
+
+## Decision records (`adr/`)
+| ADR | Decision |
+|---|---|
+| 0001 | Modular monolith in a TypeScript monorepo |
+| 0002 | Esri ArcGIS as the map provider |
+| 0003 | PostgreSQL 16 with native partitioning and Nexus rollups, no TimescaleDB (amended by 0007) |
+| 0004 | 60-second bulk polling by one worker; no message queue |
+| 0005 | DATOMS credit budget per environment: only prod polls the full fleet |
+| 0006 | Poll interval per asset type |
+| 0007 | Phase 1 rollups: SQL only, once per closed 5-minute bucket (amends 0003) |
+| 0008 | Operations simplification: app-assigned groups claim, dev + prod only, deferrals, simple 3D, slim live push with server-side subscriptions |
+| 0009 | `core.asset.kind`: physical equipment vs site-level metrics |
+| 0010 | The DATOMS bulk endpoint is the only telemetry source |
 
 ## Which docs each agent must read
 | Agent | Must read |

@@ -6,7 +6,7 @@
 --
 -- Runs on: Azure Database for PostgreSQL Flexible Server 16, and on-prem
 -- PostgreSQL 16. Only extension: pg_trgm (standard contrib, allowed on Azure). Time series = native
--- partitioning + Nexus rollup tables (see docs/adr/0003).
+-- partitioning + Nexus rollup tables (see docs/adr/0003, amended by docs/adr/0007).
 --
 -- Schemas
 --   core         organisations, projects, spatial (BIM-ready), assets, settings
@@ -177,6 +177,8 @@ CREATE TRIGGER project_touch BEFORE UPDATE ON core.project
   FOR EACH ROW EXECUTE FUNCTION core.touch_updated_at();
 
 -- ---- Spatial hierarchy (BIM-ready). Nullable links on assets/events. ----
+-- source_system + external_id: set when a source (BIM, another platform) feeds the row; NULL when
+-- an admin created it. retired_at: never delete (CLAUDE.md rule 8).
 CREATE TABLE core.building (
   id            uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   project_id    uuid NOT NULL REFERENCES core.project(id),
@@ -185,8 +187,10 @@ CREATE TABLE core.building (
   bim_ref       jsonb,          -- e.g. {"ifcGuid": "...", "apsUrn": "...", "i3sLayer": "..."}
   source_system text REFERENCES core.source_system(code),
   external_id   text,
+  retired_at    timestamptz,
   created_at    timestamptz NOT NULL DEFAULT now(),
-  UNIQUE (project_id, name)
+  UNIQUE (project_id, name),
+  UNIQUE (source_system, external_id)
 );
 CREATE TABLE core.level (
   id            uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -195,7 +199,11 @@ CREATE TABLE core.level (
   elevation_m   numeric(8,2),
   sort_order    int NOT NULL DEFAULT 0,
   bim_ref       jsonb,
-  UNIQUE (building_id, name)
+  source_system text REFERENCES core.source_system(code),
+  external_id   text,
+  retired_at    timestamptz,
+  UNIQUE (building_id, name),
+  UNIQUE (source_system, external_id)
 );
 CREATE TABLE core.zone (
   id            uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -205,7 +213,11 @@ CREATE TABLE core.zone (
   kind          text,           -- as reported, e.g. 'laydown', 'gate', 'room'
   boundary      jsonb,          -- GeoJSON polygon
   bim_ref       jsonb,
-  UNIQUE (project_id, name)
+  source_system text REFERENCES core.source_system(code),
+  external_id   text,
+  retired_at    timestamptz,
+  UNIQUE (project_id, name),
+  UNIQUE (source_system, external_id)
 );
 
 -- ---- Asset types. Maps source type names to an icon/category. ----
@@ -217,6 +229,9 @@ CREATE TABLE core.asset_type (
   category      text NOT NULL CHECK (category IN ('equipment','energy','vehicle','environment','other')),
   icon          text NOT NULL DEFAULT 'generic',
   source_names  text[] NOT NULL DEFAULT '{}',  -- e.g. {'DG','Diesel Generator'} as DATOMS names them
+  -- Poll interval for assets of this type (docs/adr/0006). NULL = setting poll.interval_seconds (60).
+  -- Set by an admin only if the credit allowance requires it (open question Q14).
+  poll_interval_seconds int CHECK (poll_interval_seconds IS NULL OR poll_interval_seconds >= 60),
   created_at    timestamptz NOT NULL DEFAULT now()
 );
 
@@ -228,6 +243,11 @@ CREATE TABLE core.asset (
   building_id      uuid REFERENCES core.building(id),
   level_id         uuid REFERENCES core.level(id),
   zone_id          uuid REFERENCES core.zone(id),
+  -- docs/adr/0009: 'equipment' = a physical sensored item of any category (incl. DGs, solar, mains);
+  -- 'site_metric' = values for a whole site as the source reports them (e.g. energy site totals).
+  -- Every equipment list, count, map layer and view filters kind = 'equipment'.
+  -- Set by the connector from source data (rule lives in packages/datoms-client/src/mapping.ts).
+  kind             text NOT NULL DEFAULT 'equipment' CHECK (kind IN ('equipment','site_metric')),
   name             text NOT NULL,
   source_type_name text,                                   -- type exactly as the source names it
   make             text,
@@ -358,7 +378,9 @@ CREATE TABLE telemetry.parameter (
   UNIQUE (source_system, key)
 );
 
--- Which parameters each asset type reports (filled automatically, used by explorer pickers)
+-- Which parameters each asset reports (filled automatically, used by explorer pickers).
+-- Write rule (docs/06 section 4): INSERT only new (asset, parameter) pairs (the worker keeps the known
+-- pairs in memory); refresh last_seen_at at most once a day. Never update it on every poll.
 CREATE TABLE telemetry.asset_parameter (
   asset_id      uuid NOT NULL REFERENCES core.asset(id) ON DELETE CASCADE,
   parameter_id  int  NOT NULL REFERENCES telemetry.parameter(id),
@@ -366,13 +388,14 @@ CREATE TABLE telemetry.asset_parameter (
   PRIMARY KEY (asset_id, parameter_id)
 );
 
--- Latest packet per asset (live screens read only this)
+-- Latest packet per asset (live screens read only this). Updated every poll for every asset:
+-- fillfactor leaves room on each page so updates stay HOT (no index churn).
 CREATE TABLE telemetry.latest_packet (
   asset_id     uuid PRIMARY KEY REFERENCES core.asset(id) ON DELETE CASCADE,
   ts           timestamptz NOT NULL,         -- device-reported time (DATOMS data.time)
   values       jsonb NOT NULL,               -- {"hz":50.0,"rpm":1500,...} exactly as reported
   received_at  timestamptz NOT NULL DEFAULT now()
-);
+) WITH (fillfactor = 70);
 ALTER TABLE telemetry.latest_packet ALTER COLUMN values SET COMPRESSION lz4;
 
 -- Raw packets: one row per asset per device packet (~1/min). Daily partitions.
@@ -384,10 +407,14 @@ CREATE TABLE telemetry.packet (
   PRIMARY KEY (asset_id, ts)
 ) PARTITION BY RANGE (ts);
 ALTER TABLE telemetry.packet ALTER COLUMN values SET COMPRESSION lz4;
-CREATE INDEX packet_ts_idx ON telemetry.packet (ts);   -- for rollup scans by time
+-- For the closed-bucket rollup scans by time (docs/adr/0007). Candidate for BRIN instead of B-tree:
+-- switch only with EXPLAIN ANALYZE evidence from the S2/S3 re-benchmark with real fixtures (docs/06 section 7).
+CREATE INDEX packet_ts_idx ON telemetry.packet (ts);
 
 -- Rollups. stats = {"<param key>": {"min":..,"max":..,"avg":..,"last":..,"n":..}, ...}
--- Only numeric parameters are rolled up. Computed by functions below (worker calls them).
+-- Only numeric parameters are rolled up. Computed by functions below (worker calls them once per
+-- CLOSED bucket, docs/adr/0007). `packets` = samples Nexus stored in the bucket; the API reports it
+-- as data coverage. A compact stats format is decided after the S2/S3 re-benchmark (docs/06 section 6a).
 CREATE TABLE telemetry.rollup_5m (
   asset_id     uuid NOT NULL,
   bucket       timestamptz NOT NULL,
@@ -434,11 +461,13 @@ CREATE TABLE telemetry.asset_status_current (
   asset_id       uuid PRIMARY KEY REFERENCES core.asset(id) ON DELETE CASCADE,
   source_value   text NOT NULL,              -- exactly as reported
   since          timestamptz NOT NULL,       -- when this status started (source time if provided)
-  observed_at    timestamptz NOT NULL,       -- last time we saw it
+  observed_at    timestamptz NOT NULL,       -- when Nexus first observed this status. Written on CHANGE
+                                             -- only, never every poll (latest_packet.received_at has the last poll)
   details        jsonb                       -- extra source status fields (fault codes, etc.)
-);
+) WITH (fillfactor = 80);
 
--- Status changes only (for "today's running timeline", run hours as reported)
+-- Status changes only, as OBSERVED BY NEXUS in polls (for "today's running timeline"; the UI labels it
+-- "observed by Nexus", precision ~ one poll interval; docs/adr/0007)
 CREATE TABLE telemetry.asset_status_history (
   asset_id      uuid NOT NULL,
   started_at    timestamptz NOT NULL,
@@ -466,10 +495,12 @@ CREATE TABLE telemetry.asset_location_history (
 ) PARTITION BY RANGE (observed_at);
 
 -- ---- Rollup functions (idempotent; safe to re-run for any window) ----
--- NORMAL PATH (measured, see docs/06 section 6): the worker builds 5-minute stats IN MEMORY from the
--- packets it writes and upserts rollup_5m once per closed bucket. refresh_rollup_5m() is the
--- RECOVERY path only: worker restart (open bucket), late packets, history backfill.
--- refresh_rollup_combine() runs once per closed hour (1h) and once per closed Dubai day (1d).
+-- PHASE 1 PATH (docs/adr/0007, amends 0003): SQL only, no in-memory accumulators.
+--   refresh_rollup_5m(bucket_start, bucket_end) runs ONCE per CLOSED 5-minute bucket, at
+--   bucket end + rollup.close_grace_intervals x the current poll interval (default 2 x 60 s).
+--   Late packets: re-run for the affected closed buckets only. Never a sliding window, never every minute.
+-- refresh_rollup_combine() runs once per closed hour (1h, after the hour's last 5-min bucket) and once
+-- per closed Dubai day (1d). In-memory rollups are a scale trigger in docs/12 section 2 (new ADR).
 CREATE OR REPLACE FUNCTION telemetry.refresh_rollup_5m(p_from timestamptz, p_to timestamptz)
 RETURNS int LANGUAGE plpgsql AS $$
 DECLARE v_rows int;
@@ -573,14 +604,26 @@ CREATE INDEX event_project_time_idx ON events.event (project_id, occurred_at DES
 CREATE INDEX event_asset_time_idx   ON events.event (asset_id, occurred_at DESC);
 CREATE INDEX event_title_trgm_idx   ON events.event USING gin (title gin_trgm_ops);  -- notification search
 
--- Per-user read state for the bell
+-- Per-user read state for the bell (docs/06 section 3, item 11).
+-- "Mark all read" moves a read_marker; event_read holds only events read one by one AFTER the marker.
+-- Unread = events in scope with occurred_at > the user's marker (global or per project, whichever is
+-- later) and no event_read row. event_read is partitioned like events.event and dropped with it.
+CREATE TABLE events.read_marker (
+  user_id      uuid NOT NULL REFERENCES access.app_user(id) ON DELETE CASCADE,
+  project_id   uuid REFERENCES core.project(id) ON DELETE CASCADE,  -- NULL = every project in the user's scope
+  read_before  timestamptz NOT NULL,
+  updated_at   timestamptz NOT NULL DEFAULT now()
+);
+CREATE UNIQUE INDEX read_marker_user_all_uq     ON events.read_marker (user_id) WHERE project_id IS NULL;
+CREATE UNIQUE INDEX read_marker_user_project_uq ON events.read_marker (user_id, project_id) WHERE project_id IS NOT NULL;
+
 CREATE TABLE events.event_read (
   user_id      uuid NOT NULL REFERENCES access.app_user(id) ON DELETE CASCADE,
   event_id     uuid NOT NULL,
   occurred_at  timestamptz NOT NULL,
   read_at      timestamptz NOT NULL DEFAULT now(),
-  PRIMARY KEY (user_id, event_id)
-);
+  PRIMARY KEY (user_id, event_id, occurred_at)
+) PARTITION BY RANGE (occurred_at);
 
 -- =====================================================================
 -- INTEGRATION
@@ -659,6 +702,7 @@ CREATE INDEX audit_user_time_idx ON audit.log (user_id, at DESC);
 
 -- =====================================================================
 -- READ VIEWS (used by API modules that own no tables: equipment, energy, portfolio tiles)
+-- Equipment views include kind = 'equipment' only (docs/adr/0009).
 -- =====================================================================
 CREATE OR REPLACE VIEW core.v_asset_live AS
 SELECT a.id               AS asset_id,
@@ -681,14 +725,31 @@ LEFT JOIN telemetry.asset_status_current s  ON s.asset_id = a.id
 LEFT JOIN telemetry.status_map m            ON m.source_system = a.source_system AND m.source_value = s.source_value
 LEFT JOIN telemetry.latest_packet lp        ON lp.asset_id = a.id
 LEFT JOIN telemetry.asset_location_current l ON l.asset_id = a.id
-WHERE a.retired_at IS NULL;
+WHERE a.retired_at IS NULL
+  AND a.kind = 'equipment';
 
--- Info box 2 / equipment counts per project, type and display status
+-- Info box 2 / equipment counts per project, type and display status (equipment only, via v_asset_live)
 CREATE OR REPLACE VIEW core.v_project_asset_counts AS
 SELECT project_id, asset_type, category, status_display, count(*) AS assets
 FROM core.v_asset_live
 WHERE project_id IS NOT NULL
 GROUP BY project_id, asset_type, category, status_display;
+
+-- Site-level values as the source reports them (kind = 'site_metric'): energy site totals (R-25) now,
+-- manpower / weather later. Never shown as equipment, never on the map.
+CREATE OR REPLACE VIEW core.v_site_metric_live AS
+SELECT a.id               AS asset_id,
+       a.project_id,
+       a.name,
+       a.external_id,
+       a.source_system,
+       a.source_type_name,
+       lp.ts              AS last_packet_at,
+       lp.values          AS latest_values
+FROM core.asset a
+LEFT JOIN telemetry.latest_packet lp ON lp.asset_id = a.id
+WHERE a.retired_at IS NULL
+  AND a.kind = 'site_metric';
 
 -- =====================================================================
 -- SEED DATA (reference values; environment-specific seeds live in db/seeds)
@@ -696,10 +757,16 @@ GROUP BY project_id, asset_type, category, status_display;
 INSERT INTO core.source_system (code, name) VALUES ('datoms', 'DATOMS IoT Platform');
 
 INSERT INTO core.setting (key, value, description) VALUES
-  ('poll.interval_seconds',       '60',  'Live poll interval. Budget tracker may slow it, never speed it beyond limits.'),
+  ('poll.interval_seconds',       '60',  'Default live poll interval. Budget tracker may slow it, never speed it beyond limits. Per-type override: asset_type.poll_interval_seconds (ADR 0006).'),
+  ('poll.subset_external_ids',    'null','null = poll the full fleet (prod). A JSON array of DATOMS ids = poll only these in id mode (non-prod; ADR 0005). Set per environment in db/seeds.'),
+  ('budget.max_share',            '1.0', 'Share of every DATOMS credit/request cap this environment may use (ADR 0005). Prod 1.0; dev seed sets a small share.'),
+  ('rollup.close_grace_intervals','2',   'A 5-minute bucket is rolled up once, this many poll intervals after it ends (ADR 0007).'),
+  ('telemetry.expected_packets_per_minute','1','Used only to show data coverage on charts (packets / expected). INTERIM from the DATOMS PDF ("typically once per minute") until Q12.'),
   ('catalogue.interval_minutes',  '60',  'Catalogue sync interval'),
-  ('retention.packet_days',       '90',  'Raw packets kept (days)'),
-  ('retention.rollup_5m_days',    '400', '5-minute rollups kept (days)'),
+  ('catalogue.retire_after_misses','2',  'Retire an asset only after this many consecutive COMPLETE catalogue walks without it'),
+  ('catalogue.retire_max_fraction','0.05','If one sync would retire more than this share of active assets, retire nothing and alert'),
+  ('retention.packet_days',       '90',  'Raw packets kept (days). Stays 90 until open question Q15 (archive) is answered.'),
+  ('retention.rollup_5m_days',    '60',  '5-minute rollups kept (days). Decided 2026-10-08 (architecture review 1); older ranges use hourly rollups.'),
   ('retention.rollup_1h_days',    '1830','Hourly rollups kept (days)'),
   ('retention.api_call_days',     '30',  'External API call log kept (days)'),
   ('retention.audit_days',        '730', 'Audit log kept (days)'),
@@ -708,7 +775,7 @@ INSERT INTO core.setting (key, value, description) VALUES
   ('retention.location_history_days','400','Location history kept (days)'),
   ('display.stale_after_seconds', '300', 'INTERIM stale rule until DATOMS states its offline rule (open question Q8)'),
   ('display.timezone',            '"Asia/Dubai"', 'Display timezone and local-day boundary'),
-  ('archive.enabled',             'false', 'Export partitions to Blob (Parquet) before dropping');
+  ('archive.enabled',             'false', 'Export partitions to Blob (Parquet) before dropping. Deferred (ADR 0008) until Q15 is answered.');
 
 INSERT INTO core.feature_flag (key, enabled, description) VALUES
   ('project.weather',     false, 'Weather box (phase 2)'),
@@ -775,6 +842,7 @@ SELECT core.create_range_partitions('telemetry.rollup_1h',              'month',
 SELECT core.create_range_partitions('telemetry.asset_status_history',   'month', current_date, 3);
 SELECT core.create_range_partitions('telemetry.asset_location_history', 'month', current_date, 3);
 SELECT core.create_range_partitions('events.event',                     'month', current_date, 3);
+SELECT core.create_range_partitions('events.event_read',                'month', current_date, 3);
 SELECT core.create_range_partitions('integration.api_call',             'day',   current_date - 1, 9);
 SELECT core.create_range_partitions('audit.log',                        'month', current_date, 3);
 
