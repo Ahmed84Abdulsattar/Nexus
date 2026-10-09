@@ -1,0 +1,24 @@
+# Local development services. Start with: docker compose up -d
+# Local only: trust auth on a loopback-bound port, so there is no password to store.
+# Matches DATABASE_URL=postgres://nexus_api@localhost:5432/nexus (docs/04).
+services:
+  postgres:
+    image: postgres:16
+    restart: unless-stopped
+    ports:
+      - '127.0.0.1:5432:5432'
+    environment:
+      POSTGRES_USER: nexus
+      POSTGRES_DB: nexus
+      POSTGRES_HOST_AUTH_METHOD: trust
+      TZ: UTC
+    volumes:
+      - nexus-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U nexus -d nexus']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  nexus-pgdata:

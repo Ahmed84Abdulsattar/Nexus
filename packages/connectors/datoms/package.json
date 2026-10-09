@@ -1,0 +1,33 @@
+{
+  "name": "@nexus/connectors-datoms",
+  "version": "0.0.0",
+  "private": true,
+  "description": "DatomsConnector: implements SourceConnector using datoms-client.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@nexus/connectors-core": "workspace:*",
+    "@nexus/datoms-client": "workspace:*"
+  },
+  "devDependencies": {
+    "@nexus/config": "workspace:*",
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

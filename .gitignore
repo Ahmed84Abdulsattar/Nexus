@@ -26,3 +26,7 @@ Thumbs.db
 # generated
 playwright-report/
 test-results/
+
+# vite / turbo
+*.local
+.vite/

@@ -1,0 +1,5 @@
+{
+  "extends": "./tsconfig/library.json",
+  "compilerOptions": { "noEmit": true, "allowJs": true, "checkJs": false },
+  "include": ["test", "vitest.config.ts", "vitest/index.d.ts"]
+}

@@ -1,0 +1,11 @@
+# docs/05 ownership. Replace the owner handles when the frontend developer's GitHub handle is known
+# (open question, see the S0-01 PR). Rules are matched last-wins.
+*                       @Ahmed84Abdulsattar
+/apps/api/              @Ahmed84Abdulsattar
+/apps/worker/           @Ahmed84Abdulsattar
+/packages/datoms-client/ @Ahmed84Abdulsattar
+/packages/connectors/   @Ahmed84Abdulsattar
+/db/                    @Ahmed84Abdulsattar
+/infra/                 @Ahmed84Abdulsattar
+/.github/               @Ahmed84Abdulsattar
+# /apps/web/            @<frontend-developer>

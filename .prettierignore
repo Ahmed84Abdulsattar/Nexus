@@ -1,0 +1,15 @@
+node_modules
+dist
+build
+coverage
+.turbo
+pnpm-lock.yaml
+*.tsbuildinfo
+# Docs, DB reference files and Claude config are owned by their own tasks and are not reformatted here.
+docs
+db
+scripts
+.claude
+CLAUDE.md
+GETTING-STARTED.md
+PROMPTS.md
