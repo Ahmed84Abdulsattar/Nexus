@@ -8,11 +8,11 @@ Versions: use the current stable major at project start and pin exact versions i
 | Area | Choice | Why |
 |---|---|---|
 | Language | **TypeScript 5.x**, `strict: true` everywhere | One language across frontend, backend and worker, so both developers can work on either side |
-| Runtime | **Node.js 22 LTS** (move to the next LTS when it is active) | LTS support, native fetch |
+| Runtime | **Node.js 22 LTS** (move to the next LTS when it is active). `.nvmrc` and CI pin 22, so CI is the reference; `engines` is `>=22`, so a newer local Node (e.g. 24) is allowed | LTS support, native fetch |
 | Package manager | **pnpm** workspaces | Fast; strict dependencies |
 | Monorepo tasks | **Turborepo** | Cached `build/test/lint` per package |
 | Lint / format | ESLint (flat config, typescript-eslint, import rules), Prettier | The same rules for everyone and every agent |
-| Git hooks | Husky + lint-staged; Conventional Commits (commitlint) | Clean history and changelogs |
+| Git hooks | Husky + lint-staged; Conventional Commits (commitlint, `config-conventional` with `subject-case` off so subjects can start with a backlog ID) | Clean history and changelogs |
 | Dependency updates | Renovate | Security patches |
 
 ## Frontend (`apps/web`)

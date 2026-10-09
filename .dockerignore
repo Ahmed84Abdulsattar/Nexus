@@ -1,0 +1,12 @@
+.env
+.env.*
+!.env.example
+**/node_modules
+**/dist
+**/.turbo
+.git
+.github
+**/test
+**/*.test.ts
+**/*.spec.ts
+docs
