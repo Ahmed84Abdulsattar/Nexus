@@ -88,7 +88,8 @@ nexus/
 │   │       │   ├── energy/           # energy ribbon, table, charts
 │   │       │   ├── events/           # notifications list
 │   │       │   ├── explorer/         # data explorer
-│   │       │   └── admin/            # users and roles, project access, integration health, linking to-do
+│   │       │   ├── admin/            # users and roles, project access, integration health, linking to-do
+│   │       │   └── dev/              # components page (dev builds only, S0-06); never in the production bundle
 │   │       ├── assets/icons/asset-types/  # tower-crane.svg, hoist.svg, generator.svg, generic.svg …
 │   │       ├── styles/               # tailwind.css, tokens.css (colours incl. status/state colours)
 │   │       ├── lib/                  # format (numbers, units, dates in Asia/Dubai), featureFlags
