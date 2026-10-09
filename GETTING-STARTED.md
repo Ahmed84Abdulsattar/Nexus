@@ -95,7 +95,7 @@ git checkout -b S2-03-portfolio-map
 - **Docs are the source of truth.** If you decide something new, ask the architect agent to update the doc or write an ADR in the same PR.
 - **When Claude repeats a mistake,** add one line to `CLAUDE.md` so every agent learns it.
 - **Open questions** (`docs/open-questions.md`): update them when DATOMS or Innovo answers, then tell the architect agent to update the affected docs.
-- **Sprint sheet changes:** "Regenerate docs/source/backlog.md from docs/source/Nexus_Phase1_Sprint_Plan.xlsx."
+- **Sprint sheet changes:** regenerate `docs/source/backlog.md` from the sheet with `python scripts/gen-backlog.py` (needs `python -m pip install --user openpyxl` once), then check `git diff docs/source/backlog.md` shows only the rows you changed.
 - **Two sessions at once on one machine** (optional): use git worktrees so they don't edit the same files:
   ```
   git worktree add ../nexus-s3-worker -b S3-03-live-poll

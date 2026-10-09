@@ -43,6 +43,9 @@ nexus/
 │   └── source/                       # client docs, DATOMS PDF, sprint sheet (read-only inputs) + markdown copies:
 │                                     # brief.md, structure.md, backlog.md (agents read these)
 │
+├── scripts/                          # repo tools, not app code
+│   └── gen-backlog.py                # regenerates docs/source/backlog.md from the sprint sheet
+│
 ├── db/
 │   ├── schema.sql                    # reference schema: the target state, kept in sync with migrations
 │   ├── roles.sql                     # database roles and grants (run once per environment by the migrator)
