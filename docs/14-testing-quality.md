@@ -8,6 +8,10 @@
 5. Docs are updated if behaviour, API, schema or structure changed (`docs/`, `db/schema.sql`, OpenAPI).
 6. There is no `TODO` without a backlog ID.
 
+## Tooling decisions
+- **Node version.** CI runs Node 22 LTS (from `.nvmrc`); that result is the one that counts. Developers may run a newer Node locally (e.g. 24); `engines` is `>=22`. If something passes locally but fails in CI, CI wins.
+- **Commit messages.** commitlint uses `@commitlint/config-conventional` with the `subject-case` rule turned off, because subjects start with a backlog ID (e.g. `feat: S2-03 portfolio map`). All other Conventional Commits rules apply. Config: `commitlint.config.js`.
+
 ## Test pyramid
 | Level | Tool | What |
 |---|---|---|
