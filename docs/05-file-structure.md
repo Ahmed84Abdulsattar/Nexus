@@ -19,6 +19,10 @@ nexus/
 ├── GETTING-STARTED.md                # VS Code + Claude Code setup and first steps
 ├── PROMPTS.md                        # prompts for each step of the build
 ├── .gitignore
+├── .dockerignore                     # keeps .env, node_modules and tests out of images
+├── .husky/                           # git hooks: lint-staged (pre-commit), commitlint (commit-msg)
+├── commitlint.config.js              # Conventional Commits
+├── renovate.json                     # dependency update rules (Renovate)
 ├── .claude/
 │   ├── settings.json                 # shared Claude Code permissions (allows pnpm checks, blocks .env reads)
 │   └── agents/                       # role agents (architect, datoms-integration, …)
@@ -34,7 +38,8 @@ nexus/
 │   ├── 01-product-vision.md … 14-testing-quality.md
 │   ├── adr/                          # NNNN-title.md decision records
 │   ├── sprints/                      # S0.md, S1.md … (task breakdowns by the architect agent)
-│   ├── runbooks/                     # on-call: DATOMS down, poll lag, DB full, key rotation
+│   ├── runbooks/                     # on-call: DATOMS down, poll lag, DB full, key rotation;
+│   │                                 # setup: entra-setup.md, ArcGIS key, Azure deploy (no secret values)
 │   └── source/                       # client docs, DATOMS PDF, sprint sheet (read-only inputs) + markdown copies:
 │                                     # brief.md, structure.md, backlog.md (agents read these)
 │
@@ -52,7 +57,7 @@ nexus/
 │   ├── web/                          # React SPA (frontend developer owns this)
 │   │   ├── index.html
 │   │   ├── vite.config.ts
-│   │   ├── public/
+│   │   ├── public/                   # static files, incl. staticwebapp.config.json (SPA fallback, headers)
 │   │   └── src/
 │   │       ├── main.tsx
 │   │       ├── app/
@@ -122,9 +127,11 @@ nexus/
 │   │   │       # each module: <name>.module.ts, <name>.controller.ts, <name>.service.ts,
 │   │   │       #              <name>.repository.ts (Kysely), dto/, <name>.spec.ts
 │   │   ├── test/                     # integration tests (Testcontainers Postgres)
-│   │   └── openapi.json              # GENERATED on build
+│   │   ├── openapi.json              # GENERATED on build
+│   │   └── Dockerfile                # image for Container Apps (non-root)
 │   │
 │   └── worker/                       # NestJS standalone: the ONLY process that calls DATOMS
+│       ├── Dockerfile                # image for Container Apps (non-root, exactly 1 replica)
 │       └── src/
 │           ├── main.ts
 │           ├── worker.module.ts
