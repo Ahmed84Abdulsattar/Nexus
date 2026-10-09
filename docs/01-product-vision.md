@@ -63,7 +63,7 @@ Innovo runs many active construction projects across the UAE. Site data about eq
 - Manual data entry for sensor data.
 
 ## Success looks like
-- All DATOMS sites appear on the map automatically, with live statuses no more than about 1 minute behind DATOMS.
+- All DATOMS sites appear on the map automatically, with live statuses within about 2 poll intervals of DATOMS (about 1–2 minutes at the normal 60 s poll; see N-03).
 - A user goes from portfolio to project to equipment in 3 clicks on desktop or mobile.
 - No user can ever see a project they are not assigned to.
 - Adding the 501st site or the 5,000th user needs no code change.

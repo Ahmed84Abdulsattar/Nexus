@@ -54,7 +54,7 @@ Versions: use the current stable major at project start and pin exact versions i
 | Area | Choice | Notes |
 |---|---|---|
 | Database | **Azure Database for PostgreSQL Flexible Server 16** (zone-redundant HA in prod) | The same SQL runs on-premise PostgreSQL 16 |
-| Time series | **Native PostgreSQL partitioning** (daily partitions for packets) + **Nexus rollup tables** (5 min / 1 h / 1 day) built by SQL functions | See `adr/0003-database-time-series.md`. Azure allows only the Apache edition of TimescaleDB, which has no compression or continuous aggregates, so Nexus does not depend on TimescaleDB. |
+| Time series | **Native PostgreSQL partitioning** (daily partitions for packets) + **Nexus rollup tables** (5 min / 1 h / 1 day) built by SQL functions **once per closed bucket** (no sliding window, no in-memory accumulators in phase 1) | See `adr/0003-database-time-series.md` and `adr/0007-sql-rollups-per-closed-bucket.md`. Azure allows only the Apache edition of TimescaleDB, which has no compression or continuous aggregates, so Nexus does not depend on TimescaleDB. |
 | JSON | `jsonb` for parameter sets, with `lz4` column compression | DATOMS sends ~103 parameters per packet, so one row per packet keeps row counts 100× lower than one row per parameter |
 | Cache | None in phase 1 (in-process LRU for auth and lookups). **Azure Cache for Redis** only when there are more than 3 API replicas or measured need. | |
 | Files | Azure Blob Storage (phase 2) | |
@@ -69,22 +69,21 @@ Versions: use the current stable major at project start and pin exact versions i
 | Azure Key Vault | DATOMS token, ArcGIS key, DB credentials |
 | Azure Container Registry | Images |
 | Application Insights + Log Analytics | Logs, metrics, alerts, dashboards |
-| Microsoft Entra ID | App registrations: `nexus-web` (SPA), `nexus-api` (exposes scope `access_as_user`) |
-| Azure Front Door + WAF (prod, optional) | Edge security and custom domain |
-| Bicep | All infrastructure as code (`infra/`) |
+| Microsoft Entra ID | App registrations: `nexus-web` (SPA), `nexus-api` (exposes scope `access_as_user`; groups claim = "groups assigned to the application", ADR 0008) |
+| Azure Front Door + WAF | **Deferred** (ADR 0008) until Innovo decides network exposure (Q20) |
+| Bicep | All infrastructure as code (`infra/`), two cloud environments: dev and prod (ADR 0008) |
 | GitHub Actions (or Azure DevOps) | CI/CD with OIDC to Azure, no stored cloud secrets |
 
 ## Environment variables (single list; `.env.example` must match it)
 | Variable | Used by | Example / notes |
 |---|---|---|
 | `NODE_ENV` | all | `development` / `production` |
-| `APP_ENV` | all | `local` / `dev` / `test` / `prod` |
+| `APP_ENV` | all | `local` / `dev` / `prod` (no `test` environment, ADR 0008) |
 | `DATABASE_URL` | api, worker, migrations | `postgres://nexus_api@localhost:5432/nexus` (in Azure: host + Entra token through managed identity) |
 | `DATABASE_POOL_MAX` | api, worker | `10` |
 | `ENTRA_TENANT_ID` | api, web | Innovo tenant GUID |
 | `ENTRA_API_CLIENT_ID` / `ENTRA_API_AUDIENCE` | api | `nexus-api` app id / `api://nexus-api` |
 | `ENTRA_WEB_CLIENT_ID` | web (`VITE_ENTRA_WEB_CLIENT_ID`) | `nexus-web` app id |
-| `ENTRA_GRAPH_CLIENT_SECRET` or managed identity | api | For Graph group overage only |
 | `AUTH_MODE` | api, web | `entra` (default). `dev` is allowed **only when `APP_ENV=local`**: it signs local test tokens for seeded users. The API refuses to start with `dev` anywhere else. |
 | `KEY_VAULT_URI` | api, worker | `https://kv-nexus-dev.vault.azure.net/` (secrets below are read from here in Azure) |
 | `DATOMS_BASE_URL` / `DATOMS_ORG_ID` / `DATOMS_TOKEN` | worker, CLI | Token comes from Key Vault in Azure |
@@ -99,6 +98,8 @@ Versions: use the current stable major at project start and pin exact versions i
 
 Local development: Postgres from docker-compose, `DATOMS_LIVE=false`, `LIVE_MODE=poll`, and either `AUTH_MODE=dev` or a real dev Entra app registration.
 
+There is no Microsoft Graph secret: the `nexus-api` token carries only the groups assigned to the application, so the 200-group overage path is not used (ADR 0008, Q16). Poll scope and budget share per environment are **settings** (`poll.subset_external_ids`, `budget.max_share`) set by `db/seeds/`, not environment variables (ADR 0005).
+
 ## External services
 | Service | Use |
 |---|---|
@@ -108,7 +109,8 @@ Local development: Postgres from docker-compose, `DATOMS_LIVE=false`, `LIVE_MODE
 ## Not used (and why) — do not introduce
 | Not used | Why |
 |---|---|
-| Kafka, RabbitMQ, Event Hubs | One poller and one source. Add Azure Service Bus only if DATOMS streaming or webhooks arrive (ADR). |
+| Kafka, RabbitMQ, Event Hubs | One poller, one source and one DATOMS endpoint for telemetry (ADR 0010). Add Azure Service Bus only if DATOMS streaming or webhooks arrive (ADR). |
+| Microsoft Graph for group overage | Not needed with the "groups assigned to the application" claim (ADR 0008) |
 | Microservices, Kubernetes (AKS) | Too much operations work for this team. Container Apps scales enough. |
 | GraphQL | REST + OpenAPI is enough, simpler to secure per project, and the reporting app will read REST |
 | Prisma / TypeORM | Weak support for partitioned tables, jsonb and raw time-series SQL. Kysely gives typed raw SQL. |

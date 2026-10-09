@@ -21,11 +21,11 @@ GRANT USAGE ON ALL SEQUENCES IN SCHEMA core, access, telemetry, events, integrat
 
 -- API writes: access admin, read state, audit, admin-held fields, settings, linking
 GRANT INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA access TO nexus_api;
-GRANT INSERT, UPDATE, DELETE ON events.event_read TO nexus_api;
+GRANT INSERT, UPDATE, DELETE ON events.event_read, events.read_marker TO nexus_api;           -- R-41 read state (docs/06 section 3, item 11)
 GRANT INSERT ON audit.log TO nexus_api;
 GRANT INSERT, UPDATE ON core.project, core.district, core.building, core.level, core.zone TO nexus_api;  -- R-63 admin projects
-GRANT UPDATE (project_id, asset_type_id, building_id, level_id, zone_id) ON core.asset TO nexus_api;    -- assign/link assets
-GRANT INSERT, UPDATE ON core.asset_type, core.setting, core.feature_flag TO nexus_api;
+GRANT UPDATE (project_id, asset_type_id, building_id, level_id, zone_id) ON core.asset TO nexus_api;    -- assign/link assets (not `kind`: set by the connector, ADR 0009)
+GRANT INSERT, UPDATE ON core.asset_type, core.setting, core.feature_flag TO nexus_api;              -- incl. asset_type.poll_interval_seconds (ADR 0006)
 GRANT INSERT, UPDATE, DELETE ON telemetry.status_map TO nexus_api;
 GRANT UPDATE (display_name, unit, category, is_hidden) ON telemetry.parameter TO nexus_api;           -- fill gaps only
 GRANT UPDATE ON integration.link_todo TO nexus_api;
@@ -34,6 +34,7 @@ GRANT UPDATE ON integration.link_todo TO nexus_api;
 GRANT INSERT, UPDATE ON core.project, core.asset, core.asset_type TO nexus_worker;
 GRANT INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA telemetry TO nexus_worker;
 GRANT INSERT, UPDATE ON ALL TABLES IN SCHEMA events TO nexus_worker;
+REVOKE INSERT, UPDATE ON events.event_read, events.read_marker FROM nexus_worker;               -- per-user read state is API-only
 GRANT INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA integration TO nexus_worker;
 -- Partition maintenance (create/drop partitions) runs as nexus_worker through
 -- core.create_range_partitions / core.drop_partitions_before. Those functions must be

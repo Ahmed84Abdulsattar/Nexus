@@ -17,14 +17,14 @@ flowchart LR
   API --> DB[(PostgreSQL 16<br/>partitioned telemetry)]
   WK[Nexus Worker<br/>DATOMS sync] --> DB
   WK -->|publish changes| PUB
-  WK -->|REST v4, Bearer token<br/>read-only| DATOMS[DATOMS Public API]
+  WK -->|REST v4 bulk endpoint, Bearer token<br/>read-only| DATOMS[DATOMS Public API]
   API --> KV[Key Vault]
   WK --> KV
   API & WK & WEB --> AI[App Insights]
 ```
 
 Key rules shown by the diagram:
-- **Only the worker talks to DATOMS.** The API and the browser never call DATOMS.
+- **Only the worker talks to DATOMS.** The API and the browser never call DATOMS. Telemetry, status, location, alerts and site data come **only** from the bulk endpoint (ADR 0010).
 - **Users read only from Nexus's own database.** So 5 users and 5,000 users cause the same DATOMS traffic.
 - **The browser gets live changes from Web PubSub**, not by polling DATOMS.
 
@@ -35,7 +35,7 @@ Key rules shown by the diagram:
 | `apps/api` | NestJS 11 (Fastify) on Node 22 LTS | Azure Container Apps | 1→N replicas on HTTP load | Stateless. Any replica can serve any request. |
 | `apps/worker` | NestJS standalone application, same codebase | Azure Container Apps (min 1, max 1 for the poller) | Leader lock; split jobs later | The only DATOMS caller. Scheduled jobs plus a job runner. |
 | Database | Azure Database for PostgreSQL Flexible Server 16 | Managed, zone-redundant HA in prod | Vertical first, then read replica | Schemas: `core`, `access`, `telemetry`, `events`, `integration`, `audit` (see `06-database.md`) |
-| Live push | Azure Web PubSub | Managed | Units | One hub `nexus`, one group per project |
+| Live push | Azure Web PubSub | Managed | Units | One hub `nexus`, one group per project. Slim messages; joins are done on the server after a scope check (ADR 0008). |
 | Files (later) | Azure Blob Storage | Managed | — | Private. Short-lived SAS links only. |
 
 ## 3. Modules inside the API and worker
@@ -77,13 +77,14 @@ sequenceDiagram
     D-->>C: assets page
   end
   C-->>W: SourceAsset[] (Nexus types)
-  W->>DB: upsert sites / assets by (source_system, external_id)
-  W->>DB: mark assets not seen as retired_at = now (never delete)
+  W->>DB: upsert assets (names, nameplate) by (source_system, external_id)
+  Note over W,DB: sites, asset types and parameter keys come from the bulk rows in the live poll (ADR 0010)
+  W->>DB: if the walk was complete: retire assets missed in 2 complete walks (never delete; stop if > 5%)
   W->>DB: new unmatched items → integration.link_todo
   W->>DB: insert integration.sync_run (counts, duration, errors)
 ```
 
-### 4.2 Live poll (every 60 s)
+### 4.2 Live poll (every 60 s by default; per asset type, ADR 0006)
 ```mermaid
 sequenceDiagram
   participant W as Worker (poll job, leader only)
@@ -92,20 +93,22 @@ sequenceDiagram
   participant D as DATOMS API
   participant DB as PostgreSQL
   participant P as Web PubSub
-  W->>B: can spend credits for fleet F?
+  W->>W: which assets are due? (per-type interval; env subset, ADR 0005)
+  W->>B: can spend credits (× budget.max_share)?
   B-->>W: yes / wait
-  loop pages of 500
-    C->>D: POST /assets/telemetry/latest/query {page, limit:500}
-    D-->>C: rows (asset_id, success, data.time, parameters)
-    Note over C: 422 → halve page and retry<br/>429 → wait Retry-After<br/>5xx → backoff + jitter
+  loop fleet pages of 500 (all due) or id-mode chunks of 500 (some due)
+    C->>D: POST /assets/telemetry/latest/query
+    D-->>C: rows (asset_id, success, data.time, parameters, + status/location/alerts when present)
+    Note over C: 422 → halve page and resume<br/>429 → wait Retry-After<br/>5xx → backoff + jitter
   end
   W->>DB: for each row: skip if data.time ≤ stored time
   W->>DB: upsert telemetry.latest_packet (only if newer time)
   W->>DB: insert telemetry.packet (one row per asset packet, daily partition)
-  W->>DB: upsert asset status / location if present
-  W->>P: publish {projectId, changes[]} to group project:{id}
+  W->>DB: on change only: asset status / location; insert new alerts into events.event
+  W->>P: publish slim messages to group project:{id} (status/location changes, summary, values hint)
   W->>DB: insert integration.sync_run
 ```
+Rollups are built separately, once per closed 5-minute bucket, by SQL (ADR 0007).
 
 ### 4.3 User reads a screen
 ```mermaid
@@ -120,17 +123,21 @@ sequenceDiagram
   A->>DB: read latest_packet + rollups
   A-->>B: JSON
   B->>A: POST /v1/live/token
-  A-->>B: Web PubSub URL, allowed only for groups of the user's projects
-  B->>P: connect, join project:{projectId}
-  P-->>B: changes pushed every poll
+  A-->>B: Web PubSub URL (identifies the user, no group-join rights)
+  B->>P: connect (gets connectionId)
+  B->>A: POST /v1/live/subscriptions {connectionId, projectIds}
+  A->>A: permission + scope check per project (out-of-scope ids dropped)
+  A->>P: add connection to project:{projectId} (server side)
+  P-->>B: slim changes pushed every poll; panels refetch values from the API
 ```
 
 ### 4.4 Failure behaviour
 | Failure | What happens |
 |---|---|
 | DATOMS down or 5xx | The worker backs off and retries. Screens keep showing the last values with their timestamps. The health page turns red after 5 min. An App Insights alert fires. |
-| DATOMS 429 or limit near | The budget tracker slows polling (60 s → 120 s → 300 s) and logs a warning. It never breaks the limits. |
-| Worker crash | Container Apps restarts it. The leader lock is released when the session ends. On the next poll, time-based dedupe stops duplicates. |
+| DATOMS 429 or limit near | The budget tracker slows polling (every interval × 2, then × 5; 60 s → 120 s → 300 s by default) and logs a warning. It never breaks the limits. |
+| Worker crash | Container Apps restarts it. The leader lock is released when the session ends. On the next poll, time-based dedupe stops duplicates. Rollups have no in-memory state; any missed closed buckets are refreshed on start. |
+| Access removed by an admin | The API closes the affected live connections. Clients reconnect and re-subscribe through the scope check (ADR 0008). |
 | Database failover | Zone-redundant HA (prod). Apps reconnect through the pool with retry. |
 | Web PubSub down | The browser falls back to polling the Nexus API every 60 s. |
 | Entra down | Already signed-in users keep working until their tokens expire. Nothing else can be done about it. |
@@ -147,22 +154,25 @@ interface SourceConnector {
   readonly sourceSystem: string;                  // 'datoms'
   listSites(): AsyncIterable<SourceSite>;
   listAssets(): AsyncIterable<SourceAsset>;
-  pollLatest(): AsyncIterable<SourceReading[]>;   // batches
-  listEvents?(since: Date): AsyncIterable<SourceEvent>;
-  fetchHistory?(assetId: string, from: Date, to: Date): AsyncIterable<SourceReading>;
+  // batches; a reading carries values plus status, location, kind and alerts when the source has them
+  pollLatest(scope?: { externalIds?: string[] }): AsyncIterable<SourceReading[]>;
+  listEvents?(since: Date): AsyncIterable<SourceEvent>;          // other sources only; DATOMS alerts come in pollLatest (ADR 0010)
+  fetchHistory?(assetId: string, from: Date, to: Date): AsyncIterable<SourceReading>;  // DATOMS: on hold (ADR 0010)
 }
 ```
 The worker runs each registered connector on its own schedule, and every connector writes to the same tables. Adding a source adds a package and a schedule. The screens do not change.
 
 ## 6. Environments and deployment
+Two cloud environments only (ADR 0008):
+
 | Env | Purpose | Data | Deploy |
 |---|---|---|---|
 | local | developer machines | fixtures (recorded DATOMS responses), docker-compose PostgreSQL 16 | `pnpm dev` |
-| dev | shared integration | DATOMS test org (if provided) or fixtures | automatic on merge to `main` |
-| test | UAT / pilot | live DATOMS (read-only) | manual promote |
-| prod | all users | live DATOMS | manual approval |
+| dev | shared integration | fixtures, or a small id-mode subset of live DATOMS with a small `budget.max_share` (ADR 0005); a DATOMS test org if provided (Q7, Q10) | automatic on merge to `main` |
+| prod | all users, and the pilot (S9: only pilot users are assigned to the Entra app) | live DATOMS, full fleet; the only environment that polls the full fleet | manual approval |
 
-- All infrastructure is defined in Bicep (`infra/`). The same templates are used for every environment, with different parameter files.
+- All infrastructure is defined in Bicep (`infra/`). The same templates are used for every environment, with different parameter files (`dev`, `prod`).
+- Deferred until there is a decision: Azure Front Door + WAF (Q20) and the Blob/Parquet archive (Q15).
 - Private networking in prod: the API and worker run in a VNet-integrated Container Apps environment, and Postgres and Key Vault use private endpoints.
 - Managed identities for app → Key Vault and app → Postgres (Entra auth for Postgres where possible).
 

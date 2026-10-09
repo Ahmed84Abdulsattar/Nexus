@@ -2,6 +2,7 @@
 
 > Read-only copy for agents. The spreadsheet is the source and tracks status. Regenerate this file when the sheet changes.
 > Map decided: Esri ArcGIS (docs/adr/0002). Database: PostgreSQL 16 without TimescaleDB (docs/adr/0003). Where a task disagrees with docs/, docs/ wins.
+> Regenerated from the spreadsheet on 2026-10-08 after architecture review 1 (ADRs 0005–0010). Changed rows: the sprint dependencies for S2–S6, S0-04, S2-02, S3-01, S3-03, S3-04 (on hold), S4-01, S4-02, S4-03, S4-05, S5-01, S5-02, S5-03, S6-01, S6-02, S6-03, S6-04, S9-02.
 
 ## Sprints
 
@@ -9,11 +10,11 @@
 |---|---|---|---|---|
 | S0 | Setup + map decision | 1–2 | Repos, Azure dev environment, Microsoft sign-in skeleton, design tokens, ArcGIS map wrapper skeleton | Azure and Entra access; map decision |
 | S1 | Foundation | 3–4 | Data model, permissions in the API, app shell, responsive layout | Nothing |
-| S2 | Portfolio map + access | 5–6 | Top-level map of all DATOMS sites; DATOMS client; users and roles API | DATOMS API docs |
-| S3 | DATOMS sync + admin | 7–8 | Live DATOMS data flowing; device linking, sync health, users and roles screens | DATOMS API docs + key |
-| S4 | Project page | 9–10 | Level 1 page with live asset pins and equipment / energy boxes | Asset location + status in API |
-| S5 | Energy | 11–12 | Info box 3 and energy detail page; load-test harness | Site totals in API |
-| S6 | Equipment + notifications | 13–14 | Info box 2, equipment detail, device card, DATOMS notifications | Notifications in API |
+| S2 | Portfolio map + access | 5–6 | Top-level map of all DATOMS sites; DATOMS client; users and roles API | DATOMS sample bulk response + bulk field list (Q21, Q22) |
+| S3 | DATOMS sync + admin | 7–8 | Live DATOMS data flowing; device linking, sync health, users and roles screens | DATOMS sample + field list (Q21, Q22) + key |
+| S4 | Project page | 9–10 | Level 1 page with live asset pins and equipment / energy boxes | Bulk field names for location + status (Q22) |
+| S5 | Energy | 11–12 | Info box 3 and energy detail page; load-test harness | Whether DATOMS has site totals and ownership (Q3); field names (Q22) |
+| S6 | Equipment + notifications | 13–14 | Info box 2, equipment detail, device card, DATOMS notifications | Alert field names in the bulk response (Q22) |
 | S7 | Explorer + hardening | 15–16 | All DATOMS data explorer, security hardening, production environment, mobile polish | Nothing |
 | S8 | Load and security | 17–18 | Load test at 100+ sites, backups and alerts, penetration test, user guide | Pen-test slot |
 | S9 | Pilot (GHAFWOODS) | 19–20 | Testing with pilot users, fixes, runbook | Pilot users |
@@ -64,21 +65,21 @@
 - **Estimate (days):** 2
 - **Acceptance check:** Merge to main deploys to dev automatically
 
-### S0-04 · Entra ID app registrations (API + web app), app roles, Nexus security groups
+### S0-04 · Entra ID app registrations (API + web app), Nexus security groups, app-assigned groups claim
 - **Sprint:** S0
 - **Week:** W1
 - **Work package:** Setup
 - **Steps (how to do it):** 1. In Entra ID, register two apps: 'Nexus API' and 'Nexus Web'.
-  2. On Nexus API, define app roles: Admin, Leadership, ProjectDirector, ProjectManager, HSE, Plant, Procurement.
-  3. Create security groups (e.g. Nexus-Admins) and assign them to the roles.
+  2. Create the Nexus security groups (docs/08 section 1; e.g. Nexus-Admins). Roles are mapped from groups in the Nexus database (docs/08 section 3), not defined as Entra app roles. The final role list is Q17.
+  3. On Nexus API, set the groups claim to 'Groups assigned to the application' (ADR 0008). Assign the Nexus groups to the enterprise app; users must be direct members. No Graph permission or secret.
   4. Turn on 'assignment required' so only group members can sign in.
   5. Share client IDs with the frontend.
-- **Output when done:** Sign-in apps and roles ready; test users in each group
+- **Output when done:** Sign-in apps and groups ready; test users in each group
 - **Now done by:** You (backend)
 - **Requirement:** Innovo: permissions
-- **External blocker:** Entra admin consent
+- **External blocker:** Entra admin consent; Entra ID P1 licence and setup confirmed by Innovo IT (Q16)
 - **Estimate (days):** 1
-- **Acceptance check:** Test users in each group can get a token with the right role
+- **Acceptance check:** Test users in each group get a token whose groups claim contains only their app-assigned Nexus group(s)
 
 ### S0-05 · React + TypeScript app shell (Vite), routing, linting
 - **Sprint:** S0
@@ -284,21 +285,21 @@
 - **Estimate (days):** 2
 - **Acceptance check:** Returns only the user's projects; search under 300 ms
 
-### S2-02 · DATOMS API client: auth, paging, retries, rate-limit handling
+### S2-02 · DATOMS API client: bulk endpoint, paging, retries, rate-limit and credit handling
 - **Sprint:** S2
 - **Week:** W2
 - **Work package:** DATOMS connector
-- **Steps (how to do it):** 1. Read the DATOMS API docs (once received).
-  2. Build a DATOMS client module: login/token, list sites, list devices, get values.
-  3. Handle paging, retries and rate limits.
-  4. Test against GHAFWOODS on dev.
-  If docs are not here yet: build with a mock and swap later.
+- **Steps (how to do it):** 1. Read the v4 PDF, plus the DATOMS sample bulk response (Q21) and bulk field list (Q22) once received.
+  2. Build packages/datoms-client: list assets (catalogue) and the bulk endpoint (fleet and id mode) as the ONLY telemetry source (ADR 0010). data/latest is for CLI checks only.
+  3. Put ALL field mapping in src/mapping.ts. Until the sample arrives, build against the v4 PDF shape. Save the sample to fixtures/ with tokens removed.
+  4. Handle paging, 422 halving (with the learned page size), retries, rate limits, and the credit budget with budget.max_share (ADR 0005).
+  5. Test against GHAFWOODS on dev using fixtures or a small id-mode subset (never the full fleet from dev).
 - **Output when done:** Code that can talk to DATOMS
 - **Now done by:** You (backend)
 - **Requirement:** Brief: energy, crane utilisation
-- **External blocker:** DATOMS API docs + read-only key
+- **External blocker:** DATOMS sample bulk response (Q21) + bulk field list (Q22) + read-only key. Needed before this task starts; they do not block S0 or S1.
 - **Estimate (days):** 3
-- **Acceptance check:** Client reads GHAFWOODS sites and devices in dev
+- **Acceptance check:** Client reads the GHAFWOODS demo fleet (generators and tower cranes) through the bulk endpoint in dev; DATOMS field names exist only in src/mapping.ts
 
 ### S2-03 · Portfolio map (chosen provider, through the map wrapper): one pin per DATOMS site, coloured Active green, Central Store blue, Finished grey, In bid yellow where DATOMS gives the status
 - **Sprint:** S2
@@ -362,14 +363,15 @@
 - **Sprint:** S3
 - **Week:** W1
 - **Work package:** DATOMS connector
-- **Steps (how to do it):** 1. Scheduled job in apps/worker, every hour.
-  2. Read all DATOMS sites, devices and parameters (name, unit).
+- **Steps (how to do it):** 1. Scheduled job in apps/worker, every hour (and early when the poll sees unknown ids).
+  2. Read all DATOMS assets (list assets: names, nameplate). Sites, asset types and parameters (name, unit) come in the bulk rows. The live poll (S3-03) upserts them the same way, so the catalogue job spends no bulk credits.
   3. Insert new ones, update changed ones in the database.
+  4. Retire safely (docs/07 section 6): only after a complete walk; only rows missed in 2 consecutive complete walks; retire nothing and alert if more than 5% would go.
 - **Output when done:** Nexus always knows every DATOMS site and device
 - **Now done by:** You (backend)
 - **Requirement:** Innovo: show all DATOMS data
 - **Depends on:** S2-02
-- **External blocker:** DATOMS API docs + read-only key
+- **External blocker:** DATOMS sample + field list (Q21, Q22) + read-only key; id stability (Q11)
 - **Estimate (days):** 2
 - **Acceptance check:** New DATOMS site appears in Nexus within 1 hour
 
@@ -387,22 +389,22 @@
 - **Estimate (days):** 2
 - **Acceptance check:** No guessed links; unmatched items listed
 
-### S3-03 · Live sync (every minute): latest values and statuses to readings + latest value table
+### S3-03 · Live sync (every minute by default): bulk endpoint → packets, latest values, statuses, locations, alerts
 - **Sprint:** S3
 - **Week:** W1–W2
 - **Work package:** DATOMS connector
-- **Steps (how to do it):** 1. Job every minute: get latest values and statuses for all devices.
-  2. Write them to 'reading' (history) and 'latest_value' (current).
-  3. Insert in batches.
-  4. Log how long each run takes.
-- **Output when done:** Live DATOMS data in Nexus within 60 seconds
+- **Steps (how to do it):** 1. Job every 60 s by default (per-type interval, ADR 0006): bulk endpoint only (ADR 0010). Fleet mode when every asset is due, otherwise id mode. In dev, only the configured subset (ADR 0005).
+  2. Write telemetry.packet (history) and telemetry.latest_packet (current); status, location and alerts on change only.
+  3. Insert in batches. No per-poll bookkeeping writes (asset_parameter is insert-only; status observed_at only on change).
+  4. Log how long each run takes and the credits used per window.
+- **Output when done:** Live DATOMS data in Nexus within about 2 poll intervals
 - **Now done by:** You (backend)
 - **Requirement:** Brief: real-time visibility
 - **Depends on:** S3-01
 - **Estimate (days):** 2
-- **Acceptance check:** Value in Nexus within 60 s of DATOMS
+- **Acceptance check:** Value in Nexus within 2 poll intervals of DATOMS (N-03)
 
-### S3-04 · History backfill and gap repair after outages
+### S3-04 · History backfill and gap repair after outages (ON HOLD)
 - **Sprint:** S3
 - **Week:** W2
 - **Work package:** DATOMS connector
@@ -414,7 +416,9 @@
 - **Now done by:** You (backend)
 - **Requirement:** Brief: trends
 - **Depends on:** S3-03
+- **External blocker:** ON HOLD (decided 2026-10-08). The bulk endpoint has no history (ADR 0010); Nexus builds its own history from polls from day one. Needs a DATOMS history feed (Q12) and a new ADR to use it. Until then, gaps stay gaps and charts show coverage (ADR 0007).
 - **Estimate (days):** 2
+- **Status:** Blocked
 - **Acceptance check:** GHAFWOODS history since Jul 2026 loaded; gaps refilled after a forced outage
 
 ### S3-05 · Device linking to-do list
@@ -462,8 +466,9 @@
 - **Week:** W1
 - **Work package:** Project page
 - **Steps (how to do it):** 1. Use the rollup functions in db/schema.sql: telemetry.refresh_rollup_5m and refresh_rollup_combine (1 h, 1 day in Asia/Dubai).
-  2. Worker rollups job runs every minute for the recent window and re-runs for late data.
-  3. Check a 30-day query returns in under 1 second.
+  2. Worker rollups job (ADR 0007): refresh_rollup_5m once per CLOSED 5-minute bucket, 2 poll intervals after it ends; re-run only for closed buckets that get late packets; 1 h after the hour's last bucket; 1 d after the Dubai day. No sliding window, no in-memory accumulators.
+  3. Return data coverage (packets / expectedPackets) with each bucket.
+  4. Check a 30-day query returns in under 1 second.
 - **Output when done:** Fast data for every chart
 - **Now done by:** You (backend)
 - **Requirement:** Brief: trends
@@ -475,27 +480,28 @@
 - **Sprint:** S4
 - **Week:** W1
 - **Work package:** Project page
-- **Steps (how to do it):** 1. When the worker sees a status or value change, publish a message to Azure Web PubSub (per project channel).
-  2. API gives the browser a Web PubSub token for only the projects it may see.
+- **Steps (how to do it):** 1. When the worker sees a status or location change, publish a slim message to Azure Web PubSub (per project group): no parameter values; values.updated hint; summary.updated; chunked well under 1 MB (docs/10, ADR 0008).
+  2. API gives the browser a Web PubSub token with no group-join rights. POST /v1/live/subscriptions checks permission and scope, then joins the connection to project groups on the server.
+  3. On any Nexus access change, close the affected live connections so clients re-subscribe through the scope check. Settle with the security-reviewer how the API confirms a connectionId belongs to the caller.
 - **Output when done:** Changes pushed to browsers live
 - **Now done by:** You (backend)
 - **Requirement:** Brief: real-time visibility
 - **Depends on:** S3-03
 - **Estimate (days):** 2
-- **Acceptance check:** Pin colour changes without refresh
+- **Acceptance check:** Pin colour changes without refresh; a user whose project access is removed stops receiving that project's messages at once; nothing project-specific is sent to the portfolio group
 
-### S4-03 · Project summary API for the equipment and energy info boxes
+### S4-03 · Project summary APIs for the equipment and energy info boxes
 - **Sprint:** S4
 - **Week:** W1–W2
 - **Work package:** Project page
-- **Steps (how to do it):** 1. Endpoint GET /projects/{id}/summary returning the equipment and energy info boxes.
-  2. Fill them from latest DATOMS values. Manpower and materials are added later once their source is known.
-- **Output when done:** One call loads the project page
+- **Steps (how to do it):** 1. Endpoints GET /projects/{id}/equipment/summary (Box 2) and GET /projects/{id}/energy/summary (Box 3), as in docs/10.
+  2. Fill them from the latest DATOMS values: equipment counts from kind = 'physical' assets; energy site totals from site_metric records when DATOMS provides them. Manpower and materials are not built (slots only).
+- **Output when done:** The project page loads its boxes
 - **Now done by:** You (backend)
 - **Requirement:** Sheet: L1 Info boxes
 - **Depends on:** S3-03
 - **Estimate (days):** 2
-- **Acceptance check:** One call returns all four boxes
+- **Acceptance check:** The two endpoints return Box 2 and Box 3 as reported; Boxes 1 and 4 are "coming later" slots
 
 ### S4-04 · Project page layout: site map, side panel, equipment and energy info boxes (space kept for manpower and materials later)
 - **Sprint:** S4
@@ -515,15 +521,15 @@
 - **Sprint:** S4
 - **Week:** W1–W2
 - **Work package:** Project page
-- **Steps (how to do it):** 1. Draw one pin per asset at its DATOMS location.
-  2. Icon by type: tower crane, hoist, equipment, generator.
+- **Steps (how to do it):** 1. Draw one pin per equipment asset (kind = 'physical') at its DATOMS location; no location = "Not on map".
+  2. Icon by type: tower crane, hoist, equipment, generator; unknown types use the generic icon.
   3. Colour by DATOMS status: Running green, Idle amber, Maintenance red, Off grey.
-  4. Turn on clustering and a Map/Satellite switch.
+  4. Turn on clustering and a Map/Satellite switch. 3D uses the same icons with no callouts or pulse (ADR 0008).
 - **Output when done:** Live equipment pins on the site map
 - **Now done by:** Colleague (frontend)
 - **Requirement:** Sheet: L1 blinkers on map
 - **Depends on:** S3-03
-- **External blocker:** DATOMS: does API return location + status?
+- **External blocker:** Bulk field names for location + status (Q22; DATOMS confirmed the data is in the bulk response); blink vs pulse (Q19)
 - **Estimate (days):** 2
 - **Acceptance check:** Running green, Idle amber, Maintenance red, Off grey as reported
 
@@ -557,13 +563,13 @@
 - **Sprint:** S5
 - **Week:** W1
 - **Work package:** Energy
-- **Steps (how to do it):** 1. Endpoint returning per project: generators (running/total), solar generation, mains, total load, loads by area, site totals and CO2 exactly as DATOMS gives them.
+- **Steps (how to do it):** 1. Endpoint returning per project: generators (running/total), solar generation, mains, total load, loads by area, site totals and CO2 exactly as DATOMS gives them in the bulk response. Site totals are read from site_metric records (ADR 0009); anything missing shows "no data yet".
   2. Compare with the DATOMS Site View for GHAFWOODS; numbers must match.
 - **Output when done:** Energy data for box 3 and the energy page
 - **Now done by:** You (backend)
 - **Requirement:** Brief: energy monitoring; Sheet: L2 Energy
 - **Depends on:** S3-03
-- **External blocker:** DATOMS: are site totals in the API?
+- **External blocker:** Whether DATOMS has site totals (Q3); bulk field names (Q22)
 - **Estimate (days):** 3
 - **Acceptance check:** Figures match DATOMS Site View for GHAFWOODS
 
@@ -572,7 +578,7 @@
 - **Week:** W1
 - **Work package:** Energy
 - **Steps (how to do it):** 1. Endpoint listing energy equipment: DG ID, description, type (DG/solar/mains), status, owned or hired.
-  2. Ownership comes from the Nexus asset register.
+  2. Ownership comes from a DATOMS field (R-31). If DATOMS lacks it, the column is hidden and reported (Q3). Nexus doesn't keep its own ownership register.
 - **Output when done:** Data for the energy table
 - **Now done by:** You (backend)
 - **Requirement:** Sheet: L2 Energy
@@ -585,7 +591,7 @@
 - **Week:** W2
 - **Work package:** Energy
 - **Steps (how to do it):** 1. Endpoints for trends by day, week, month, year.
-  2. Read from the summaries in S5-01, never raw readings.
+  2. Read from the rollup tables (S4-01), never raw readings for ranges over 6 h. 5-minute data only within 60 days; older ranges use hourly. Return the resolution used and data coverage per bucket.
 - **Output when done:** Trend data for charts
 - **Now done by:** You (backend)
 - **Requirement:** Sheet: L2 trend graphs
@@ -662,8 +668,8 @@
 - **Sprint:** S6
 - **Week:** W1
 - **Work package:** Equipment
-- **Steps (how to do it):** 1. Endpoint listing equipment per project: ID, name, type, make/model, current status.
-  2. Include every extra parameter DATOMS sends for that device.
+- **Steps (how to do it):** 1. Endpoint listing equipment per project (kind = 'physical' only): ID, name, type, make/model, current status, plus extra nameplate fields as optional columns.
+  2. Every parameter DATOMS sends for a device is available from GET /assets/{id} (device card). The list endpoint carries no live values (ADR 0008).
 - **Output when done:** Data for the equipment table
 - **Now done by:** You (backend)
 - **Requirement:** Brief: crane utilisation, asset tracking; Sheet: L2 Equipment
@@ -676,19 +682,19 @@
 - **Week:** W1–W2
 - **Work package:** Equipment
 - **Steps (how to do it):** 1. Endpoint for one device: latest values of every parameter.
-  2. Today's timeline of status changes (running, idle, off) from DATOMS events.
+  2. Today's timeline of status changes (running, idle, off) as observed by Nexus in polls, labelled "observed by Nexus" (ADR 0007). DATOMS's own status history is used only if a later ADR adds it.
 - **Output when done:** Data for the device card
 - **Now done by:** You (backend)
 - **Requirement:** Sheet: L2 Equipment
 - **Depends on:** S6-01
 - **Estimate (days):** 2
-- **Acceptance check:** Timeline matches DATOMS events
+- **Acceptance check:** Timeline shows the status changes Nexus observed, labelled "observed by Nexus", accurate to one poll interval
 
 ### S6-03 · Info box 2 counts: tower cranes, hoists, all equipment (total / idle)
 - **Sprint:** S6
 - **Week:** W2
 - **Work package:** Equipment
-- **Steps (how to do it):** 1. Counts per project: tower cranes total/idle, hoists total/idle, all equipment total/idle, using DATOMS statuses.
+- **Steps (how to do it):** 1. Counts per project (kind = 'physical' only): tower cranes total/idle, hoists total/idle, all equipment total/idle, using DATOMS statuses.
   2. Add to the project summary (S5-03).
 - **Output when done:** Numbers for info box 2
 - **Now done by:** You (backend)
@@ -697,18 +703,18 @@
 - **Estimate (days):** 1
 - **Acceptance check:** Counts follow DATOMS statuses
 
-### S6-04 · Notifications sync from DATOMS and API (filter by site, asset, type)
+### S6-04 · Notifications from the DATOMS bulk response, and API (filter by site, asset, type)
 - **Sprint:** S6
 - **Week:** W2
 - **Work package:** Notifications
-- **Steps (how to do it):** 1. Worker job every minute: fetch DATOMS notifications and faults.
-  2. Store them; endpoint to list with filters: site, asset, type, date.
+- **Steps (how to do it):** 1. In the live poll: take DATOMS alerts and faults from the bulk response (ADR 0010; no separate events job).
+  2. Store them; endpoint to list with filters: site, asset, type, date. "Mark all read" moves a read marker (docs/06 section 3, item 11).
   3. Show them exactly as DATOMS sends them.
 - **Output when done:** Notifications in Nexus
 - **Now done by:** You (backend)
 - **Requirement:** Innovo: alerts as they come
-- **Depends on:** S3-01
-- **External blocker:** DATOMS: notifications in API?
+- **Depends on:** S3-03
+- **External blocker:** Alert field names in the bulk response (Q22)
 - **Estimate (days):** 2
 - **Acceptance check:** Same notifications as DATOMS, newest first
 
@@ -949,7 +955,7 @@
 - **Sprint:** S9
 - **Week:** W1
 - **Work package:** Pilot
-- **Steps (how to do it):** 1. Give pilot users access on GHAFWOODS.
+- **Steps (how to do it):** 1. Give pilot users access on GHAFWOODS in **prod** (there is no test environment, ADR 0008): only pilot users are assigned to the Entra app during the pilot.
   2. Walk through each screen with them.
   3. Record issues in the backlog.
 - **Output when done:** Pilot feedback list

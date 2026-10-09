@@ -26,8 +26,7 @@ nexus/
 │   ├── workflows/
 │   │   ├── ci.yml                    # lint, typecheck, test, build, contract tests on every PR
 │   │   ├── deploy-dev.yml            # on merge to main
-│   │   ├── deploy-test.yml           # manual promote of a dev build
-│   │   └── deploy-prod.yml           # manual approval
+│   │   └── deploy-prod.yml           # manual approval (no test environment, ADR 0008)
 │   ├── pull_request_template.md
 │   └── CODEOWNERS                    # apps/web → frontend dev; apps/api, apps/worker, db → backend dev
 │
@@ -45,6 +44,7 @@ nexus/
 │   ├── migrations/                   # 0001_init.sql, 0002_….sql (node-pg-migrate, SQL, up + down)
 │   ├── seeds/
 │   │   ├── dev-roles.sql             # roles, permissions, demo group mappings
+│   │   ├── dev-settings.sql          # dev only: poll.subset_external_ids, small budget.max_share (ADR 0005)
 │   │   └── scale-100-sites.ts        # generates 100 sites / 5,000 assets from fixtures
 │   └── README.md
 │
@@ -130,12 +130,12 @@ nexus/
 │           ├── worker.module.ts
 │           ├── leader/               # pg advisory-lock leader election
 │           ├── jobs/
-│           │   ├── catalogue-sync.job.ts   # hourly: sites, assets, parameters
-│           │   ├── live-poll.job.ts        # every 60 s: bulk latest → packets, latest, status, location
-│           │   ├── events-sync.job.ts      # when DATOMS events endpoint exists
-│           │   ├── history-backfill.job.ts # when DATOMS history endpoint exists; gap repair
-│           │   ├── rollups.job.ts          # every minute: refresh 5m/1h/1d rollups
-│           │   └── maintenance.job.ts      # daily: create future partitions, drop/archive old ones
+│           │   ├── catalogue-sync.job.ts   # hourly (+ early on unknown ids): assets, nameplate; safe retire
+│           │   ├── live-poll.job.ts        # 60 s default, per asset type: BULK endpoint only (ADR 0010) →
+│           │   │                           #   packets, latest, status, location, alerts (no separate events job)
+│           │   ├── rollups.job.ts          # SQL once per CLOSED 5-min bucket (+2 poll intervals), then 1h, 1d (ADR 0007)
+│           │   └── maintenance.job.ts      # daily: create future partitions, drop old ones (archive deferred, ADR 0008)
+│           │   # history-backfill: ON HOLD until a DATOMS history feed is decided by ADR (ADR 0010)
 │           ├── pipeline/             # map SourceReading → DB writes, change detection, publish
 │           ├── publish/              # Web PubSub publisher (group per project)
 │           └── metrics/              # sync_run writer, OpenTelemetry metrics
@@ -149,15 +149,18 @@ nexus/
 │   │       └── constants.ts          # project states, status display names (labels only, from data)
 │   ├── datoms-client/                # ALL DATOMS knowledge lives here
 │   │   ├── src/
-│   │   │   ├── client.ts             # DatomsClient: listAssets, getLatest, queryLatestBulk, (later) sites, events, history
+│   │   │   ├── client.ts             # DatomsClient: listAssets, queryLatestBulk (fleet + id mode); getLatest = CLI only
 │   │   │   ├── http.ts               # fetch + gzip + retry/backoff + Retry-After
-│   │   │   ├── budget.ts             # rate + credit budget tracker (limits from 07-datoms-integration.md)
-│   │   │   ├── paging.ts             # page walker, 422 halving
-│   │   │   ├── mapping.ts            # DATOMS JSON → Source* types
+│   │   │   ├── budget.ts             # rate + credit budget tracker × budget.max_share (07 section 4, ADR 0005)
+│   │   │   ├── paging.ts             # page walker, 422 halving, learned page size
+│   │   │   ├── mapping.ts            # THE ONLY place DATOMS field names live: DATOMS JSON → Source* types
+│   │   │   │                         # (values, status, location, asset type, site link, kind, alerts). When
+│   │   │   │                         # the DATOMS sample (Q21) arrives, only this file + its tests change.
 │   │   │   ├── errors.ts
 │   │   │   └── types.ts              # raw DATOMS response types (private to this package)
-│   │   ├── fixtures/                 # recorded real responses (no secrets), used by tests and dev
-│   │   ├── scripts/                  # CLI: check, assets, latest, bulk, poll --minutes N, record
+│   │   ├── fixtures/                 # recorded real responses (tokens/headers removed), incl. the DATOMS sample bulk response (Q21)
+│   │   ├── scripts/                  # CLI: check, assets, latest (data/latest: CLI only), bulk, poll --minutes N, record
+│   │   │                             # live runs use id mode by default; fleet mode needs --fleet (ADR 0005)
 │   │   └── test/
 │   ├── connectors/
 │   │   ├── core/                     # SourceConnector interface + Source* types
@@ -169,7 +172,7 @@ nexus/
 │   ├── main.bicep
 │   ├── modules/                      # containerApps, postgres, keyVault, webPubSub, staticWebApp,
 │   │                                 # appInsights, acr, network, storage, frontDoor
-│   └── env/                          # dev.bicepparam, test.bicepparam, prod.bicepparam
+│   └── env/                          # dev.bicepparam, prod.bicepparam (two cloud environments, ADR 0008)
 │
 └── tests/
     ├── load/                         # k6 scripts: api-1000-users.js, worker-5000-assets

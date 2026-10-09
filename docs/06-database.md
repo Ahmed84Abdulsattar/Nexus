@@ -2,15 +2,15 @@
 
 - **Reference SQL:** `db/schema.sql`. It was tested on PostgreSQL 16 and runs as-is on Azure Database for PostgreSQL Flexible Server 16 and on on-premise PostgreSQL 16.
 - **Migrations:** `db/migrations/NNNN_name.sql` (node-pg-migrate, with up and down). The schema file and the migrations must always describe the same state.
-- **Why no TimescaleDB:** see `adr/0003-database-time-series.md`.
+- **Why no TimescaleDB:** see `adr/0003-database-time-series.md` (amended by `adr/0007-sql-rollups-per-closed-bucket.md`).
 
 ## 1. Schemas and ownership
 | Schema | Tables | Owned by module |
 |---|---|---|
-| `core` | `setting`, `feature_flag`, `source_system`, `district`, `project`, `building`, `level`, `zone`, `asset_type`, `asset`; views `v_asset_live`, `v_project_asset_counts` | portfolio, spatial, assets, config |
+| `core` | `setting`, `feature_flag`, `source_system`, `district`, `project`, `building`, `level`, `zone`, `asset_type`, `asset`; views `v_asset_live`, `v_project_asset_counts` (equipment only), `v_site_metric_live` | portfolio, spatial, assets, config |
 | `access` | `app_user`, `role`, `permission`, `role_permission`, `group_role`, `user_role`, `project_access`; functions `user_roles()`, `user_project_ids()` | access |
 | `telemetry` | `parameter`, `asset_parameter`, `latest_packet`, `packet`, `rollup_5m`, `rollup_1h`, `rollup_1d`, `status_map`, `asset_status_current`, `asset_status_history`, `asset_location_current`, `asset_location_history` | telemetry |
-| `events` | `event`, `event_read` | events |
+| `events` | `event`, `event_read`, `read_marker` | events |
 | `integration` | `sync_run`, `api_call`, `link_todo`, `cursor` | integrations |
 | `audit` | `log` | audit |
 
@@ -38,6 +38,8 @@ erDiagram
   PARAMETER ||--o{ ASSET_PARAMETER : "reported by"
   ASSET ||--o{ ASSET_PARAMETER : reports
   APP_USER ||--o{ PROJECT_ACCESS : granted
+  APP_USER ||--o{ READ_MARKER : "read up to"
+  APP_USER ||--o{ EVENT_READ : "read one by one"
   PROJECT ||--o{ PROJECT_ACCESS : "visible to"
   ROLE ||--o{ ROLE_PERMISSION : has
   ROLE ||--o{ GROUP_ROLE : "mapped from Entra group"
@@ -49,33 +51,43 @@ erDiagram
 3. **One row per packet, not one row per parameter.** DATOMS sends about 103 parameters per asset per minute. Storing them as one `jsonb` object per packet keeps row counts about 100× lower and stores any new parameter with no schema change. `lz4` compression is set on the jsonb columns, and new partitions inherit it.
 4. **Values exactly as reported.** `values` holds the source's keys and values unchanged. Display names and units come from `telemetry.parameter`, filled from the source. Admins may fill a gap only where the source gives nothing.
 5. **Status as reported.** `asset_status_current.source_value` stores the DATOMS label exactly. `telemetry.status_map` translates labels to the four display colours (running, idle, maintenance, off). This is a lookup table of DATOMS's own labels; Nexus never works out a status from values. An unmapped label shows as `unknown` and creates a `link_todo` row of type `status_value` for an admin.
-6. **Daily partitions** for `packet` and `api_call`; **monthly** for `rollup_5m`, `rollup_1h`, status and location histories, events and audit. `rollup_1d` is not partitioned (small, kept forever). Dropping a partition is instant retention, with no slow `DELETE`.
-7. **Rollups instead of continuous aggregates.** The `refresh_rollup_5m()` and `refresh_rollup_combine()` functions are safe to run again for any time window. The worker calls them every minute for the recent window and again for late data. Daily buckets are **local days in Asia/Dubai**.
-8. **BIM-ready spatial model.** `building → level → zone`, with nullable `building_id / level_id / zone_id` on `core.asset` and `events.event`, and `bim_ref` jsonb for IFC GUIDs, APS URNs or ArcGIS I3S layer ids.
+6. **Daily partitions** for `packet` and `api_call`; **monthly** for `rollup_5m`, `rollup_1h`, status and location histories, events, `event_read` and audit. `rollup_1d` is not partitioned (small, kept forever). Dropping a partition is instant retention, with no slow `DELETE`.
+7. **Rollups instead of continuous aggregates (ADR 0007).** The `refresh_rollup_5m()` and `refresh_rollup_combine()` functions are safe to run again for any time window. In phase 1 they are the **only** rollup path. The worker runs `refresh_rollup_5m` **once per closed 5-minute bucket**, `rollup.close_grace_intervals` (2) poll intervals after the bucket ends, and again only for closed buckets that receive late packets. It never runs over a sliding window or every minute. Daily buckets are **local days in Asia/Dubai**. Each rollup row stores `packets`, the number of samples Nexus stored, which the API reports as data coverage.
+8. **BIM-ready spatial model.** `building → level → zone`, with nullable `building_id / level_id / zone_id` on `core.asset` and `events.event`, and `bim_ref` jsonb for IFC GUIDs, APS URNs or ArcGIS I3S layer ids. `building`, `level` and `zone` each have nullable `source_system` + `external_id` (unique together) and `retired_at`, so a BIM model or another platform can feed them later with the same identity and never-delete rules as assets.
 9. **Access is data.** Entra groups map to roles in `group_role`. Project scope sits in `project_access` (per user or per group). Roles with `all_projects = true` (admin, leadership) skip the project filter.
+10. **Asset kind (ADR 0009).** `core.asset.kind` is `physical` for physical sensored items of any category (including DGs, solar and mains) or `site_metric` for site-level values as the source reports them, such as energy site totals. **Every equipment list, count, map layer and view filters `kind = 'physical'`.** `v_asset_live` and `v_project_asset_counts` already do. Site-level values are read through `v_site_metric_live`.
+11. **Read state that doesn't grow with users × events.** "Mark all read" moves one row in `events.read_marker` (per user, either global or per project). `events.event_read` holds only events read one by one after the marker. It is partitioned by `occurred_at` like `events.event` and dropped with it. Unread = events in scope with `occurred_at` later than the user's latest applicable marker and no `event_read` row.
 
 ## 4. Write paths (worker)
 | Job | Writes | Rule |
 |---|---|---|
-| Catalogue sync (hourly) | `core.project`, `core.asset`, `core.asset_type` (new source names become `generic` plus a `link_todo`), `telemetry.parameter` | Upsert on `(source_system, external_id)`; set `last_seen_at`; retire missing rows |
-| Live poll (60 s) | `telemetry.packet` (insert … ON CONFLICT DO NOTHING), `telemetry.latest_packet` (upsert only if `ts` is newer), `telemetry.asset_parameter`, `asset_status_current` + `asset_status_history` (on change only), `asset_location_*` (on change only) | Skip a packet whose `ts` is not newer than the stored `latest_packet.ts`. Reject a `ts` more than 10 minutes in the future (log it). |
-| Rollups | **5 min: built in the worker's memory** from the packets it writes (min, max, sum, count, last per numeric parameter, per asset). One upsert per asset when each 5-minute bucket closes. **1 h:** `refresh_rollup_combine` once per closed hour, in batches of 1,000 assets. **1 d:** once per closed Dubai day. The live screen never waits for rollups; charts of the current hour or day read the finer table for the open part. | `refresh_rollup_5m()` (SQL) is the **recovery path only**: rebuild the open bucket after a worker restart, late packets (the poll job records the oldest time it touched), and history backfill. Never call it every minute over a sliding window (measured: too slow at scale, see section 6). |
-| Events sync | `events.event` | Upsert on `(source_system, external_id, occurred_at)` |
-| Maintenance (daily 02:00 Dubai) | Creates 7 days of future daily partitions and 2 months of future monthly ones; drops partitions past retention (archives first if `archive.enabled`) | Settings in `core.setting`: `retention.packet_days`, `rollup_5m_days`, `rollup_1h_days`, `event_days`, `status_history_days`, `location_history_days`, `api_call_days`, `audit_days`. `rollup_1d` is kept forever. |
+| Catalogue sync (hourly, `GET /assets`) | `core.asset` (names, nameplate) | Upsert on `(source_system, external_id)` and set `last_seen_at`. **Retire safely:** only after a complete page walk where the number seen equals `pagination.total`, and only for rows missed in `catalogue.retire_after_misses` (2) consecutive complete walks. If more than `catalogue.retire_max_fraction` (5%) of active assets would be retired, retire nothing and alert. |
+| Live poll (60 s, bulk endpoint only, ADR 0010) | `core.project` (sites), `core.asset_type` (new source type names become `generic` plus a `link_todo`), `core.asset` (site link, `kind`), `telemetry.parameter` (new keys), `telemetry.packet` (insert … ON CONFLICT DO NOTHING), `telemetry.latest_packet` (upsert only if `ts` is newer), `telemetry.asset_parameter` (**insert new pairs only**), `asset_status_current` + `asset_status_history` (**on change only**), `asset_location_*` (on change only), `events.event` (alerts from the bulk rows) | Skip a packet whose `ts` is not newer than the stored `latest_packet.ts`. Reject a `ts` more than 10 minutes in the future (log it). **No per-poll bookkeeping updates:** the worker keeps known (asset, parameter) pairs in memory and refreshes `asset_parameter.last_seen_at` at most daily. `asset_status_current.observed_at` is written on change only. Rows for DATOMS ids that the catalogue doesn't know yet are skipped, counted in `sync_run` and trigger an early catalogue sync (at most once per 5 min). |
+| Rollups (ADR 0007) | `rollup_5m`, `rollup_1h`, `rollup_1d` | **5 min:** `refresh_rollup_5m(bucket_start, bucket_end)` runs **once per closed bucket**, at bucket end + `rollup.close_grace_intervals` × the current poll interval (default 2 × 60 s). The poll job records the oldest `ts` it wrote. If that falls in an already-closed bucket, only those buckets are refreshed again. **1 h:** `refresh_rollup_combine` right after the hour's last 5-minute bucket is refreshed, in batches of 1,000 assets. **1 d:** once per closed Dubai day. No sliding window, no per-minute refresh, and no in-memory accumulators in phase 1 (that is a scale trigger in `12` §2). The live screen never waits for rollups; charts of the current hour or day read the finer table for the open part. |
+| Alerts (in the live poll) | `events.event` | Upsert on `(source_system, external_id, occurred_at)`. Alerts come from the bulk response (ADR 0010); there is no separate events-sync job. |
+| Maintenance (daily 02:00 Dubai) | Creates 7 days of future daily partitions and 2 months of future monthly ones (including `event_read`); drops partitions past retention. Archiving to Blob is **deferred** (`archive.enabled = false`, ADR 0008, Q15). | Settings in `core.setting`: `retention.packet_days` (90, stays until Q15), `rollup_5m_days` (**60**), `rollup_1h_days`, `event_days` (also used for `event_read`), `status_history_days`, `location_history_days`, `api_call_days`, `audit_days`. `rollup_1d` is kept forever. |
 
-Bulk writes use multi-row `INSERT … SELECT FROM unnest(...)` or `COPY`, one transaction per page of 500 assets.
+Bulk writes use multi-row `INSERT … SELECT FROM unnest(...)` or `COPY`, one transaction per page of 500 assets. `latest_packet` (fillfactor 70) and `asset_status_current` (fillfactor 80) leave free space on each page so the frequent updates stay HOT, with no index churn.
 
 ## 5. Read paths (API): examples
 ```sql
--- Project page markers + info box data (one query, ~ms)
-SELECT * FROM core.v_asset_live WHERE project_id = $1;
+-- Project page markers (one query, ~ms). Equipment only (the view filters kind = 'physical').
+-- The marker list does not select latest_values (live messages are slim; the asset panel fetches values).
+SELECT asset_id, name, asset_type, category, icon, status_display, status_source_value,
+       last_packet_at, latitude, longitude
+FROM core.v_asset_live WHERE project_id = $1;
 
--- Info box 2 counts
+-- Info box 2 counts (equipment only)
 SELECT asset_type, status_display, assets FROM core.v_project_asset_counts WHERE project_id = $1;
 
--- Trend: one parameter over a range, choosing the table by range length
---   ≤ 6 h → telemetry.packet ; ≤ 7 d → rollup_5m ; ≤ 90 d → rollup_1h ; else → rollup_1d
-SELECT bucket, (stats->$2->>'avg')::numeric AS avg,
+-- Energy site totals as reported (site-level records, kind = 'site_metric')
+SELECT name, last_packet_at, latest_values FROM core.v_site_metric_live WHERE project_id = $1;
+
+-- Trend: one parameter over a range, choosing the table by range length and retention
+--   ≤ 6 h → telemetry.packet ; ≤ 7 d AND within retention.rollup_5m_days (60) → rollup_5m ;
+--   ≤ 90 d → rollup_1h ; else → rollup_1d. The API returns the resolution it actually used.
+-- `packets` is returned with each bucket as data coverage (ADR 0007).
+SELECT bucket, packets, (stats->$2->>'avg')::numeric AS avg,
        (stats->$2->>'min')::numeric AS min, (stats->$2->>'max')::numeric AS max
 FROM telemetry.rollup_1h
 WHERE asset_id = $1 AND bucket >= $3 AND bucket < $4
@@ -114,30 +126,34 @@ Test machine: PostgreSQL 16.13 with 2 vCPU and 8 GB RAM (shared_buffers 2 GB), a
 | Unread count, 20 projects, 30 days | event ⟕ event_read | 24 ms | 45 ms |
 | One poll write (300 packets + 300 latest upserts) | insert/upsert | 6 ms | — |
 | 5-min rollup in SQL, one closed bucket, 300 assets | `refresh_rollup_5m` | 0.68 s | — |
-| 5-min rollup in SQL, sliding 15-min window, 300 assets | `refresh_rollup_5m` | 1.6 s | — |
+| 5-min rollup in SQL, sliding 15-min window, 300 assets (not used; for comparison) | `refresh_rollup_5m` | 1.6 s | — |
 | Hourly close, one hour, 300 assets | `refresh_rollup_combine` | 1.8 s | — |
 
 **What this means:**
 - Every screen query is well inside the N-04 target (p95 < 300 ms for live screens, < 1 s for charts), including cold reads. Cold reads only happen after a restart; afterwards the data is cached.
 - The DB load from users is tiny. The heavy work is the rollups.
-- **Rollups:** SQL-side rollups parse every jsonb packet (~0.3 ms per packet). A sliding SQL refresh every minute would take ~25–30 s at 5,000 assets, so the design is: in-memory 5-minute rollups in the worker (near-zero DB cost), with SQL only for recovery, and hourly and daily combines once per period. The estimates for hourly close are ~30 s at 5,000 assets and ~2 min at 20,000; this runs in the background, batched by 1,000 assets.
+- **Rollups (ADR 0007):** SQL-side rollups parse every jsonb packet (~0.3 ms per packet). A sliding SQL refresh every minute would take ~25–30 s at 5,000 assets, so it is never used. Phase 1 refreshes each **closed** 5-minute bucket once: about 0.68 s at 300 assets, an estimated ~11 s per 5 minutes at 5,000 and ~45 s at 20,000. Hourly and daily combines run once per period; the hourly close is estimated at ~30 s at 5,000 assets and ~2 min at 20,000, in the background, batched by 1,000 assets. If the closed-bucket refresh passes 30 s, the `12` §2 trigger moves 5-minute rollups into the worker's memory (new ADR).
+- **Re-benchmark with real fixtures in S2/S3.** This benchmark used random values and short keys (`p001`…`p103`). Re-run it with the recorded DATOMS sample (Q21) once it arrives, including the closed-bucket refresh time and the row sizes in section 6a. Decide then whether a more compact rollup `stats` format is needed (an ADR if it changes).
 - Re-run this benchmark (the `db/seeds/scale-100-sites.ts` seed plus these queries) after any schema change on telemetry tables, and paste the table into the PR.
 
-## 6a. Sizing estimates (measured: 591 MB per day for 300 assets of raw packets with random values; real readings compress better)
-These assume about 1 packet per asset per minute and about 103 numeric parameters per packet. They are estimates; measure the real numbers.
+## 6a. Sizing estimates (from the benchmark's measured row sizes)
+Measured on 7 Oct 2026: about **1.37 KB per raw packet row** (591 MB for 432,000 rows) and about **4.05 KB per rollup row** (5-minute: 2.8 GB for 691,200 rows; hourly: 5.3 GB for 1,296,000 rows). Rollup rows are larger because each of the ~103 parameters stores min, max, avg, last and n. Per asset per day: raw ≈ 1.97 MB, 5-minute ≈ 1.17 MB, hourly ≈ 98 KB.
 
-| Fleet | Packets/day | Raw packets (90 days) | 5-min rollups (400 days) | Hourly (5 years) |
-|---|---|---|---|---|
-| 250 assets (now) | 360 k | ~35–80 GB | ~25–60 GB | ~10–20 GB |
-| 2,000 assets | 2.9 M | ~0.3–0.6 TB | ~0.2–0.5 TB | ~0.1 TB |
-| 20,000 assets | 29 M | Move raw history off PostgreSQL (see `12-scalability.md`) | | |
+These assume 1 packet per asset per minute and 103 numeric parameters, with the retention in `core.setting` (raw 90 days, 5-minute **60 days**, hourly 5 years). The benchmark used random values and short keys, so real data may be smaller (repeating values compress better) or larger (longer keys). **Re-measure with real fixtures in S2/S3.**
 
-If the measured size is high, first lower `retention.packet_days`, or archive raw partitions to Blob as Parquet. Do not change the table design.
+| Fleet | Packets/day | Raw packets (90 d) | 5-min rollups (60 d) | Hourly (5 years) | Total at steady state |
+|---|---|---|---|---|---|
+| 250 assets (pilot) | 360 k | ~44 GB | ~18 GB | ~45 GB (~9 GB/yr) | ~105 GB |
+| 2,000 assets | 2.9 M | ~355 GB | ~140 GB | ~360 GB (~72 GB/yr) | ~0.85 TB |
+| 20,000 assets | 29 M | ~3.5 TB | ~1.4 TB | ~3.6 TB (~0.7 TB/yr) | ~8.5 TB |
+
+Add indexes (~10–20%), and remember that zone-redundant HA keeps a second copy. Raw packets pass 1 TB at about **5,600 assets**. That is the planned point for the raw-telemetry step in `12-scalability.md` §2: archive or move raw packets, with an ADR. If the measured size is high, first lower `retention.packet_days` (Innovo decides, Q15), or archive raw partitions to Blob as Parquet (deferred, ADR 0008). Do not change the table design without an ADR.
 
 ## 7. Indexes (already in the schema)
 - `asset(project_id)` (partial, active only), `asset(asset_type_id)`.
 - **Search:** trigram GIN indexes (`pg_trgm`) on `asset.name`, `project.name` and `event.title`. These make `ILIKE '%text%'` fast at any size (0.5 ms over 25,000 assets). Search endpoints must use `ILIKE` on these columns (or `similarity()` for typo-tolerant search) and always apply project scope.
-- `packet` primary key `(asset_id, ts)` for history per asset, and `packet(ts)` for rollup scans.
+- `packet` primary key `(asset_id, ts)` for history per asset, and `packet(ts)` for the closed-bucket rollup scans. A BRIN index on `ts` may replace the B-tree (much smaller, since inserts arrive in time order), but only with `EXPLAIN ANALYZE` evidence from the S2/S3 re-benchmark.
+- `event_read` primary key `(user_id, event_id, occurred_at)`; `read_marker` unique per user (global) and per user + project.
 - Rollup primary keys `(asset_id, bucket)`.
 - `event(project_id, occurred_at DESC)` and `event(asset_id, occurred_at DESC)`.
 - `project_access` by user and by group.
@@ -152,8 +168,8 @@ If the measured size is high, first lower `retention.packet_days`, or archive ra
 
 ## 9. Database security
 - App roles and exact grants are in `db/roles.sql` (run once per environment):
-  - `nexus_api`: read on everything. Writes on: `access.*`; `events.event_read`; `audit.log` (insert); the admin-held project and spatial tables; `core.asset` (link columns only); `asset_type`, `setting`, `feature_flag`, `status_map`; `telemetry.parameter` (display columns only); `integration.link_todo`.
-  - `nexus_worker`: read on everything. Writes on synced `core.project/asset/asset_type`, `telemetry.*`, `events.event`, `integration.*`. Partition maintenance goes through SECURITY DEFINER functions.
+  - `nexus_api`: read on everything. Writes on: `access.*`; `events.event_read` and `events.read_marker`; `audit.log` (insert); the admin-held project and spatial tables; `core.asset` (link columns only, not `kind`); `asset_type` (including `poll_interval_seconds`), `setting`, `feature_flag`, `status_map`; `telemetry.parameter` (display columns only); `integration.link_todo`.
+  - `nexus_worker`: read on everything. Writes on synced `core.project/asset/asset_type`, `telemetry.*`, `events.event`, `integration.*`. No writes on per-user read state. Partition maintenance goes through SECURITY DEFINER functions.
   - `nexus_migrator`: DDL, and owns the functions.
   Every role has the least access it needs.
 - The API never connects as the owner. Entra (managed identity) is used for database auth in Azure where possible.

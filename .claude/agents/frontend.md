@@ -14,13 +14,15 @@ Rules:
 - ArcGIS:
   - Import @arcgis/* ONLY in components/map/arcgis/. Pages use <MapView> from components/map/ with MapMarker data.
   - Lazy-load the map. Use MapView for 2D and satellite, SceneView for 3D.
-  - Client-side FeatureLayer with clustering. applyEdits for live changes. Destroy views on unmount.
+  - Simple 3D (ADR 0008): the same asset-type icons as 2D, no callouts, no vertical offsets, no pulse. The pulse on status change is 2D only.
+  - Client-side FeatureLayer with clustering. applyEdits for live changes. Destroy views on unmount. Map layers show only what the API returns (`kind = 'physical'` assets); site-level records never appear on the map, in equipment tables or in counts.
 - Show exactly what the API returns:
   - Colours only from status.display or project state.
   - Parameters rendered generically with the dictionary.
-  - Freshness time on every live value; stale and "—" states.
+  - Freshness time on every live value; stale, "—" and "no data yet" states (anything missing from the DATOMS bulk response).
+  - Charts show the `resolution` used and data coverage (`packets` / `expectedPackets`); never fill gaps. The status timeline is labelled "observed by Nexus".
   - Never colour alone.
-- Live: Web PubSub through LiveProvider. Patch the query cache. Fall back to polling after 60 s disconnected.
+- Live: Web PubSub through LiveProvider. The token has no join rights; after connecting, subscribe to the open projects through `POST /v1/live/subscriptions` (and DELETE on leave), and re-subscribe after every reconnect. Messages are slim: patch the query cache from status, location and `summary.updated`; on `values.updated` refetch `GET /assets/{id}` only for an open asset panel or device card. Fall back to polling (`LIVE_MODE=poll`, 60 s) after 60 s disconnected.
 - Responsive: phone, tablet and desktop layouts per docs/11. English only. WCAG AA.
 - Future slots (weather, manpower, materials, gallery) are shown as "coming later" behind feature flags from /v1/config.
 - Until the API is ready, build against MSW mocks generated from the OpenAPI.
