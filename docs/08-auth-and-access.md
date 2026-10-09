@@ -15,6 +15,7 @@
 
 ## 2. Request flow in the API
 1. **EntraJwtGuard** (global). It validates the signature against the tenant JWKS (cached), plus `iss`, `aud = api://nexus-api`, `exp`/`nbf`, `tid = Innovo tenant` and `scp` contains `access_as_user`.
+   - Built in S1-02 (`apps/api/src/common/auth/`): the JWKS URL comes from config (`ENTRA_JWKS_URL`, default derived from the tenant id). A bad or expired token gives 401, a valid token without `access_as_user` gives 403, an unreachable JWKS gives 503. `aud` may be the identifier URI or the API client id (Q29). Until S1-01 the user, role and scope lookup sits behind the `AccessDirectory` interface with an in-memory implementation.
 2. **Load the user.** Upsert `access.app_user` by `oid` (name, email, last_seen_at). An inactive user gets 403.
 3. **Build the AccessContext** (cached 5 min per user + group hash):
    ```ts
