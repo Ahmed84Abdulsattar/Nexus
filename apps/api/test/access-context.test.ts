@@ -91,4 +91,17 @@ describe('AccessContextService', () => {
     directory.setActive(OID, true);
     await expect(service.resolve({ oid: OID, groupIds: [] })).resolves.toBeDefined();
   });
+
+  it('hands out a read-only, frozen context', async () => {
+    const { directory, service } = setup();
+    directory.assignUserRole(OID, 'viewer');
+    const ctx = await service.resolve({ oid: OID, groupIds: [] });
+    expect(Object.isFrozen(ctx)).toBe(true);
+    expect(Object.isFrozen(ctx.roles)).toBe(true);
+    expect(() => (ctx.roles as string[]).push('admin')).toThrow(TypeError);
+    expect(() => (ctx.permissions as Set<string>).add('admin.settings')).toThrow(TypeError);
+    expect(() => (ctx.projectIds as Set<string>).add('p')).toThrow(TypeError);
+    expect(ctx.permissions.has('asset.read')).toBe(true);
+    expect(await service.resolve({ oid: OID, groupIds: [] })).toBe(ctx);
+  });
 });

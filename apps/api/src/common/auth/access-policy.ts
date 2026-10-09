@@ -26,18 +26,17 @@ function readLevel(reflector: Reflector, target: Target): AccessPolicy[] {
 }
 
 /**
- * The decorators of the handler win; the class decorators apply only to handlers that have none.
- * Exactly one decorator on the chosen level is valid.
+ * Access decorators are method-level only. Any access metadata on the controller class is a
+ * conflict (denied at runtime, and the default-deny scan fails), so a class decorator can never
+ * be silently replaced by, or merged with, a method decorator.
  */
 export function resolveAccessPolicy(
   reflector: Reflector,
   handler: Target,
   controller: Target,
 ): AccessPolicy {
-  for (const target of [handler, controller]) {
-    const found = readLevel(reflector, target);
-    if (found.length > 1) return { kind: 'conflict' };
-    if (found[0]) return found[0];
-  }
-  return { kind: 'none' };
+  if (readLevel(reflector, controller).length > 0) return { kind: 'conflict' };
+  const found = readLevel(reflector, handler);
+  if (found.length > 1) return { kind: 'conflict' };
+  return found[0] ?? { kind: 'none' };
 }

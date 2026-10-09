@@ -85,18 +85,24 @@ export class EntraJwtGuard implements CanActivate {
         requiredClaims: ['exp'],
       }));
     } catch (err) {
-      if (err instanceof errors.JOSEError && !(err instanceof errors.JWKSTimeout)) {
+      if (err instanceof errors.JOSEError) {
         // Detail is for our logs only; the client just learns the token is not acceptable.
         this.logger.debug(`Token rejected: ${err.code}`);
         throw new UnauthorizedException('Invalid or expired token.');
       }
-      // Key fetch failed or timed out: not the caller's fault.
-      this.logger.error(`JWKS unavailable: ${err instanceof Error ? err.message : String(err)}`);
+      // KeySetUnavailableError or anything unexpected: not the caller's fault.
+      this.logger.error(err instanceof Error ? err.message : String(err));
       throw new ServiceUnavailableException('Token keys are temporarily unavailable.');
     }
 
     if (typeof payload['tid'] !== 'string' || payload['tid'].toLowerCase() !== auth.tenantId) {
       throw new UnauthorizedException('Token is from another tenant.');
+    }
+    // Only tokens issued to the Nexus SPA. Other apps of the tenant must not reach the API even
+    // if they obtained the scope. (S0-04 also sets "assignment required" on the enterprise app.)
+    const azp = payload['azp'];
+    if (typeof azp !== 'string' || azp.toLowerCase() !== auth.webClientId) {
+      throw new ForbiddenException('Token was not issued to the Nexus web app.');
     }
     // A valid token without the delegated scope (for example an app-only token) is not for users.
     const scopes = typeof payload['scp'] === 'string' ? payload['scp'].split(' ') : [];

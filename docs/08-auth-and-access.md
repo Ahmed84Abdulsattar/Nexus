@@ -8,15 +8,15 @@
 | `nexus-worker` | (none) | Uses a managed identity for Key Vault and Postgres; never signs in as a user |
 | `nexus-reporting` (later) | Service principal | Client credentials, app role `Reporting.Read` |
 
-- Single tenant (the Innovo tenant only). Assignment required = yes, so only assigned users and groups can sign in at all.
+- Single tenant (the Innovo tenant only). Assignment required = yes, so only assigned users and groups can sign in at all. S0-04 must set this on the `nexus-api` enterprise app as well as `nexus-web`; the API also refuses tokens whose `azp` is not `ENTRA_WEB_CLIENT_ID`.
 - Entra security groups (suggested): `Nexus-Admins`, `Nexus-Leadership`, `Nexus-ProjectManagers`, `Nexus-SiteUsers`, `Nexus-Viewers`, plus per-project groups if Innovo wants them (e.g. `Nexus-Project-GHAFWOODS`). The final role list is open question Q17.
 - **Groups claim (ADR 0008):** `nexus-api` emits only the groups **assigned to the enterprise application**. Every group used in `access.group_role` or `access.project_access` must be assigned to the app; the admin screen warns when a mapped group is not in any token it has seen. Users must be **direct** members of an assigned group. Group-based assignment needs Entra ID P1 or higher (Q16 asks Innovo IT to confirm the licence and the nested-group behaviour).
 - **No group overage path:** because the claim lists only the few assigned groups, the 200-group overage case doesn't arise, and Nexus does **not** call Microsoft Graph (no `GroupMember.Read.All`, no Graph secret). If a token ever arrives with an overage marker instead of `groups`, the API refuses with 403 and logs it for an admin.
 
 ## 2. Request flow in the API
 1. **EntraJwtGuard** (global). It validates the signature against the tenant JWKS (cached), plus `iss`, `aud = api://nexus-api`, `exp`/`nbf`, `tid = Innovo tenant` and `scp` contains `access_as_user`.
-   - Built in S1-02 (`apps/api/src/common/auth/`): the JWKS URL comes from config (`ENTRA_JWKS_URL`, default derived from the tenant id). A bad or expired token gives 401, a valid token without `access_as_user` gives 403, an unreachable JWKS gives 503. `exp`/`nbf` allow 30 s of clock skew. `aud` may be the identifier URI or the API client id until S0-04 confirms the real token, then only that one is accepted (Q29). `AUTH_MODE=dev` is accepted only with `APP_ENV=local` and is not implemented yet. Until S1-01 the user, role and scope lookup sits behind the `AccessDirectory` interface with an in-memory implementation.
-2. **Load the user.** Upsert `access.app_user` by `oid` (name, email, last_seen_at). An inactive user gets 403.
+   - Built in S1-02 (`apps/api/src/common/auth/`): the JWKS URL comes from config (`ENTRA_JWKS_URL`, default derived from the tenant id; an override is accepted only when `APP_ENV=local`). Keys are cached for 6 h and an unknown `kid` triggers a refetch. A bad or expired token gives 401, a valid token without `access_as_user` gives 403, an unreachable JWKS gives 503. `exp`/`nbf` allow 30 s of clock skew. `aud` may be the identifier URI or the API client id until S0-04 confirms the real token, then only that one is accepted (Q29). `AUTH_MODE=dev` is accepted only with `APP_ENV=local` and is not implemented yet. Until S1-01 the user, role and scope lookup sits behind the `AccessDirectory` interface with an in-memory implementation.
+2. **Load the user.** Upsert `access.app_user` by `oid` (name, email, last_seen_at). An inactive user gets 403. Users are matched by `oid` only; email is never used for authorisation.
 3. **Build the AccessContext** (cached 5 min per user + group hash):
    ```ts
    interface AccessContext {
@@ -29,7 +29,7 @@
    ```
 4. **@RequirePermission('asset.read')** on every controller method, or `@AnySignedIn()` for `/me`, `/config`, `/live/token` and `/live/subscriptions` (which then checks permission and scope per project itself), or `@Public()` for `/health/*` only. A handler with none of them fails a test (default deny).
 5. **Project scope.**
-   - Routes with `:projectId` use `ProjectScopeGuard`, which gives 404 if the project is not in scope. It is 404, not 403, so it doesn't reveal that the project exists.
+   - `ProjectScopeGuard` is a global guard (third, after the permission guard): every route with a `:projectId` parameter gets 404 if the id is not a UUID or the project is not in scope. Nothing opts in. The decorators in step 4 are method-level only; access metadata on a controller class is refused. It is 404, not 403, so it doesn't reveal that the project exists.
    - List and search queries go through `withProjectScope()` in the repository.
    - Asset or event routes look up the project of the asset or event first, then check scope.
 6. **Audit.** Sign-in (first request per session), admin changes and CSV exports are written to `audit.log`.

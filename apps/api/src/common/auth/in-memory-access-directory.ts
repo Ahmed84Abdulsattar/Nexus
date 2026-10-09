@@ -99,11 +99,11 @@ export class InMemoryAccessDirectory implements AccessDirectory {
   }
 
   grantProjectToUser(oid: string, projectId: string): void {
-    add(this.userProjects, this.ensureUser(oid).id, projectId);
+    add(this.userProjects, this.ensureUser(oid).id, projectId.toLowerCase());
   }
 
   grantProjectToGroup(groupId: string, projectId: string): void {
-    add(this.groupProjects, groupId.toLowerCase(), projectId);
+    add(this.groupProjects, groupId.toLowerCase(), projectId.toLowerCase());
   }
 }
 

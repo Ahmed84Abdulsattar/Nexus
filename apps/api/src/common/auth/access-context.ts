@@ -4,13 +4,44 @@ import type { PermissionKey, RoleCode } from '@nexus/shared';
 
 /** docs/08 section 2, step 3. */
 export interface AccessContext {
-  userId: string;
-  roles: RoleCode[];
-  permissions: Set<PermissionKey>;
+  readonly userId: string;
+  readonly roles: readonly RoleCode[];
+  readonly permissions: ReadonlySet<PermissionKey>;
   /** Any role has all_projects. */
-  allProjects: boolean;
-  /** Empty when allProjects is true. */
-  projectIds: Set<string>;
+  readonly allProjects: boolean;
+  /** Lower-case ids. Empty when allProjects is true. */
+  readonly projectIds: ReadonlySet<string>;
+}
+
+/** A Set that throws on change: Object.freeze does not stop Set.add. */
+class ImmutableSet<T> extends Set<T> {
+  override add(): never {
+    throw new TypeError('AccessContext is read-only');
+  }
+  override delete(): never {
+    throw new TypeError('AccessContext is read-only');
+  }
+  override clear(): never {
+    throw new TypeError('AccessContext is read-only');
+  }
+}
+
+function immutableSet<T>(values: Iterable<T>): ReadonlySet<T> {
+  // Fill through Set.prototype.add: the overridden add() is for callers.
+  const set = new ImmutableSet<T>();
+  for (const v of values) Set.prototype.add.call(set, v);
+  return set;
+}
+
+/** A deep-frozen copy; cached contexts are shared between requests and must not change. */
+export function freezeAccessContext(ctx: AccessContext): AccessContext {
+  return Object.freeze({
+    userId: ctx.userId,
+    roles: Object.freeze([...ctx.roles]),
+    permissions: immutableSet(ctx.permissions),
+    allProjects: ctx.allProjects,
+    projectIds: immutableSet([...ctx.projectIds].map((id) => id.toLowerCase())),
+  });
 }
 
 export function hasPermission(ctx: AccessContext, key: PermissionKey): boolean {
@@ -19,7 +50,8 @@ export function hasPermission(ctx: AccessContext, key: PermissionKey): boolean {
 
 /** Project scope check. Callers answer 404 (never 403) when this is false (CLAUDE.md rule 6). */
 export function canAccessProject(ctx: AccessContext, projectId: string): boolean {
-  return ctx.allProjects || ctx.projectIds.has(projectId);
+  // The single place where project ids are compared: case-insensitive.
+  return ctx.allProjects || ctx.projectIds.has(projectId.toLowerCase());
 }
 
 export interface SignedInIdentity {
@@ -79,7 +111,7 @@ export class AccessContextService {
       this.cache.delete(key);
       throw new InactiveUserError();
     }
-    const context = await this.directory.loadAccess(userId, identity.groupIds);
+    const context = freezeAccessContext(await this.directory.loadAccess(userId, identity.groupIds));
     this.cache.set(key, { userId, context, expiresAt: now + ACCESS_CONTEXT_TTL_MS });
     return context;
   }
