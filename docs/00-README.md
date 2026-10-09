@@ -21,7 +21,7 @@ These docs are the single source of truth for people **and** for Claude Code age
 | 14 | `14-testing-quality.md` | Definition of done, test pyramid, review checklist |
 | — | `adr/` | Decisions and their reasons (list below) |
 | — | `source/` | Client brief, structure sheet, DATOMS API PDF, sprint sheet (inputs; read-only). Agents read the markdown copies: `brief.md`, `structure.md`, `backlog.md`. |
-| — | `open-questions.md` | Questions waiting on Innovo or DATOMS (Q1–Q22, including items DATOMS has promised). Never guess these into code. |
+| — | `open-questions.md` | Questions waiting on Innovo or DATOMS (Q1–Q26, including items DATOMS has promised). Never guess these into code. |
 
 ## Decision records (`adr/`)
 | ADR | Decision |

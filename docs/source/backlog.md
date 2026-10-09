@@ -784,18 +784,19 @@
 - **Estimate (days):** 2
 - **Acceptance check:** New parameter types appear with no code change
 
-### S7-02 · Security hardening: private endpoints, key rotation, firewall rules
+### S7-02 · Security hardening: private endpoints, key rotation, firewall rules, web security headers
 - **Sprint:** S7
 - **Week:** W2
 - **Work package:** Security
 - **Steps (how to do it):** 1. Put PostgreSQL and Blob behind private endpoints.
   2. Rotate keys in Key Vault.
   3. Firewall: only Container Apps can reach the database.
-- **Output when done:** Data not reachable from the internet
+  4. Web app security headers and CSP (docs/08 §6) in staticwebapp.config.json: a CSP that allows only the MSAL (Entra) and ArcGIS domains plus the API and Web PubSub hosts; HSTS, X-Content-Type-Options, Referrer-Policy, frame-ancestors none. (Added by the S0 plan, 2026-10-09.)
+- **Output when done:** Data not reachable from the internet; the web app sends a CSP and security headers
 - **Now done by:** You (backend)
 - **Requirement:** Innovo: security
 - **Estimate (days):** 2
-- **Acceptance check:** Databases unreachable from internet
+- **Acceptance check:** Databases unreachable from internet; a header scan of the prod web URL shows the CSP and security headers, and sign-in and the map still work with the CSP on
 
 ### S7-03 · Explorer screens: site and device picker, parameter tiles, chart with ranges and compare
 - **Sprint:** S7

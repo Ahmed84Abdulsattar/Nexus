@@ -19,6 +19,10 @@ nexus/
 ├── GETTING-STARTED.md                # VS Code + Claude Code setup and first steps
 ├── PROMPTS.md                        # prompts for each step of the build
 ├── .gitignore
+├── .dockerignore                     # keeps .env, node_modules and tests out of images
+├── .husky/                           # git hooks: lint-staged (pre-commit), commitlint (commit-msg)
+├── commitlint.config.js              # Conventional Commits
+├── renovate.json                     # dependency update rules (Renovate)
 ├── .claude/
 │   ├── settings.json                 # shared Claude Code permissions (allows pnpm checks, blocks .env reads)
 │   └── agents/                       # role agents (architect, datoms-integration, …)
@@ -34,9 +38,13 @@ nexus/
 │   ├── 01-product-vision.md … 14-testing-quality.md
 │   ├── adr/                          # NNNN-title.md decision records
 │   ├── sprints/                      # S0.md, S1.md … (task breakdowns by the architect agent)
-│   ├── runbooks/                     # on-call: DATOMS down, poll lag, DB full, key rotation
+│   ├── runbooks/                     # on-call: DATOMS down, poll lag, DB full, key rotation;
+│   │                                 # setup: entra-setup.md, ArcGIS key, Azure deploy (no secret values)
 │   └── source/                       # client docs, DATOMS PDF, sprint sheet (read-only inputs) + markdown copies:
 │                                     # brief.md, structure.md, backlog.md (agents read these)
+│
+├── scripts/                          # repo tools, not app code
+│   └── gen-backlog.py                # regenerates docs/source/backlog.md from the sprint sheet
 │
 ├── db/
 │   ├── schema.sql                    # reference schema: the target state, kept in sync with migrations
@@ -52,7 +60,7 @@ nexus/
 │   ├── web/                          # React SPA (frontend developer owns this)
 │   │   ├── index.html
 │   │   ├── vite.config.ts
-│   │   ├── public/
+│   │   ├── public/                   # static files, incl. staticwebapp.config.json (SPA fallback, headers)
 │   │   └── src/
 │   │       ├── main.tsx
 │   │       ├── app/
@@ -83,7 +91,8 @@ nexus/
 │   │       │   ├── energy/           # energy ribbon, table, charts
 │   │       │   ├── events/           # notifications list
 │   │       │   ├── explorer/         # data explorer
-│   │       │   └── admin/            # users and roles, project access, integration health, linking to-do
+│   │       │   ├── admin/            # users and roles, project access, integration health, linking to-do
+│   │       │   └── dev/              # components page (dev builds only, S0-06); never in the production bundle
 │   │       ├── assets/icons/asset-types/  # tower-crane.svg, hoist.svg, generator.svg, generic.svg …
 │   │       ├── styles/               # tailwind.css, tokens.css (colours incl. status/state colours)
 │   │       ├── lib/                  # format (numbers, units, dates in Asia/Dubai), featureFlags
@@ -122,9 +131,11 @@ nexus/
 │   │   │       # each module: <name>.module.ts, <name>.controller.ts, <name>.service.ts,
 │   │   │       #              <name>.repository.ts (Kysely), dto/, <name>.spec.ts
 │   │   ├── test/                     # integration tests (Testcontainers Postgres)
-│   │   └── openapi.json              # GENERATED on build
+│   │   ├── openapi.json              # GENERATED on build
+│   │   └── Dockerfile                # image for Container Apps (non-root)
 │   │
 │   └── worker/                       # NestJS standalone: the ONLY process that calls DATOMS
+│       ├── Dockerfile                # image for Container Apps (non-root, exactly 1 replica)
 │       └── src/
 │           ├── main.ts
 │           ├── worker.module.ts

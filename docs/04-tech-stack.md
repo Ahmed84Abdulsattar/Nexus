@@ -81,8 +81,9 @@ Versions: use the current stable major at project start and pin exact versions i
 | `APP_ENV` | all | `local` / `dev` / `prod` (no `test` environment, ADR 0008) |
 | `DATABASE_URL` | api, worker, migrations | `postgres://nexus_api@localhost:5432/nexus` (in Azure: host + Entra token through managed identity) |
 | `DATABASE_POOL_MAX` | api, worker | `10` |
-| `ENTRA_TENANT_ID` | api, web | Innovo tenant GUID |
+| `ENTRA_TENANT_ID` | api, web (`VITE_ENTRA_TENANT_ID`) | Innovo tenant GUID (public identifier, not a secret) |
 | `ENTRA_API_CLIENT_ID` / `ENTRA_API_AUDIENCE` | api | `nexus-api` app id / `api://nexus-api` |
+| `VITE_ENTRA_API_SCOPE` | web | `api://nexus-api/access_as_user` (the scope MSAL requests; matches `ENTRA_API_AUDIENCE`) |
 | `ENTRA_WEB_CLIENT_ID` | web (`VITE_ENTRA_WEB_CLIENT_ID`) | `nexus-web` app id |
 | `AUTH_MODE` | api, web | `entra` (default). `dev` is allowed **only when `APP_ENV=local`**: it signs local test tokens for seeded users. The API refuses to start with `dev` anywhere else. |
 | `KEY_VAULT_URI` | api, worker | `https://kv-nexus-dev.vault.azure.net/` (secrets below are read from here in Azure) |
@@ -91,7 +92,8 @@ Versions: use the current stable major at project start and pin exact versions i
 | `DATOMS_MONTHLY_CREDIT_ALLOWANCE` | worker | From the contract (Q5) |
 | `WEB_PUBSUB_ENDPOINT` / `WEB_PUBSUB_HUB` | api, worker | `https://wps-nexus-dev.webpubsub.azure.com` / `nexus` |
 | `LIVE_MODE` | api, worker, web | `pubsub` (default) or `poll`. Locally, `poll` turns off push and the web app refetches every 60 s. |
-| `ARCGIS_API_KEY` | api (served via `/v1/config`) | Referrer-restricted; Key Vault in Azure |
+| `ARCGIS_API_KEY` | api (served via `/v1/config`) | Referrer-restricted; Key Vault in Azure. One key per environment. |
+| `VITE_DEV_ARCGIS_API_KEY` | web, **local only** | Interim (S0-09) until `GET /v1/config` runs locally (S1-02). Read only by the MSW `/v1/config` mock in Vite dev mode, from the developer's git-ignored `.env`. Never set in CI or Azure: the web build fails if it is set. Remove after S1-02. |
 | `APPLICATIONINSIGHTS_CONNECTION_STRING` | all | |
 | `VITE_API_BASE_URL` | web | `http://localhost:3000/v1` |
 | `LOG_LEVEL` | api, worker | `info` |

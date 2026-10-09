@@ -25,7 +25,7 @@
 | Method & path | Permission | Purpose | Req |
 |---|---|---|---|
 | GET `/me` | (any signed-in) | User, roles, permissions, feature flags | R-01–R-04 |
-| GET `/config` | (any) | ArcGIS key and settings, enums (project states, display statuses), feature flags | — |
+| GET `/config` | (any signed-in) | ArcGIS key and settings, enums (project states, display statuses), feature flags | — |
 | GET `/projects` | portfolio.read · scoped | List with filters `state, district, type, q`; includes lat/lng, state, asset counts | R-10, R-13 |
 | GET `/projects/summary` | portfolio.read · scoped | Tiles: counts by state and by district | R-13 |
 | GET `/projects/{projectId}` | project.read · scoped | Project details, boundary | R-20 |
@@ -43,8 +43,8 @@
 | GET `/events/unread-count` | events.read · scoped | Bell badge | R-41 |
 | POST `/explorer/query` | explorer.use · scoped | `{ assetIds[], parameters[], from, to, resolution }` returns series + min/avg/max | R-50 |
 | POST `/explorer/export` | explorer.export · scoped | The same body, streamed as CSV; audit-logged | R-50 |
-| POST `/live/token` | (any) | Web PubSub client URL that identifies the user; **no** group-join rights (ADR 0008) | R-22 |
-| POST/DELETE `/live/subscriptions` | (any) + `project.read` and scope checked per project | `{ connectionId, projectIds[] }`. The server adds or removes the connection to `project:{id}` for in-scope projects only; out-of-scope ids are dropped silently. Returns the joined ids. | R-03, R-22 |
+| POST `/live/token` | (any signed-in) | Web PubSub client URL that identifies the user; **no** group-join rights (ADR 0008) | R-22 |
+| POST/DELETE `/live/subscriptions` | (any signed-in) + `project.read` and scope checked per project | `{ connectionId, projectIds[] }`. The server adds or removes the connection to `project:{id}` for in-scope projects only; out-of-scope ids are dropped silently. Returns the joined ids. | R-03, R-22 |
 | GET `/admin/users` | admin.users.manage | Users seen, roles, last seen | R-60 |
 | GET/POST/DELETE `/admin/group-roles` | admin.users.manage | Map Entra groups to roles | R-60 |
 | GET/POST/DELETE `/admin/project-access` | admin.users.manage | Grant projects to users or groups | R-60 |
