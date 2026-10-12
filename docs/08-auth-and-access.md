@@ -34,6 +34,11 @@
    - Asset or event routes look up the project of the asset or event first, then check scope.
 6. **Audit.** Sign-in (first request per session), admin changes and CSV exports are written to `audit.log`.
 
+**Known limits (accepted in the S1-02 security review, 2026-10-12):**
+- **No fallback to old JWKS keys.** Keys are cached for 6 h. If the refresh after that fails (Entra down, proxy error), every request gets 503 until a refresh succeeds; the API does not keep using the expired keys.
+- **Access cache per API instance (fixed in S1-01).** `invalidateUser`/`invalidateAll` clear only the local process, and a cache hit doesn't re-check `is_active`, so a change can take up to 5 min to reach other replicas (within R-60). S1-01 step 6 makes it work across instances.
+- **`AUTH_MODE=dev` gate.** Today it relies only on `APP_ENV=local`. When dev mode is built, the API must also refuse to start if Azure runtime variables are present, Bicep must set `APP_ENV` explicitly, and the dev signing keys stay in memory (never behind `ENTRA_JWKS_URL`).
+
 ## 3. Roles and permissions (seeded in `db/schema.sql`)
 | Permission | admin | leadership | project_manager | site_user | viewer |
 |---|:-:|:-:|:-:|:-:|:-:|
@@ -66,6 +71,7 @@ Permission keys live in `packages/shared/src/permissions.ts`, the single source 
 - Sign-out clears the MSAL cache and the live connection.
 
 ## 6. Security baseline
+Helmet, CORS, the per-user rate limit, the request size limit and turning Swagger UI off in prod are built in S1-09, before S2-01.
 - HTTPS only, HSTS, helmet headers, strict CORS (Nexus web origins only), and a CSP that allows ArcGIS domains.
 - Inputs are validated with zod. SQL goes only through Kysely parameter binding.
 - Secrets in Key Vault: DATOMS token, ArcGIS API key (also restricted by HTTP referrer), DB credentials. Rotate them every 90 days (runbook).

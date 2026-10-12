@@ -164,6 +164,7 @@
   3. Raw telemetry is telemetry.packet: one jsonb row per asset packet, daily partitions (no TimescaleDB).
   4. Every asset has project_id and optional building/level/zone ids (what BIM links to later).
   5. Add pnpm db:migrate / db:check / db:seed; run the 100-site seed and record query timings.
+  6. From the S1-02 security review (L3, accepted for now): when roles, project scope or active status change, clear the access cache on every API instance (Postgres LISTEN/NOTIFY or a per-user access version), check is_active on a cache hit, and never cache a load that started before the change.
 - **Output when done:** Database structure in place
 - **Now done by:** You (backend)
 - **Requirement:** Foundation (BIM-ready)
@@ -270,6 +271,23 @@
 - **Estimate (days):** 1
 - **Acceptance check:** Admin console hidden for non-admins
 
+### S1-09 · API baseline protections: helmet, CORS for Nexus web origins only, per-user rate limit, request size limit, Swagger UI off in prod
+- **Sprint:** S1
+- **Week:** W2
+- **Work package:** Foundation
+- **Steps (how to do it):** 1. Add helmet (@fastify/helmet) so every API response carries secure headers.
+  2. Enable CORS only for the Nexus web origins, read from config per environment (no wildcard); add the variable to .env.example and docs/04.
+  3. Add a per-user rate limit keyed on the Entra oid (by IP before sign-in); over the limit gives 429 problem+json with Retry-After; limits come from config.
+  4. Set a request body size limit (Fastify bodyLimit) from config; larger bodies get 413.
+  5. Serve Swagger UI only when APP_ENV is not prod.
+  6. Update docs/08 §6 and docs/10. Needed before S2-01 (security review of S1-02, item I6).
+- **Output when done:** The API refuses other origins, oversized bodies and excessive requests, and sends secure headers
+- **Now done by:** You (backend)
+- **Requirement:** Innovo: security
+- **Depends on:** S1-02
+- **Estimate (days):** 1
+- **Acceptance check:** Automated tests: a non-Nexus origin gets no CORS headers; a user over the limit gets 429 with Retry-After; an oversized body gets 413; secure headers on every response; Swagger UI gives 404 when APP_ENV=prod
+
 ### S2-01 · Projects API: list, filter (status, type, district), search, scoped to user
 - **Sprint:** S2
 - **Week:** W1
@@ -281,7 +299,7 @@
 - **Output when done:** Projects list endpoint the map uses
 - **Now done by:** You (backend)
 - **Requirement:** Sheet: Top level
-- **Depends on:** S1-02
+- **Depends on:** S1-02, S1-09
 - **Estimate (days):** 2
 - **Acceptance check:** Returns only the user's projects; search under 300 ms
 
