@@ -57,6 +57,7 @@ export class DatomsHttp {
   constructor(
     private readonly config: DatomsConfig,
     private readonly fetchImpl: typeof fetch = fetch,
+    private readonly timeoutMs: number = REQUEST_TIMEOUT_MS,
   ) {}
 
   /** `path` starts with "/" and is relative to `{baseUrl}/orgs/{orgId}`. */
@@ -78,7 +79,7 @@ export class DatomsHttp {
           'Accept-Encoding': 'gzip',
           ...(json !== undefined ? { 'Content-Type': 'application/json' } : {}),
         },
-        signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+        signal: AbortSignal.timeout(this.timeoutMs),
       };
       if (json !== undefined) init.body = JSON.stringify(json);
       res = await this.fetchImpl(url, init);

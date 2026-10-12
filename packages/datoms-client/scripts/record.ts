@@ -2,14 +2,19 @@
 // (endpoint path without host, method, date, HTTP status, rate-limit response headers).
 // Never the token, never request headers, never the host or org id in a header.
 //
-// Run through live.ts. Needs a built package: `pnpm --filter @nexus/datoms-client build`.
-import { mkdirSync, writeFileSync } from 'node:fs';
+// Run through live.ts (`pnpm --filter @nexus/datoms-client live ...`).
+import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import type { DatomsResponse } from '../dist/index.js';
+import type { DatomsResponse } from '../src/index.js';
 
-const here = dirname(fileURLToPath(import.meta.url));
-export const FIXTURES_DIR = join(here, '..', 'fixtures');
+// Works from scripts/ (source) and from dist/cli/scripts/ (compiled): walk up to the package root.
+function packageRoot(): string {
+  let dir = dirname(fileURLToPath(import.meta.url));
+  while (!existsSync(join(dir, 'package.json'))) dir = dirname(dir);
+  return dir;
+}
+export const FIXTURES_DIR = join(packageRoot(), 'fixtures');
 
 export interface FixtureFile {
   meta: {

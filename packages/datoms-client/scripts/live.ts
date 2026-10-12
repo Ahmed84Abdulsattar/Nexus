@@ -1,16 +1,43 @@
-// Live DATOMS CLI. Refuses to run unless DATOMS_LIVE=true (set on the command line only).
-// Load secrets by path, never by printing them:
-//   DATOMS_LIVE=true node --env-file=<path-to-.env> scripts/live.ts list
-//   ... live.ts latest <assetId>      exactly ONE data/latest call per id (limit 8 per 5 min per asset)
-//   ... live.ts bulk <id> [<id>...]   exactly ONE bulk call, id mode, at most 10 ids
-// Needs a built package: `pnpm --filter @nexus/datoms-client build`.
-import { DatomsClient, assertLive, loadDatomsConfig, type DatomsResponse } from '../dist/index.js';
-import { saveFixture } from './record.ts';
+// Live DATOMS CLI. Refuses to run unless DATOMS_LIVE=true (set on the command line only, never
+// in a file). This is the ONLY place `GET /assets/{id}/data/latest` is called (ADR 0010).
+//
+//   DATOMS_LIVE=true pnpm --filter @nexus/datoms-client live -- --env-file <path-to-.env> <command>
+//
+// Commands:
+//   list                 GET /assets, at most 5 pages (limit 60 per 60 s per IP)
+//   latest <id>...       exactly ONE data/latest call per id (limit 8 per 5 min per asset)
+//   bulk <id>...         exactly ONE bulk call, id mode, 1 to 10 ids; add --fleet for fleet mode
+//                        (page 1, limit 500; spends credits, use sparingly)
+//
+// `pnpm live` compiles src/ and scripts/ first (tsc, no new dependency), then runs this file.
+import {
+  DatomsClient,
+  DatomsHttp,
+  assertLive,
+  loadDatomsConfig,
+  type DatomsResponse,
+} from '../src/index.js';
+import { saveFixture } from './record.js';
 
-const [cmd, ...args] = process.argv.slice(2);
+const argv = process.argv.slice(2);
+const envIdx = argv.indexOf('--env-file');
+if (envIdx >= 0) {
+  const path = argv[envIdx + 1];
+  if (!path) throw new Error('--env-file needs a path');
+  process.loadEnvFile(path); // loads values into process.env; nothing is printed
+  argv.splice(envIdx, 2);
+}
+const fleet = argv.includes('--fleet');
+const rest = argv.filter((a) => a !== '--fleet' && a !== '--');
+const [cmd, ...args] = rest;
 const config = loadDatomsConfig();
 assertLive(config);
 const client = new DatomsClient(config);
+const http = new DatomsHttp(config);
+
+interface LatestBody {
+  data: { time: string; parameters: Record<string, unknown> };
+}
 
 function show(label: string, res: DatomsResponse): void {
   // Status, error code and rate-limit response headers only. Never request headers.
@@ -68,7 +95,7 @@ if (cmd === 'list') {
   }
 } else if (cmd === 'latest') {
   for (const id of new Set(args)) {
-    const res = await client.getLatestForAsset(id);
+    const res = await http.request<LatestBody>('GET', `/assets/${id}/data/latest`);
     show(`GET /assets/${id}/data/latest`, res);
     saveFixture(`asset-latest-${id}.json`, 'GET', `/assets/${id}/data/latest`, res);
     if (res.ok && res.body) {
@@ -79,10 +106,12 @@ if (cmd === 'list') {
   }
 } else if (cmd === 'bulk') {
   const ids = [...new Set(args)];
-  if (ids.length < 1 || ids.length > 10) throw new Error('bulk: give 1 to 10 ids');
-  const res = await client.bulkLatestById(ids); // one call, no retry, no loop
-  show('POST /assets/telemetry/latest/query (id mode)', res);
-  saveFixture('bulk-latest-id-mode.json', 'POST', '/assets/telemetry/latest/query', res);
+  if (!fleet && (ids.length < 1 || ids.length > 10)) throw new Error('bulk: give 1 to 10 ids');
+  // One call, no retry, no loop.
+  const res = fleet ? await client.bulkLatestFleet(1, 500) : await client.bulkLatestById(ids);
+  const mode = fleet ? 'fleet' : 'id';
+  show(`POST /assets/telemetry/latest/query (${mode} mode)`, res);
+  saveFixture(`bulk-latest-${mode}-mode.json`, 'POST', '/assets/telemetry/latest/query', res);
   if (res.ok && res.body) {
     for (const r of res.body.data) {
       console.log(

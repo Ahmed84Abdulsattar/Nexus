@@ -40,7 +40,7 @@
 - Never mix the modes (that gives 400).
 - A row is either `{ asset_id, success:true, data:{ time, parameters } }` or `{ asset_id, success:false }` (no usable packet, or in id mode not in the fleet).
 - **What a row contains.** The v4 PDF documents the DG projection (103 parameters). **DATOMS has confirmed** that everything its portal shows is available in the bulk response: sites, generators, tower cranes, statuses, locations, asset types, alerts and all parameters (section 3). The parameter **keys, names and units** for four asset categories are now known from the DATOMS parameter list (section 3.2). The field names for sites, status, location, asset type and alerts are not known yet. They arrive with the promised sample and field list (Q21, Q22). Until then, build against the v4 PDF shape, never assume a parameter list in code (the list is data: `telemetry.parameter`), and keep every field name in `src/mapping.ts`.
-- **Is it enabled for our key?** Not known yet for the provisional test key (Q34). S2-02 checks it with one call (section 3.3).
+- **Is it enabled for our key?** Yes, checked 2026-10-12 (Q34, section 3.3).
 - Not an atomic snapshot. The PDF says it "does not return events produced between polls". An alert or status that starts and ends between two polls may not be seen. Nexus shows what the bulk response contains at poll time.
 - **Credit metering:** each call is charged the exact number of in-fleet rows returned. The quota is **organisation-wide**: every credential and environment in Innovo's org shares it (ADR 0005, Q10). `F` = fleet size rounded up to 500 (minimum 500). **Today's fleet is a small demo set under 500 assets, so F = 500.**
 
@@ -83,14 +83,20 @@
   | AC Sub-Meter | 34 |
   | Solar Inverter | 23 |
 
-  **DATOMS currently has 18 DG sets connected**: the sheet's DG tab is named "DG Set (18)". This count comes from the tab name only; the Asset List confirms it in S2-02. The "(18)" is not part of the category name (Q35).
+  **The Asset List shows 8 DG Set assets, not 18** (checked 2026-10-12). The "(18)" in the sheet's tab name "DG Set (18)" is the DATOMS `category_id` of DG Set (18), not a count and not part of the category name (Q35). The category strings in the list match the Asset List exactly.
 
   **31 keys are used in more than one category with different display names** (the table at the end of the markdown copy). So `telemetry.parameter` stores names and units per (source system, source type, key), never per key alone (ADR 0011). The list is loaded by `db/seeds/datoms-parameters.sql`, exactly as given (a blank unit stays `NULL`). The list gives no data types (Q22).
+- **What the real responses showed (2026-10-12, test key, `fixtures/`):**
+  - `GET /assets`: 22 assets in one page (`pagination.total` 22, `total_pages` 1): 12 AC Sub-Meter, 8 DG Set, 1 Fuel Tank, 1 Solar Inverter. Fields per asset: `id` (legacy integer as a string), `name`, `created_at`, `lifecycle_status` (all `active`), `category_id`, `category_name` (the category string), `asset_info` (nameplate, with `null`s). No site, status or location field.
+  - `GET /assets/{id}/data/latest` for one asset per category: the parameter keys equal the parameter list exactly (DG Set 103, Fuel Tank 4, AC Sub-Meter 34, Solar Inverter 23; none extra, none missing).
+  - **Null values:** DATOMS sends keys it has no value for as `null` (96 of 103 DG keys, 1 of 4 Fuel Tank keys). `null` is kept as reported, never turned into 0 (`mapping.ts`).
+  - **Bulk rows carry only `asset_id`, `success` and `data { time, parameters }`.** No site, status, location, asset type or alert field is in them, although DATOMS said the portal data is in the bulk response (Q9, Q21, Q22). Those fields stay absent in `mapping.ts` until the sample and field list arrive. `lat`, `long`, `mc_st` and `under_maintenance` are ordinary parameters and are not mapped to location or status.
+  - One DG Set (asset 42485) last reported on 2026-10-05, 7 days before the check: `data.time` can be old. Change detection and "no data yet" rules apply as usual.
 - **Not shared yet:** the site list, location and the other fields (status, the asset type field, alerts). DATOMS said on 12 Oct 2026 that they will arrive "in the coming week" (Q1, Q21, Q22).
 - **No tower crane category** is in the list (and no hoist category). Whether tower cranes are connected to DATOMS, and which parameters they will send, is Q33. Until it is answered, crane figures on the equipment screens show "no data yet" (`02` R-24).
 
-### 3.3 Is the bulk endpoint enabled for the test key? (checked in S2-02)
-Nobody knows yet (Q34). S2-02 checks it with **one** bulk call:
+### 3.3 Is the bulk endpoint enabled for the test key? (checked in S2-02: yes)
+**Answered 2026-10-12: yes (table below).** S2-02 checked it with **one** bulk call:
 - Id mode, `{ "asset_ids": [...] }`, with a few ids taken from the Asset List. One request, with no loop and no retry (a 401 or 403 is never retried anyway).
 - Record the result in the table below and in Q34: date, HTTP status, the error `code` if any, rows returned and credits charged (from the headers). Never record the token or the request headers.
 - **If it is enabled:** save the response to `packages/datoms-client/fixtures/` (tokens and headers removed). Later live checks use id mode with a short list.
@@ -98,7 +104,9 @@ Nobody knows yet (Q34). S2-02 checks it with **one** bulk call:
 
 | Date | Result | Notes |
 |---|---|---|
-| — | Not checked yet | Filled in by S2-02 |
+| 2026-10-12 | **Enabled.** Id mode, 4 ids (one per category), one call: HTTP 200, no error code, 4 rows, all `success: true`, 4 credits charged. | Headers: `X-RateLimit-Unit: asset-read-credits`, `Limit: 2000` (= 4F with F = 500, the 1-minute credit cap), `Remaining: 1996`, `Reset: 61`. Each row's `parameters` equal that asset's `data/latest` exactly. Q34 answered. Fixture: `fixtures/bulk-latest-id-mode.json`. |
+
+Rate-limit headers seen on 2026-10-12: `GET /assets` sends `Limit: 60`, `Remaining`, `Reset` (60 s) and **no `X-RateLimit-Unit`**; the per-asset latest call sends `Limit: 8`, `Remaining`, `Reset` (300 s) and **no Unit**; the bulk call sends the Unit. The client reads the Unit first and, when it is missing, ignores Limit/Remaining for the credit budget (`budget.ts`).
 
 ### 3.4 DATOMS categories and Nexus asset types
 The mapping is data, not code: the seed appends each DATOMS category name to `core.asset_type.source_names`, and the worker matches `core.asset.source_type_name` against it (the section 6 rules for unknown type names still apply). Mapping given by Ahmed on 12 Oct 2026 (ADR 0011):
@@ -110,7 +118,7 @@ The mapping is data, not code: the seed appends each DATOMS category name to `co
 | AC Sub-Meter | `mains` | energy |
 | Solar Inverter | `solar` | energy |
 
-- The category strings are taken from the parameter list and not yet confirmed by the API (Q35). S2-02 records the real values from `GET /assets`; if they differ, only the seed file changes.
+- The category strings are **confirmed** by `GET /assets` (field `category_name`, 2026-10-12, Q35): `DG Set`, `Fuel Tank`, `AC Sub-Meter`, `Solar Inverter`. The seed is unchanged.
 - Which screens show fuel tanks (the energy table names DGs, solar and mains) is Q36.
 
 ### 3.5 Confirmed by DATOMS, waiting for field names
@@ -118,7 +126,7 @@ DATOMS has confirmed that **everything visible in its portal is in the bulk resp
 - **(Q21)** a real sample bulk response. When it arrives, save it to `packages/datoms-client/fixtures/` with tokens and headers removed.
 - **(Q22)** an updated API document listing the bulk fields for sites, status, location, asset type and alerts.
 
-They **no longer block the start of S2-02**: the test key unblocked it on 12 Oct 2026. They are still needed to map sites, status, location, asset type and alerts (S2-02's mapping for those stays empty; S3-01, S4-05, S6-04). Until they arrive, the matching Nexus field stays empty and the UI shows "no data yet". When they arrive, only `src/mapping.ts`, its tests and the fixtures change.
+The first real bulk rows (section 3.2) carry **none** of the sites, status, location, type or alert fields, so these stay absent in `mapping.ts` until the sample and list arrive. They **no longer block the start of S2-02**: the test key unblocked it on 12 Oct 2026. They are still needed to map sites, status, location, asset type and alerts (S2-02's mapping for those stays empty; S3-01, S4-05, S6-04). Until they arrive, the matching Nexus field stays empty and the UI shows "no data yet". When they arrive, only `src/mapping.ts`, its tests and the fixtures change.
 
 | Needed for | In the bulk response (field names pending Q21/Q22) | Nexus target |
 |---|---|---|
@@ -140,7 +148,7 @@ They **no longer block the start of S2-02**: the test key unblocked it on 12 Oct
 6. **Change detection.** Write a packet only if `data.time` is newer than `latest_packet.ts` for that asset.
 7. **Mapping.** All of it is in `src/mapping.ts`. It turns raw DATOMS rows into `SourceReading { externalAssetId, ts, values }` plus, when present in the row, status, location, asset type, site link, kind (`physical` / `site_metric`) and alerts. Keys and values pass through unchanged. Unknown keys are recorded in `telemetry.parameter` per (source system, the asset's source type, key) (ADR 0011). A missing field maps to "absent", never to a default value.
 8. **Logging.** For each call log the endpoint, mode, page, HTTP status, duration, credits, rate-limit headers and correlation id. Never log the token.
-9. **Fixtures.** `scripts/record.ts` saves real responses (no headers or tokens) into `fixtures/`. Tests and local dev use fixtures. `DATOMS_LIVE=true` is needed to call DATOMS. Live CLI runs use id mode with a short list by default; fleet mode against live DATOMS needs an explicit `--fleet` flag (ADR 0005). With the provisional test key (section 3.1), recording is done from a developer machine only, and the data is live, so check fixtures for anything sensitive before committing.
+9. **Fixtures and the CLI.** `scripts/record.ts` saves real responses (body plus a `meta` block with the path, method, date, status and rate-limit headers; no request headers or tokens) into `fixtures/`. Run the CLI with `DATOMS_LIVE=true pnpm --filter @nexus/datoms-client live -- --env-file <path-to-.env> list | latest <id> | bulk <id>...` (it compiles first with `tsc`, no extra tool; `--fleet` for fleet mode). It is the **only** code that calls `data/latest`; a test (`test/boundaries.test.ts`) fails if anything else mentions it. Tests and local dev use fixtures. `DATOMS_LIVE=true` is needed to call DATOMS. Live CLI runs use id mode with a short list by default; fleet mode against live DATOMS needs an explicit `--fleet` flag (ADR 0005). With the provisional test key (section 3.1), recording is done from a developer machine only, and the data is live, so check fixtures for anything sensitive before committing.
 10. **Learned page size.** After a 422, keep the smaller page size in `integration.cursor` (`job = 'live_poll'`, `value.pageLimit`) so the next poll starts with it. Try 500 again once a day.
 11. **Poll scope.** If `poll.subset_external_ids` is a list, poll only those ids in id mode (non-prod, ADR 0005). If it is `null`, plan each tick from the per-type intervals: use fleet mode when every asset is due, otherwise id mode for the due ids (ADR 0006).
 

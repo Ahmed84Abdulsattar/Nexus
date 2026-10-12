@@ -2,7 +2,7 @@
   "name": "@nexus/datoms-client",
   "version": "0.0.0",
   "private": true,
-  "description": "All DATOMS knowledge (HTTP, budget, paging, mapping). Empty until S2-02.",
+  "description": "All DATOMS knowledge (HTTP, budget, paging, mapping).",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -17,6 +17,7 @@
   ],
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
+    "live": "tsc -p tsconfig.scripts.json && node dist/cli/scripts/live.js",
     "typecheck": "tsc --noEmit",
     "test": "vitest run"
   },
