@@ -67,7 +67,12 @@ export function createDatomsConfig(
     enumerable: false,
     writable: false,
   });
-  const redacted = () => ({ baseUrl: cfg.baseUrl, orgId: cfg.orgId, live: cfg.live, token: '[redacted]' });
+  const redacted = () => ({
+    baseUrl: cfg.baseUrl,
+    orgId: cfg.orgId,
+    live: cfg.live,
+    token: '[redacted]',
+  });
   Object.defineProperty(cfg, 'toJSON', { value: redacted, enumerable: false });
   Object.defineProperty(cfg, inspect.custom, {
     value: () => `DatomsConfig ${JSON.stringify(redacted())}`,

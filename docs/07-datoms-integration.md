@@ -17,7 +17,7 @@
 | Error envelope | `{ success:false, status:"failure", error:{ code, message } }` |
 | Access | Read-only. Nexus never calls a write endpoint. |
 | Organisation | Innovo's org id is `20283` (a public identifier, not a secret). Set it as `DATOMS_ORG_ID`. |
-| Config (env) | `DATOMS_BASE_URL`, `DATOMS_ORG_ID`, `DATOMS_TOKEN` (Key Vault in cloud; the provisional test key is only in a developer's local `.env`, section 3.1), `DATOMS_LIVE` (`false` means use fixtures) |
+| Config (env) | `DATOMS_BASE_URL`, `DATOMS_ORG_ID`, `DATOMS_TOKEN` (Key Vault in cloud; the provisional test key is only in a developer's local `.env`, section 3.1), `DATOMS_LIVE` (`false` means use fixtures) | `DATOMS_BASE_URL` must be `https://api.datoms.io/...` (no other host, port, credentials, query or fragment; the client refuses anything else). The token is never part of JSON, logs or `util.inspect` output.
 
 ## 2. Endpoints in v4 today
 ### 2.1 List assets: `GET /assets?page=&limit=`

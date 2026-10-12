@@ -20,13 +20,15 @@ export const MAX_RETRY_AFTER_MS = 120_000;
 export const MAX_TIMER_MS = 2 ** 31 - 1;
 
 export const defaultSleep = (ms: number): Promise<void> =>
-  new Promise((resolve) => setTimeout(resolve, Number.isNaN(ms) ? 0 : Math.min(Math.max(ms, 0), MAX_TIMER_MS)));
+  new Promise((resolve) =>
+    setTimeout(resolve, Number.isNaN(ms) ? 0 : Math.min(Math.max(ms, 0), MAX_TIMER_MS)),
+  );
 
 /** Retry-After in seconds (the form DATOMS sends); an HTTP date is also accepted. */
 export function parseRetryAfter(value: string | undefined, nowMs = Date.now()): number | undefined {
-  if (value === undefined) return undefined;
+  if (value === undefined || value.trim() === '') return undefined;
   const secs = Number(value);
-  if (Number.isFinite(secs) && secs >= 0) return Math.ceil(secs * 1000);
+  if (Number.isFinite(secs)) return secs >= 0 ? Math.ceil(secs * 1000) : undefined;
   const date = Date.parse(value);
   return Number.isNaN(date) ? undefined : Math.max(0, date - nowMs);
 }

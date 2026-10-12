@@ -29,6 +29,11 @@ export const CREDIT_WINDOWS: readonly WindowSpec[] = [
 
 /** Request limit for bulk: 240 per 60 s per credential and organisation. */
 export const REQUESTS_PER_MINUTE = 240;
+/** Request limit for GET /assets: 60 per 60 s per IP (docs/07 section 2.1). A separate window. */
+export const ASSET_LIST_REQUESTS_PER_MINUTE = 60;
+
+/** Which request window a call counts against. Credits are shared by all groups. */
+export type CallGroup = 'bulk' | 'assets';
 
 /** Wait or skip when a call would go past this share of any cap. */
 export const CALL_THRESHOLD = 0.9;
@@ -110,7 +115,7 @@ export function fleetUnit(fleetSize: number): number {
 }
 
 export class BudgetTracker {
-  private calls: { at: number; credits: number; requests: number }[] = [];
+  private calls: { at: number; credits: number; requests: number; group: CallGroup }[] = [];
   private readonly now: () => number;
   private readonly f: number;
   private server: ServerView | undefined;
@@ -136,11 +141,12 @@ export class BudgetTracker {
   /** Load earlier usage after a restart. */
   async restore(store: BudgetStore): Promise<void> {
     const since = this.now() - 30 * DAY;
-    for (const r of await store.loadSince(since)) this.record(r.at, r.credits, r.requests);
+    for (const r of await store.loadSince(since))
+      this.record(r.at, r.credits, r.requests, r.mode === 'assets' ? 'assets' : 'bulk');
   }
 
-  record(at: number, credits: number, requests = 1): void {
-    this.calls.push({ at, credits, requests });
+  record(at: number, credits: number, requests = 1, group: CallGroup = 'bulk'): void {
+    this.calls.push({ at, credits, requests, group });
     this.prune();
   }
 
@@ -173,10 +179,12 @@ export class BudgetTracker {
     return spec.perF * this.f * this.opts.maxShare;
   }
 
-  private usedIn(ms: number, kind: 'credits' | 'requests'): number {
+  private usedIn(ms: number, kind: 'credits' | 'requests', group?: CallGroup): number {
     const from = this.now() - ms;
     let total = 0;
-    for (const c of this.calls) if (c.at > from) total += c[kind];
+    for (const c of this.calls) {
+      if (c.at > from && (group === undefined || c.group === group)) total += c[kind];
+    }
     return total;
   }
 
@@ -192,8 +200,16 @@ export class BudgetTracker {
       out.push({ name: 'monthly-allowance', cap, used, fraction: used / cap });
     }
     const reqCap = REQUESTS_PER_MINUTE * this.opts.maxShare;
-    const reqUsed = this.usedIn(MIN, 'requests');
+    const reqUsed = this.usedIn(MIN, 'requests', 'bulk');
     out.push({ name: 'requests-1m', cap: reqCap, used: reqUsed, fraction: reqUsed / reqCap });
+    const listCap = ASSET_LIST_REQUESTS_PER_MINUTE * this.opts.maxShare;
+    const listUsed = this.usedIn(MIN, 'requests', 'assets');
+    out.push({
+      name: 'assets-requests-1m',
+      cap: listCap,
+      used: listUsed,
+      fraction: listUsed / listCap,
+    });
     return out;
   }
 
@@ -215,13 +231,23 @@ export class BudgetTracker {
    * Before a call: may `estimatedCredits` be spent now? Waits or skips if it would pass 90% of
    * any cap, or exceeds what the server says is left.
    */
-  check(estimatedCredits: number): BudgetDecision {
+  check(estimatedCredits: number, group: CallGroup = 'bulk'): BudgetDecision {
     const now = this.now();
     let waitMs = 0;
     let reason = '';
 
-    const windows: { name: string; ms: number; cap: number; kind: 'credits' | 'requests' }[] =
-      CREDIT_WINDOWS.map((w) => ({ name: w.name, ms: w.ms, cap: this.cap(w), kind: 'credits' }));
+    const windows: {
+      name: string;
+      ms: number;
+      cap: number;
+      kind: 'credits' | 'requests';
+      group?: CallGroup;
+    }[] = CREDIT_WINDOWS.map((w) => ({
+      name: w.name,
+      ms: w.ms,
+      cap: this.cap(w),
+      kind: 'credits',
+    }));
     if (this.opts.monthlyAllowance !== undefined) {
       windows.push({
         name: 'monthly-allowance',
@@ -230,12 +256,23 @@ export class BudgetTracker {
         kind: 'credits',
       });
     }
-    windows.push({
-      name: 'requests-1m',
-      ms: MIN,
-      cap: REQUESTS_PER_MINUTE * this.opts.maxShare,
-      kind: 'requests',
-    });
+    windows.push(
+      group === 'assets'
+        ? {
+            name: 'assets-requests-1m',
+            ms: MIN,
+            cap: ASSET_LIST_REQUESTS_PER_MINUTE * this.opts.maxShare,
+            kind: 'requests',
+            group,
+          }
+        : {
+            name: 'requests-1m',
+            ms: MIN,
+            cap: REQUESTS_PER_MINUTE * this.opts.maxShare,
+            kind: 'requests',
+            group,
+          },
+    );
 
     for (const w of windows) {
       const est = w.kind === 'credits' ? estimatedCredits : 1;
@@ -250,7 +287,9 @@ export class BudgetTracker {
         };
       }
       const from = now - w.ms;
-      const live = this.calls.filter((c) => c.at > from).sort((a, b) => a.at - b.at);
+      const live = this.calls
+        .filter((c) => c.at > from && (w.group === undefined || c.group === w.group))
+        .sort((a, b) => a.at - b.at);
       let used = live.reduce((s, c) => s + c[w.kind], 0);
       if (used + est <= limit) continue;
       // Find when enough of the oldest calls leave the window.

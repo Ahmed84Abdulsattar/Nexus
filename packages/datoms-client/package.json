@@ -17,7 +17,7 @@
   ],
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
-    "live": "tsc -p tsconfig.scripts.json && node dist/cli/scripts/live.js",
+    "live": "tsc -p tsconfig.scripts.json && node .cli-build/scripts/live.js",
     "typecheck": "tsc --noEmit",
     "test": "vitest run"
   },

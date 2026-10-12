@@ -8,7 +8,6 @@ import {
   DatomsApi,
   DatomsApiError,
   DatomsClient,
-  DatomsHttp,
   DatomsNetworkError,
   InMemoryBudgetStore,
   InMemoryPageSizeStore,
@@ -19,6 +18,7 @@ import {
   type DatomsResponse,
   type MappedBulkPage,
 } from '../src/index.js';
+import { DatomsHttp } from '../src/http.js';
 import {
   TEST_TOKEN,
   errorReply,
@@ -299,11 +299,29 @@ describe('QA: 30 s timeout', () => {
     expect(waits).toHaveLength(4);
   });
 
-  // BUG (see QA report): a failure while READING the body (after the headers arrived, including the
-  // 30 s abort firing mid-body) escapes http.ts as a raw TypeError/AbortError and is not retried.
-  it.todo(
-    'a body-read failure is wrapped as DatomsNetworkError and retried (http.ts: await res.text() is outside the try)',
-  );
+  it('a body-read failure is wrapped as DatomsNetworkError and retried', async () => {
+    let n = 0;
+    const broken = (async () => {
+      n++;
+      const stream = new ReadableStream({
+        start(c) {
+          c.error(new TypeError('terminated'));
+        },
+      });
+      return new Response(stream, { status: 200 });
+    }) as unknown as typeof fetch;
+    const waits: number[] = [];
+    const api = new DatomsApi({
+      client: new DatomsClient(testConfig, broken),
+      budget: new BudgetTracker({ fleetSize: 500, maxShare: 1 }),
+      pageSizes: new InMemoryPageSizeStore(),
+      sleep: (ms) => (waits.push(ms), Promise.resolve()),
+      retry: { random: () => 0.5 },
+    });
+    await expect(api.bulkByIds(['1'])).rejects.toBeInstanceOf(DatomsNetworkError);
+    expect(n).toBe(5);
+    expect(waits).toHaveLength(4);
+  });
 });
 
 // -----------------------------------------------------------------------------------------------

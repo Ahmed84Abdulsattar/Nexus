@@ -14,6 +14,7 @@ const repo = join(pkg, '..', '..');
 const SKIP = new Set([
   'node_modules',
   'dist',
+  '.cli-build',
   'build',
   '.turbo',
   'coverage',

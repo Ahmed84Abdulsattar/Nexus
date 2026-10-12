@@ -7,6 +7,7 @@ import {
   DatomsClient,
   InMemoryBudgetStore,
   InMemoryPageSizeStore,
+  createDatomsConfig,
   type DatomsConfig,
   type Logger,
   type RawAsset,
@@ -24,12 +25,10 @@ export function fixture<T = unknown>(name: string): { meta: Record<string, unkno
 
 export const TEST_TOKEN = 'SECRET-TEST-TOKEN-123';
 
-export const testConfig: DatomsConfig = {
-  baseUrl: 'https://datoms.test/v4',
-  orgId: '20283',
-  token: TEST_TOKEN,
-  live: true,
-};
+export const testConfig: DatomsConfig = createDatomsConfig(
+  { baseUrl: 'https://datoms.test/v4', orgId: '20283', token: TEST_TOKEN, live: true },
+  { extraAllowedHosts: ['datoms.test'] },
+);
 
 export interface FakeReply {
   status?: number;

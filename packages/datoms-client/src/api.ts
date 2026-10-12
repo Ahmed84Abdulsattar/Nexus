@@ -14,6 +14,7 @@ import {
 } from './mapping.js';
 import {
   DEFAULT_RETRY_AFTER_MS,
+  MAX_RETRY_AFTER_MS,
   defaultSleep,
   parseRetryAfter,
   withRetry,
@@ -150,7 +151,7 @@ export class DatomsApi {
     creditsOf: (body: T | undefined) => number,
   ): Promise<DatomsResponse<T>> {
     // Always checked, also for the catalogue (0 credits): the request window counts.
-    const d = this.o.budget.check(estimatedCredits);
+    const d = this.o.budget.check(estimatedCredits, info.mode === 'assets' ? 'assets' : 'bulk');
     if (!d.allowed) {
       const max = this.o.maxBudgetWaitMs ?? 10_000;
       // A non-finite wait means the call can never fit: always skip.
@@ -176,10 +177,17 @@ export class DatomsApi {
       },
     );
     if (result.status === 429) {
-      // Retry-After too long, or still limited after the retries: skip this tick.
       const waitMs = parseRetryAfter(result.rateLimit.retryAfter) ?? DEFAULT_RETRY_AFTER_MS;
-      this.log.warn('DATOMS 429: skipping this tick', { ...info, waitMs, correlationId });
-      throw new BudgetSkippedError(waitMs, 'DATOMS rate limit (429)');
+      if (waitMs > MAX_RETRY_AFTER_MS) {
+        // DATOMS asks for a longer pause than we will wait: skip this tick.
+        this.log.warn('DATOMS 429 with a long Retry-After: skipping this tick', {
+          ...info,
+          waitMs,
+          correlationId,
+        });
+        throw new BudgetSkippedError(waitMs, 'DATOMS Retry-After above the cap');
+      }
+      // Otherwise still limited after the retries: the caller raises rate_limited.
     }
     return result;
   }
@@ -192,7 +200,7 @@ export class DatomsApi {
   ): void {
     const rl = res.rateLimit;
     const at = this.now();
-    this.o.budget.record(at, credits, 1);
+    this.o.budget.record(at, credits, 1, info.mode === 'assets' ? 'assets' : 'bulk');
     this.o.budget.applyHeaders(rl);
     this.log.info('DATOMS call', {
       ...info,
@@ -246,7 +254,7 @@ export class DatomsApi {
   /** Walks `GET /assets` page by page; the caller processes and releases each page. */
   async *walkAssets(
     limit = 1000,
-    state: { capped?: boolean } = {},
+    state: { capped?: boolean; incomplete?: boolean } = {},
   ): AsyncGenerator<AssetListPage> {
     let page = 1;
     // Hard stop for a server that reports absurd pagination: the fleet is at most 20,000 assets.
@@ -266,6 +274,10 @@ export class DatomsApi {
       );
       if (!res.ok || !res.body) this.fail(res, info);
       const mapped = mapAssetListPage(res.body);
+      if (!mapped.pagination) {
+        state.incomplete = true;
+        this.log.error('catalogue page has no pagination: walk is not complete', { page });
+      }
       yield mapped;
       const totalPages = mapped.pagination?.totalPages ?? page;
       if (page >= totalPages) return;
@@ -282,7 +294,7 @@ export class DatomsApi {
   ): Promise<{ assets: MappedAsset[]; total: number | undefined; complete: boolean }> {
     const assets: MappedAsset[] = [];
     let total: number | undefined;
-    const state: { capped?: boolean } = {};
+    const state: { capped?: boolean; incomplete?: boolean } = {};
     for await (const p of this.walkAssets(limit, state)) {
       assets.push(...p.assets);
       total = p.pagination?.total ?? total;
@@ -290,7 +302,8 @@ export class DatomsApi {
     return {
       assets,
       total,
-      complete: !state.capped && total !== undefined && assets.length === total,
+      complete:
+        !state.capped && !state.incomplete && total !== undefined && assets.length === total,
     };
   }
 
@@ -346,6 +359,12 @@ export class DatomsApi {
       }
       if (!res.ok || !res.body) this.fail(res, info);
       const mapped = mapBulkPage(res.body);
+      if (!mapped.pagination) {
+        // Never a silent single-page walk: the rest of the fleet would look like "no data".
+        const msg = 'DATOMS fleet-mode response has no pagination';
+        this.log.error(msg, { ...info });
+        throw new DatomsApiError(res.status, 'MISSING_PAGINATION', 'unexpected', msg);
+      }
       const learned = await this.o.pageSizes.get();
       if (limit === MAX_BULK_LIMIT && learned && learned.limit < MAX_BULK_LIMIT) {
         await this.o.pageSizes.set({ limit, learnedAt: this.now() });

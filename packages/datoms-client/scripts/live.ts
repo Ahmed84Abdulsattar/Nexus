@@ -10,13 +10,15 @@
 //                        (page 1, limit 500; spends credits, use sparingly)
 //
 // `pnpm live` compiles src/ and scripts/ first (tsc, no new dependency), then runs this file.
+import { DatomsClient, assertLive, loadDatomsConfig, type DatomsResponse } from '../src/index.js';
+import { DatomsHttp } from '../src/http.js';
 import {
-  DatomsClient,
-  DatomsHttp,
-  assertLive,
-  loadDatomsConfig,
-  type DatomsResponse,
-} from '../src/index.js';
+  MAX_BULK_IDS,
+  MAX_LATEST_IDS,
+  latestPath,
+  loadEnvFileKeepingLiveGate,
+  validateIds,
+} from './guards.js';
 import { saveFixture } from './record.js';
 
 const argv = process.argv.slice(2);
@@ -24,7 +26,7 @@ const envIdx = argv.indexOf('--env-file');
 if (envIdx >= 0) {
   const path = argv[envIdx + 1];
   if (!path) throw new Error('--env-file needs a path');
-  process.loadEnvFile(path); // loads values into process.env; nothing is printed
+  loadEnvFileKeepingLiveGate(path); // nothing is printed; the file cannot turn DATOMS_LIVE on
   argv.splice(envIdx, 2);
 }
 const fleet = argv.includes('--fleet');
@@ -33,7 +35,7 @@ const [cmd, ...args] = rest;
 const config = loadDatomsConfig();
 assertLive(config);
 const client = new DatomsClient(config);
-const http = new DatomsHttp(config);
+const http = new DatomsHttp(config, undefined, undefined, { allowPerAssetLatest: true });
 
 interface LatestBody {
   data: { time: string; parameters: Record<string, unknown> };
@@ -56,7 +58,13 @@ if (cmd === 'list') {
   while (page <= totalPages && page <= 5) {
     const res = await client.listAssets(page, 1000);
     show(`GET /assets page ${page}`, res);
-    saveFixture(`assets-list-page${page}.json`, 'GET', `/assets?page=${page}&limit=1000`, res);
+    saveFixture(
+      `assets-list-page${page}.json`,
+      'GET',
+      `/assets?page=${page}&limit=1000`,
+      res,
+      config.token,
+    );
     if (!res.ok || !res.body) break;
     totalPages = res.body.pagination.total_pages;
     console.log('pagination', JSON.stringify(res.body.pagination));
@@ -94,10 +102,11 @@ if (cmd === 'list') {
     }
   }
 } else if (cmd === 'latest') {
-  for (const id of new Set(args)) {
-    const res = await http.request<LatestBody>('GET', `/assets/${id}/data/latest`);
-    show(`GET /assets/${id}/data/latest`, res);
-    saveFixture(`asset-latest-${id}.json`, 'GET', `/assets/${id}/data/latest`, res);
+  for (const id of validateIds(args, MAX_LATEST_IDS)) {
+    const path = latestPath(id); // validated and URL-encoded
+    const res = await http.request<LatestBody>('GET', path);
+    show(`GET ${path}`, res);
+    saveFixture(`asset-latest-${id}.json`, 'GET', path, res, config.token);
     if (res.ok && res.body) {
       console.log(
         `  time=${res.body.data.time} keys=${Object.keys(res.body.data.parameters).length}`,
@@ -105,13 +114,18 @@ if (cmd === 'list') {
     }
   }
 } else if (cmd === 'bulk') {
-  const ids = [...new Set(args)];
-  if (!fleet && (ids.length < 1 || ids.length > 10)) throw new Error('bulk: give 1 to 10 ids');
+  const ids = fleet ? [] : validateIds(args, MAX_BULK_IDS);
   // One call, no retry, no loop.
   const res = fleet ? await client.bulkLatestFleet(1, 500) : await client.bulkLatestById(ids);
   const mode = fleet ? 'fleet' : 'id';
   show(`POST /assets/telemetry/latest/query (${mode} mode)`, res);
-  saveFixture(`bulk-latest-${mode}-mode.json`, 'POST', '/assets/telemetry/latest/query', res);
+  saveFixture(
+    `bulk-latest-${mode}-mode.json`,
+    'POST',
+    '/assets/telemetry/latest/query',
+    res,
+    config.token,
+  );
   if (res.ok && res.body) {
     for (const r of res.body.data) {
       console.log(

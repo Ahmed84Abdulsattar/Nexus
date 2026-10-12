@@ -20,3 +20,18 @@ export function validateIds(ids: readonly string[], max: number): string[] {
 export function latestPath(id: string): string {
   return `/assets/${encodeURIComponent(assertValidId(id))}/data/latest`;
 }
+
+/**
+ * Loads an env file without letting it change DATOMS_LIVE: the live gate is the shell's value
+ * only (set on the command line), so a file can never switch it on.
+ */
+export function loadEnvFileKeepingLiveGate(
+  path: string,
+  env: NodeJS.ProcessEnv = process.env,
+  loader: (path: string) => void = (p) => process.loadEnvFile(p),
+): void {
+  const shell = env['DATOMS_LIVE'];
+  loader(path);
+  if (shell === undefined) delete env['DATOMS_LIVE'];
+  else env['DATOMS_LIVE'] = shell;
+}

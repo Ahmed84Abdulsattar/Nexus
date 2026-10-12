@@ -41,7 +41,7 @@ describe('asset list mapping', () => {
     expect(a.lifecycleStatus).toBe('active');
     expect(a.createdAt).toBeInstanceOf(Date);
     expect(a.nameplate).toEqual(raw.asset_info);
-    expect(a.nameplate['model']).toBeNull();
+    expect(a.nameplate?.['model']).toBeNull();
   });
 
   it('missing fields are absent, not defaulted', () => {
@@ -51,7 +51,7 @@ describe('asset list mapping', () => {
     expect(a.sourceTypeName).toBeUndefined();
     expect(a.sourceTypeId).toBeUndefined();
     expect(a.lifecycleStatus).toBeUndefined();
-    expect(a.nameplate).toEqual({});
+    expect(a.nameplate).toBeUndefined();
   });
 });
 

@@ -1,11 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import {
   DatomsClient,
-  DatomsHttp,
   DatomsNetworkError,
+  createDatomsConfig,
   REQUEST_TIMEOUT_MS,
   loadDatomsConfig,
 } from '../src/index.js';
+import { DatomsHttp } from '../src/http.js';
 import { TEST_TOKEN, errorReply, fakeFetch, testConfig } from './helpers.js';
 
 describe('http layer', () => {
@@ -96,19 +97,26 @@ describe('http layer', () => {
 
   it('refuses to call unless DATOMS_LIVE=true', async () => {
     const { impl, calls } = fakeFetch(() => ({ body: {} }));
-    const http = new DatomsHttp({ ...testConfig, live: false }, impl);
+    const http = new DatomsHttp(
+      createDatomsConfig(
+        { baseUrl: testConfig.baseUrl, orgId: '20283', token: TEST_TOKEN, live: false },
+        { extraAllowedHosts: ['datoms.test'] },
+      ),
+      impl,
+    );
     await expect(http.request('GET', '/assets')).rejects.toThrow(/DATOMS_LIVE/);
     expect(calls).toHaveLength(0);
   });
 
   it('reads config from the environment', () => {
     const c = loadDatomsConfig({
-      DATOMS_BASE_URL: 'https://x/v4/',
+      DATOMS_BASE_URL: 'https://api.datoms.io/v4/',
       DATOMS_ORG_ID: '1',
       DATOMS_TOKEN: 't',
       DATOMS_LIVE: 'true',
     });
-    expect(c).toEqual({ baseUrl: 'https://x/v4', orgId: '1', token: 't', live: true });
+    expect(c).toMatchObject({ baseUrl: 'https://api.datoms.io/v4', orgId: '1', live: true });
+    expect(c.token).toBe('t');
     expect(loadDatomsConfig({}).live).toBe(false);
   });
 });

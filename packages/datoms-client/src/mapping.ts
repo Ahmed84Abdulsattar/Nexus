@@ -104,7 +104,7 @@ export interface MappedAsset {
   sourceTypeId: string | undefined;
   lifecycleStatus: string | undefined;
   /** `asset_info`, unchanged (make, model, kva, capacity, ... and nulls as sent). */
-  nameplate: Record<string, unknown>;
+  nameplate: Record<string, unknown> | undefined;
 }
 
 export function mapAsset(raw: RawAsset): MappedAsset {
@@ -119,7 +119,7 @@ export function mapAsset(raw: RawAsset): MappedAsset {
         ? undefined
         : String(raw.category_id),
     lifecycleStatus: raw.lifecycle_status ?? undefined,
-    nameplate: raw.asset_info ?? {},
+    nameplate: raw.asset_info ?? undefined,
   };
 }
 
