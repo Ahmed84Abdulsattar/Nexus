@@ -3,6 +3,7 @@
 > Read-only copy for agents. The spreadsheet is the source and tracks status. Regenerate this file when the sheet changes.
 > Map decided: Esri ArcGIS (docs/adr/0002). Database: PostgreSQL 16 without TimescaleDB (docs/adr/0003). Where a task disagrees with docs/, docs/ wins.
 > Regenerated from the spreadsheet on 2026-10-08 after architecture review 1 (ADRs 0005–0010). Changed rows: the sprint dependencies for S2–S6, S0-04, S2-02, S3-01, S3-03, S3-04 (on hold), S4-01, S4-02, S4-03, S4-05, S5-01, S5-02, S5-03, S6-01, S6-02, S6-03, S6-04, S9-02.
+> Changed on 2026-10-12 (DATOMS provisional test key, docs/07 section 3): the S2 sprint dependency and S2-02 (Steps, External blocker, Acceptance check) now show S2-02 as unblocked.
 
 ## Sprints
 
@@ -10,7 +11,7 @@
 |---|---|---|---|---|
 | S0 | Setup + map decision | 1–2 | Repos, Azure dev environment, Microsoft sign-in skeleton, design tokens, ArcGIS map wrapper skeleton | Azure and Entra access; map decision |
 | S1 | Foundation | 3–4 | Data model, permissions in the API, app shell, responsive layout | Nothing |
-| S2 | Portfolio map + access | 5–6 | Top-level map of all DATOMS sites; DATOMS client; users and roles API | DATOMS sample bulk response + bulk field list (Q21, Q22) |
+| S2 | Portfolio map + access | 5–6 | Top-level map of all DATOMS sites; DATOMS client; users and roles API | None to start S2-02 (DATOMS test key received 2026-10-12; bulk access checked in S2-02, Q34). Site field names still pending (Q21, Q22) |
 | S3 | DATOMS sync + admin | 7–8 | Live DATOMS data flowing; device linking, sync health, users and roles screens | DATOMS sample + field list (Q21, Q22) + key |
 | S4 | Project page | 9–10 | Level 1 page with live asset pins and equipment / energy boxes | Bulk field names for location + status (Q22) |
 | S5 | Energy | 11–12 | Info box 3 and energy detail page; load-test harness | Whether DATOMS has site totals and ownership (Q3); field names (Q22) |
@@ -307,17 +308,18 @@
 - **Sprint:** S2
 - **Week:** W2
 - **Work package:** DATOMS connector
-- **Steps (how to do it):** 1. Read the v4 PDF, plus the DATOMS sample bulk response (Q21) and bulk field list (Q22) once received.
+- **Steps (how to do it):** 1. Read the v4 PDF, docs/07 section 3 (test key, what DATOMS has shared) and docs/source/datoms-parameters.md (parameter keys, names and units for DG Set, Fuel Tank, AC Sub-Meter, Solar Inverter; seeded per source type, ADR 0011). Use the DATOMS sample bulk response (Q21) and bulk field list (Q22) once received.
   2. Build packages/datoms-client: list assets (catalogue) and the bulk endpoint (fleet and id mode) as the ONLY telemetry source (ADR 0010). data/latest is for CLI checks only.
-  3. Put ALL field mapping in src/mapping.ts. Until the sample arrives, build against the v4 PDF shape. Save the sample to fixtures/ with tokens removed.
-  4. Handle paging, 422 halving (with the learned page size), retries, rate limits, and the credit budget with budget.max_share (ADR 0005).
-  5. Test against GHAFWOODS on dev using fixtures or a small id-mode subset (never the full fleet from dev).
+  3. Bulk check with the provisional test key (DATOMS_TOKEN only in the local .env; DATOMS_LIVE=true on a developer machine): make ONE bulk call in id mode with a few ids from the Asset List. Record the result in docs/07 section 3.3 and Q34 (no token, no headers). If bulk is enabled, save the response to fixtures/. If it is not, record that and keep the worker on fixtures; never fall back to data/latest (ADR 0010).
+  4. Put ALL field mapping in src/mapping.ts. Until the sample arrives, build against the v4 PDF shape. Save recorded responses (Asset List, the bulk call) to fixtures/ with tokens and headers removed.
+  5. Handle paging, 422 halving (with the learned page size), retries, rate limits, and the credit budget with budget.max_share (ADR 0005).
+  6. Test against GHAFWOODS using fixtures or a small id-mode subset from a developer machine (never the full fleet; the test key is not in Key Vault, so the cloud dev worker stays on fixtures).
 - **Output when done:** Code that can talk to DATOMS
 - **Now done by:** You (backend)
 - **Requirement:** Brief: energy, crane utilisation
-- **External blocker:** DATOMS sample bulk response (Q21) + bulk field list (Q22) + read-only key. Needed before this task starts; they do not block S0 or S1.
+- **External blocker:** None. Unblocked 2026-10-12: DATOMS provisional read-only test key for org 20283 (valid until 10 Nov 2026). Checked inside this task: whether the bulk endpoint is enabled for the key (Q34). Still pending, not blocking: site, location, status and alert field names (Q21, Q22); those mappings stay empty ("no data yet") until they arrive.
 - **Estimate (days):** 3
-- **Acceptance check:** Client reads the GHAFWOODS demo fleet (generators and tower cranes) through the bulk endpoint in dev; DATOMS field names exist only in src/mapping.ts
+- **Acceptance check:** One bulk call made with the test key and its result recorded in docs/07 section 3.3 and Q34. If bulk is enabled: the client reads a small id-mode subset of the live fleet through the bulk endpoint. If not: the client's tests pass on fixtures and the worker stays on fixtures. Either way: no data/latest call outside scripts/, and DATOMS field names exist only in src/mapping.ts
 
 ### S2-03 · Portfolio map (chosen provider, through the map wrapper): one pin per DATOMS site, coloured Active green, Central Store blue, Finished grey, In bid yellow where DATOMS gives the status
 - **Sprint:** S2

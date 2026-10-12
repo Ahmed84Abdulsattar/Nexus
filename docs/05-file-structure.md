@@ -40,8 +40,9 @@ nexus/
 │   ├── sprints/                      # S0.md, S1.md … (task breakdowns by the architect agent)
 │   ├── runbooks/                     # on-call: DATOMS down, poll lag, DB full, key rotation;
 │   │                                 # setup: entra-setup.md, ArcGIS key, Azure deploy (no secret values)
-│   └── source/                       # client docs, DATOMS PDF, sprint sheet (read-only inputs) + markdown copies:
-│                                     # brief.md, structure.md, backlog.md (agents read these)
+│   └── source/                       # client docs, DATOMS PDF, DATOMS parameter list, sprint sheet (read-only inputs)
+│                                     # + markdown copies: brief.md, structure.md, datoms-parameters.md, backlog.md
+│                                     # (agents read these)
 │
 ├── scripts/                          # repo tools, not app code
 │   └── gen-backlog.py                # regenerates docs/source/backlog.md from the sprint sheet
@@ -53,6 +54,7 @@ nexus/
 │   ├── seeds/
 │   │   ├── dev-roles.sql             # roles, permissions, demo group mappings
 │   │   ├── dev-settings.sql          # dev only: poll.subset_external_ids, small budget.max_share (ADR 0005)
+│   │   ├── datoms-parameters.sql     # every env: DATOMS parameter list per source type + category → asset type names (ADR 0011)
 │   │   └── scale-100-sites.ts        # generates 100 sites / 5,000 assets from fixtures
 │   └── README.md
 │
@@ -93,7 +95,8 @@ nexus/
 │   │       │   ├── explorer/         # data explorer
 │   │       │   ├── admin/            # users and roles, project access, integration health, linking to-do
 │   │       │   └── dev/              # components page (dev builds only, S0-06); never in the production bundle
-│   │       ├── assets/icons/asset-types/  # tower-crane.svg, hoist.svg, generator.svg, generic.svg …
+│   │       ├── assets/icons/asset-types/  # one per asset_type.icon: tower-crane.svg, hoist.svg, generator.svg,
+│   │       │                              # fuel-tank.svg, solar.svg, mains.svg, generic.svg … (missing icon → generic)
 │   │       ├── styles/               # tailwind.css, tokens.css (colours incl. status/state colours)
 │   │       ├── lib/                  # format (numbers, units, dates in Asia/Dubai), featureFlags
 │   │       └── test/                 # MSW handlers, test utils

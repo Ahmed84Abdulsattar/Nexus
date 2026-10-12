@@ -43,10 +43,10 @@
 | GET `/projects/{projectId}/energy/summary` | project.read · scoped | Info box 3 values, as reported (DG states from equipment; site totals from `v_site_metric_live` when DATOMS provides them) | R-25 |
 | GET `/projects/{projectId}/energy/assets` | asset.read · scoped | Energy equipment table | R-31 |
 | GET `/projects/{projectId}/energy/trends` | telemetry.history · scoped | `?metric=&from=&to=&resolution=` | R-31, R-32 |
-| GET `/assets/{assetId}` | asset.read · scoped via asset's project | Nameplate, type, status, location, latest values with parameter metadata | R-23, R-33 |
+| GET `/assets/{assetId}` | asset.read · scoped via asset's project | Nameplate, type, status, location, latest values with parameter metadata **for this asset's source type** (ADR 0011: the same key can have a different name and unit per type; no entry = raw key, no unit) | R-23, R-33 |
 | GET `/assets/{assetId}/timeline` | telemetry.history · scoped | Status changes for a day (`?date=YYYY-MM-DD`, local), with `origin: "observed"`. The UI labels it "observed by Nexus" (ADR 0007). | R-23 |
 | GET `/assets/{assetId}/history` | telemetry.history · scoped | `?parameter=&from=&to=&resolution=` returns `{ resolution, points: [{ t, avg, min, max, last, packets, expectedPackets }] }` | R-32 |
-| GET `/parameters` | asset.read | Parameter dictionary (key, displayName, unit, dataType) | R-23 |
+| GET `/parameters` | asset.read | Parameter dictionary per source type: items `(sourceTypeName, key, displayName, unit, dataType)`, filter `?sourceTypeName=`. A key can appear once per source type with different names (ADR 0011); clients never look a name up by key alone. | R-23, R-50 |
 | GET `/events` | events.read · scoped | `?projectId=&assetId=&category=&from=&to=&unread=true`, paged | R-40, R-41 |
 | POST `/events/read` | events.read · scoped | `{ items: [{ eventId, occurredAt }] }` inserts `event_read` rows (occurredAt is needed because events and read state are partitioned by time). `{ all: true, projectId?, before: ISO }` moves the user's `read_marker` (global or per project) and inserts no per-event rows (`06` §3, item 11). | R-41 |
 | GET `/events/unread-count` | events.read · scoped | Bell badge | R-41 |

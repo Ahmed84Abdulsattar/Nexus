@@ -222,13 +222,15 @@ CREATE TABLE core.zone (
 
 -- ---- Asset types. Maps source type names to an icon/category. ----
 -- New source types are inserted automatically as 'generic' until an admin maps them.
+-- source_names holds source type names exactly as core.asset.source_type_name stores them. The DATOMS
+-- category names are appended by db/seeds/datoms-parameters.sql (docs/adr/0011), not hard-coded here.
 CREATE TABLE core.asset_type (
   id            uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  code          text NOT NULL UNIQUE,     -- tower_crane, hoist, diesel_generator, solar, mains, forklift, …
+  code          text NOT NULL UNIQUE,     -- tower_crane, hoist, diesel_generator, fuel_tank, solar, mains, forklift, …
   display_name  text NOT NULL,
   category      text NOT NULL CHECK (category IN ('equipment','energy','vehicle','environment','other')),
   icon          text NOT NULL DEFAULT 'generic',
-  source_names  text[] NOT NULL DEFAULT '{}',  -- e.g. {'DG','Diesel Generator'} as DATOMS names them
+  source_names  text[] NOT NULL DEFAULT '{}',  -- e.g. {'Solar Inverter'} as DATOMS names the category
   -- Poll interval for assets of this type (docs/adr/0006). NULL = setting poll.interval_seconds (60).
   -- Set by an admin only if the credit allowance requires it (open question Q14).
   poll_interval_seconds int CHECK (poll_interval_seconds IS NULL OR poll_interval_seconds >= 60),
@@ -249,7 +251,8 @@ CREATE TABLE core.asset (
   -- Set by the connector from source data (rule lives in packages/datoms-client/src/mapping.ts).
   kind             text NOT NULL DEFAULT 'physical' CHECK (kind IN ('physical','site_metric')),
   name             text NOT NULL,
-  source_type_name text,                                   -- type exactly as the source names it
+  source_type_name text,                                   -- type (DATOMS: asset category) exactly as the source names it;
+                                                           -- also the key into telemetry.parameter (docs/adr/0011)
   make             text,
   model            text,
   serial_no        text,
@@ -362,23 +365,36 @@ $$;
 -- TELEMETRY
 -- =====================================================================
 
--- Parameter dictionary: auto-discovered from packet keys. Admin may set display name/unit
--- only if the source does not provide them (source values win).
+-- Parameter dictionary, one row per (source, source asset type, key) (docs/adr/0011). The same key can
+-- have a different name and unit per source type (e.g. DATOMS 'mpow_r' = "Mains L1 Active Power" on a
+-- DG Set, "L1 Active Power" on an AC Sub-Meter), so names are never stored per key alone.
+-- Filled from the source: auto-discovered from packet keys by the live poll, plus the DATOMS parameter
+-- list in db/seeds/datoms-parameters.sql. Admin may set display name/unit only if the source does not
+-- provide them (source values win).
+-- Lookup for an asset's values: source_system = asset.source_system AND source_type_name IS NOT DISTINCT
+-- FROM asset.source_type_name AND key = <value key>. No row = show the raw key, no unit. Never fall back
+-- to the same key of another source type.
 CREATE TABLE telemetry.parameter (
-  id             serial PRIMARY KEY,
-  source_system  text NOT NULL REFERENCES core.source_system(code),
-  key            text NOT NULL,              -- e.g. 'hz', 'rpm', 'fuel'
-  display_name   text,                       -- from source when available
-  unit           text,                       -- from source when available
-  data_type      text NOT NULL DEFAULT 'number' CHECK (data_type IN ('number','text','boolean','json')),
-  category       text,                       -- as reported, e.g. 'electrical', 'engine'
-  is_hidden      boolean NOT NULL DEFAULT false,
-  first_seen_at  timestamptz NOT NULL DEFAULT now(),
-  last_seen_at   timestamptz NOT NULL DEFAULT now(),
-  UNIQUE (source_system, key)
+  id               serial PRIMARY KEY,
+  source_system    text NOT NULL REFERENCES core.source_system(code),
+  source_type_name text,                     -- asset type/category exactly as the source names it; equals
+                                             -- core.asset.source_type_name. NULL = type not known yet (Q22)
+  key              text NOT NULL,            -- e.g. 'hz', 'rpm', 'fuel'
+  display_name     text,                     -- from source when available
+  unit             text,                     -- from source when available
+  data_type        text NOT NULL DEFAULT 'number' CHECK (data_type IN ('number','text','boolean','json')),
+                                             -- seeded rows keep the default; the live poll sets it from the
+                                             -- first value it sees (docs/adr/0011)
+  category         text,                     -- parameter group as reported, e.g. 'electrical', 'engine'
+                                             -- (not the asset category)
+  is_hidden        boolean NOT NULL DEFAULT false,
+  first_seen_at    timestamptz NOT NULL DEFAULT now(),
+  last_seen_at     timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT parameter_source_type_key_uq UNIQUE NULLS NOT DISTINCT (source_system, source_type_name, key)
 );
 
 -- Which parameters each asset reports (filled automatically, used by explorer pickers).
+-- parameter_id points at the dictionary row for the asset's own source type (docs/adr/0011).
 -- Write rule (docs/06 section 4): INSERT only new (asset, parameter) pairs (the worker keeps the known
 -- pairs in memory); refresh last_seen_at at most once a day. Never update it on every poll.
 CREATE TABLE telemetry.asset_parameter (
@@ -789,6 +805,7 @@ INSERT INTO core.asset_type (code, display_name, category, icon) VALUES
   ('tower_crane',      'Tower crane',      'equipment', 'tower-crane'),
   ('hoist',            'Hoist',            'equipment', 'hoist'),
   ('diesel_generator', 'Diesel generator', 'energy',    'generator'),
+  ('fuel_tank',        'Fuel tank',        'energy',    'fuel-tank'),
   ('solar',            'Solar',            'energy',    'solar'),
   ('mains',            'Mains',            'energy',    'mains'),
   ('forklift',         'Forklift',         'vehicle',   'forklift'),
