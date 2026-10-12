@@ -18,6 +18,7 @@
 | Unit | Vitest | datoms-client (paging, 422 halving, 429 Retry-After, budget windows, mapping), access logic, formatting, map marker mapping |
 | Integration | Vitest + Testcontainers (Postgres 16) + supertest | Every API endpoint, including a **403/404 out-of-scope test for every endpoint**; live subscriptions refuse out-of-scope projects and connections are closed on revocation; worker pipeline writing fixtures to the DB; closed-bucket rollups and late packets; safe catalogue retire; partition maintenance |
 | Contract | zod schemas vs live DATOMS (nightly, read-only) and vs fixtures (every PR) | DATOMS response shapes |
+| API contract | CI regenerates `apps/api/openapi.json` and `apps/web/src/api/schema.d.ts` (`pnpm openapi:generate`) and fails on `git diff --exit-code`; web `typecheck` fails when a call site no longer matches | Frontend and backend agree (S1-03) |
 | Component | Vitest + Testing Library + MSW | Info boxes, tables, side panel, states (loading, empty, error, stale) |
 | End-to-end | Playwright (desktop + phone viewports) | Sign in (test tenant or mocked MSAL), portfolio → project → asset, equipment table, energy page, notifications, admin access change |
 | Load | k6 + fixture replay | See `12-scalability.md` |
