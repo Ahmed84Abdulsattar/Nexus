@@ -110,7 +110,8 @@ nexus/
 │   │   │   │   │                     # decorators.ts (@RequirePermission, @AnySignedIn, @Public), project-scope.guard.ts,
 │   │   │   │   │                     # project-scope.ts (withProjectScope for Kysely queries)
 │   │   │   │   ├── db/               # Kysely provider, transaction helper, generated DB types
-│   │   │   │   ├── http/             # problem+json filter (problem-json.filter.ts), ProblemDetails DTO
+│   │   │   │   ├── http/             # problem+json filter (problem-json.filter.ts), ProblemDetails DTO,
+│   │   │   │   │                     # configure-app.ts (the /v1 prefix, shared by main, generator and tests)
 │   │   │   │   ├── paging/           # cursor paging helpers
 │   │   │   │   └── logging/
 │   │   │   └── modules/

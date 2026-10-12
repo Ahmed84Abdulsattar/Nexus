@@ -22,6 +22,7 @@ delete process.env['ENTRA_JWKS_URL'];
 
 // Imported after the environment is set, because AuthModule reads it when it is loaded.
 const { AppModule } = await import('../app.module.js');
+const { configureApp } = await import('../common/http/configure-app.js');
 const { buildOpenApiDocument } = await import('./setup.js');
 
 const outFile = resolve(dirname(fileURLToPath(import.meta.url)), '../../openapi.json');
@@ -30,6 +31,7 @@ const app = await NestFactory.create<NestFastifyApplication>(AppModule, new Fast
   logger: false,
 });
 try {
+  configureApp(app);
   await app.init();
   await mkdir(dirname(outFile), { recursive: true });
   await writeFile(outFile, JSON.stringify(buildOpenApiDocument(app), null, 2) + '\n');

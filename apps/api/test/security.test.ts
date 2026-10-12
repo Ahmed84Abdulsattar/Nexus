@@ -31,28 +31,28 @@ describe('token hardening', () => {
   it('refuses a token whose azp is not the Nexus web app (403)', async () => {
     const other = '00000000-0000-4000-8000-000000000001';
     expect(
-      (await t.get('/test-auth/any', await t.token({ claims: { azp: other } }))).statusCode,
+      (await t.get('/v1/test-auth/any', await t.token({ claims: { azp: other } }))).statusCode,
     ).toBe(403);
   });
 
   it('refuses a token without azp (403)', async () => {
     expect(
-      (await t.get('/test-auth/any', await t.token({ claims: { azp: undefined } }))).statusCode,
+      (await t.get('/v1/test-auth/any', await t.token({ claims: { azp: undefined } }))).statusCode,
     ).toBe(403);
   });
 
   it('refuses HS256 signed with the RSA public JWK as the secret (algorithm confusion)', async () => {
     const secret = new TextEncoder().encode(JSON.stringify(t.keys.publicJwk));
     const token = await signToken({ keys: t.keys, alg: 'HS256', signWith: secret });
-    expect((await t.get('/test-auth/any', token)).statusCode).toBe(401);
+    expect((await t.get('/v1/test-auth/any', token)).statusCode).toBe(401);
   });
 
   it('refuses RS512 and PS256 tokens even when their keys are in the JWKS', async () => {
     const { rs512, ps256 } = t as unknown as Record<string, Awaited<ReturnType<typeof makeKeys>>>;
     const a = await signToken({ keys: rs512!, alg: 'RS512', signWith: rs512!.privateKey });
     const b = await signToken({ keys: ps256!, alg: 'PS256', signWith: ps256!.privateKey });
-    expect((await t.get('/test-auth/any', a)).statusCode).toBe(401);
-    expect((await t.get('/test-auth/any', b)).statusCode).toBe(401);
+    expect((await t.get('/v1/test-auth/any', a)).statusCode).toBe(401);
+    expect((await t.get('/v1/test-auth/any', b)).statusCode).toBe(401);
   });
 
   it.each([
@@ -62,7 +62,7 @@ describe('token hardening', () => {
   ])('ignores a header-embedded %s that points at an attacker key', async (_name, header) => {
     const attacker = await makeKeys('test-key-1'); // same kid as the real key
     const token = await signToken({ keys: attacker, header: header(attacker) });
-    expect((await t.get('/test-auth/any', token)).statusCode).toBe(401);
+    expect((await t.get('/v1/test-auth/any', token)).statusCode).toBe(401);
   });
 });
 
@@ -80,7 +80,7 @@ describe('project scope applies to every :projectId route without opting in', ()
 
   it('404 for a project outside the scope', async () => {
     expect(
-      (await t.get(`/test-auth/projects/${PROJECT_B}`, await t.token({ claims: { oid } })))
+      (await t.get(`/v1/test-auth/projects/${PROJECT_B}`, await t.token({ claims: { oid } })))
         .statusCode,
     ).toBe(404);
   });
@@ -91,10 +91,11 @@ describe('project scope applies to every :projectId route without opting in', ()
       const admin = 'aaaaaaaa-0000-4000-8000-0000000000b2';
       t.directory.assignUserRole(admin, 'admin');
       expect(
-        (await t.get(`/test-auth/projects/${bad}`, await t.token({ claims: { oid } }))).statusCode,
+        (await t.get(`/v1/test-auth/projects/${bad}`, await t.token({ claims: { oid } })))
+          .statusCode,
       ).toBe(404);
       expect(
-        (await t.get(`/test-auth/projects/${bad}`, await t.token({ claims: { oid: admin } })))
+        (await t.get(`/v1/test-auth/projects/${bad}`, await t.token({ claims: { oid: admin } })))
           .statusCode,
       ).toBe(404);
     },
@@ -102,7 +103,7 @@ describe('project scope applies to every :projectId route without opting in', ()
 
   it('matches ids case-insensitively', async () => {
     const res = await t.get(
-      `/test-auth/projects/${PROJECT_A.toUpperCase()}`,
+      `/v1/test-auth/projects/${PROJECT_A.toUpperCase()}`,
       await t.token({ claims: { oid } }),
     );
     expect(res.statusCode).toBe(200);
@@ -143,7 +144,7 @@ describe('JWKS unavailable gives 503, not 401', () => {
       resolver: createKeyResolver(new URL(url)),
     });
     try {
-      return (await t.get('/test-auth/any', await t.token())).statusCode;
+      return (await t.get('/v1/test-auth/any', await t.token())).statusCode;
     } finally {
       await t.app.close();
     }

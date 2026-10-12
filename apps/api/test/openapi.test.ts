@@ -34,6 +34,20 @@ describe('/docs and /openapi.json by APP_ENV', () => {
   });
 });
 
+describe('the /v1 prefix', () => {
+  it('puts routes under /v1 but keeps /health, /docs and /openapi.json outside it', async () => {
+    const t = await appFor('local', true);
+    expect((await t.get('/health/live')).statusCode).toBe(200);
+    expect((await t.get('/v1/health/live')).statusCode).toBe(404);
+    expect((await t.get('/docs')).statusCode).toBe(200);
+    expect((await t.get('/v1/docs')).statusCode).toBe(404);
+    expect((await t.get('/v1/openapi.json')).statusCode).toBe(404);
+    // An unprefixed API route does not exist.
+    expect((await t.get('/test-auth/public')).statusCode).toBe(404);
+    expect((await t.get('/v1/test-auth/public')).statusCode).toBe(200);
+  });
+});
+
 describe('the OpenAPI document', () => {
   it('registers ProblemDetails and documents it on the routes it can happen on', async () => {
     const t = await appFor('local', true);
@@ -48,13 +62,13 @@ describe('the OpenAPI document', () => {
         'application/problem+json': { schema: { $ref: '#/components/schemas/ProblemDetails' } },
       },
     };
-    const asset = doc.paths['/test-auth/asset']?.['get']?.responses;
+    const asset = doc.paths['/v1/test-auth/asset']?.['get']?.responses;
     expect(asset?.['401']).toMatchObject(ref);
     expect(asset?.['403']).toMatchObject(ref);
-    expect(doc.paths['/test-auth/projects/{projectId}']?.['get']?.responses['404']).toMatchObject(
-      ref,
-    );
-    expect(doc.paths['/test-auth/echo']?.['post']?.responses['422']).toMatchObject(ref);
+    expect(
+      doc.paths['/v1/test-auth/projects/{projectId}']?.['get']?.responses['404'],
+    ).toMatchObject(ref);
+    expect(doc.paths['/v1/test-auth/echo']?.['post']?.responses['422']).toMatchObject(ref);
     // The @Public health route needs no token, so it documents no 401.
     expect(doc.paths['/health/live']?.['get']?.responses['401']).toBeUndefined();
   });

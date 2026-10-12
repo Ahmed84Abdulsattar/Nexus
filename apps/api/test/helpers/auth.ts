@@ -25,6 +25,7 @@ import {
 import { JWT_KEY_RESOLVER } from '../../src/common/auth/entra-jwt.guard.js';
 import type { InMemoryAccessDirectory } from '../../src/common/auth/in-memory-access-directory.js';
 import { mountDocs } from '../../src/openapi/setup.js';
+import { configureApp } from '../../src/common/http/configure-app.js';
 import { APP_CONFIG, type AppConfig, loadConfig } from '../../src/config/env.js';
 
 export const TENANT_ID = '11111111-2222-4333-8444-555555555555';
@@ -236,6 +237,7 @@ export async function createTestApp(
     )
     .compile();
   const app = moduleRef.createNestApplication<NestFastifyApplication>(new FastifyAdapter());
+  configureApp(app);
   if (options.docs) mountDocs(app, config.appEnv);
   await app.init();
   await app.getHttpAdapter().getInstance().ready();

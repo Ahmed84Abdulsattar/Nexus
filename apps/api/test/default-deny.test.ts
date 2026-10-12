@@ -60,8 +60,8 @@ describe('default deny (docs/08 step 4, docs/10 Decorators)', () => {
     it.each(['/test-class-level', '/test-class-plus-method'])(
       'refuses %s at runtime, with and without a token',
       async (url) => {
-        expect((await t.get(url)).statusCode).toBe(403);
-        const res = await t.get(url, await t.token());
+        expect((await t.get('/v1' + url)).statusCode).toBe(403);
+        const res = await t.get('/v1' + url, await t.token());
         expect(res.statusCode).toBe(403);
         expect(res.body).not.toContain('leaked');
       },
@@ -69,13 +69,13 @@ describe('default deny (docs/08 step 4, docs/10 Decorators)', () => {
 
     it('refuses such a handler at runtime, even for a valid admin', async () => {
       t.directory.assignUserRole('aaaaaaaa-0000-4000-8000-000000000001', 'admin');
-      const res = await t.get('/test-undecorated', await t.token());
+      const res = await t.get('/v1/test-undecorated', await t.token());
       expect(res.statusCode).toBe(403);
       expect(res.body).not.toContain('leaked');
     });
 
     it('refuses such a handler without a token', async () => {
-      const res = await t.get('/test-undecorated');
+      const res = await t.get('/v1/test-undecorated');
       expect(res.statusCode).toBe(403);
     });
   });

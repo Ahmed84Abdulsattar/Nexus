@@ -1,7 +1,8 @@
 # 10 · API design (REST, `/v1`)
 
-- **Base:** `https://<host>/v1`. JSON, camelCase. OpenAPI 3.1: Swagger UI at `/docs` and the spec at `/openapi.json`, both mounted only when `APP_ENV` is not `prod`. The spec is also committed as `apps/api/openapi.json` (written by `pnpm build`), and the web client types are generated from it (see "OpenAPI and the typed client" below).
+- **Base:** `https://<host>/v1`. JSON, camelCase. Only `/health/*`, `/docs` and `/openapi.json` are outside `/v1` (`configureApp()` in `apps/api/src/common/http/configure-app.ts` sets the prefix; main.ts, the OpenAPI generator and the tests all use it, so `openapi.json` paths carry `/v1`). OpenAPI 3.1: Swagger UI at `/docs` and the spec at `/openapi.json`, both mounted only when `APP_ENV` is not `prod`. The spec is also committed as `apps/api/openapi.json` (written by `pnpm build`), and the web client types are generated from it (see "OpenAPI and the typed client" below).
 - **Auth:** `Authorization: Bearer <Entra access token>` on everything except `/health/*`.
+- **Web client:** `VITE_API_BASE_URL` ends in `/v1`; `/health/*` is called on the API origin.
 - Every endpoint below lists its **permission**. *Scoped* means the project scope filter applies.
 
 ## Conventions
