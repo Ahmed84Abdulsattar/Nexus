@@ -5,6 +5,9 @@ import {
   HttpException,
   Logger,
 } from '@nestjs/common';
+import { PROBLEM_JSON, type ProblemDetails, type ProblemFieldError } from '@nexus/shared';
+import { ZodValidationException } from 'nestjs-zod';
+import type { ZodError } from 'zod';
 
 interface Reply {
   status(code: number): Reply;
@@ -26,7 +29,11 @@ const TITLES: Record<number, string> = {
   503: 'Service Unavailable',
 };
 
-/** RFC 7807 errors for every response (docs/10): { type, title, status, detail, correlationId }. */
+/**
+ * RFC 9457 errors for every response (docs/10): { type, title, status, detail, correlationId }.
+ * The body matches `problemDetailsSchema` in @nexus/shared, which is also the OpenAPI component.
+ * Input that fails a zod DTO is 422 with the field failures in `errors` (docs/10), not Nest's 400.
+ */
 @Catch()
 export class ProblemJsonFilter implements ExceptionFilter {
   private readonly logger = new Logger(ProblemJsonFilter.name);
@@ -38,22 +45,32 @@ export class ProblemJsonFilter implements ExceptionFilter {
 
     let status = 500;
     let detail = 'Unexpected error.';
-    if (exception instanceof HttpException) {
+    let errors: ProblemFieldError[] | undefined;
+    if (exception instanceof ZodValidationException) {
+      status = 422;
+      errors = (exception.getZodError() as ZodError).issues.map((i) => ({
+        path: i.path.join('.'),
+        message: i.message,
+      }));
+      detail = 'The request did not pass validation.';
+    } else if (exception instanceof HttpException) {
       status = exception.getStatus();
       detail = messageOf(exception);
     } else {
       this.logger.error(exception instanceof Error ? exception.stack : String(exception));
     }
 
-    reply.status(status).header('content-type', 'application/problem+json');
+    reply.status(status).header('content-type', PROBLEM_JSON);
     if (status === 401) reply.header('www-authenticate', 'Bearer');
-    reply.send({
+    const body: ProblemDetails = {
       type: 'about:blank',
       title: TITLES[status] ?? (status >= 500 ? 'Internal Server Error' : 'Error'),
       status,
       detail,
       correlationId: correlationId(request),
-    });
+      ...(errors ? { errors } : {}),
+    };
+    reply.send(body);
   }
 }
 

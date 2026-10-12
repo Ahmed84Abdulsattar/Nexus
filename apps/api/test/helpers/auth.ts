@@ -1,7 +1,10 @@
 import 'reflect-metadata';
-import { Controller, Get, Module, Param, SetMetadata } from '@nestjs/common';
+import { Body, Controller, Get, Module, Param, Post, Query, SetMetadata } from '@nestjs/common';
 import { FastifyAdapter, type NestFastifyApplication } from '@nestjs/platform-fastify';
 import { Test } from '@nestjs/testing';
+import { cursorPageQuerySchema } from '@nexus/shared';
+import { createZodDto } from 'nestjs-zod';
+import { z } from 'zod';
 import {
   createLocalJWKSet,
   exportJWK,
@@ -21,6 +24,7 @@ import {
 } from '../../src/common/auth/decorators.js';
 import { JWT_KEY_RESOLVER } from '../../src/common/auth/entra-jwt.guard.js';
 import type { InMemoryAccessDirectory } from '../../src/common/auth/in-memory-access-directory.js';
+import { mountDocs } from '../../src/openapi/setup.js';
 import { APP_CONFIG, type AppConfig, loadConfig } from '../../src/config/env.js';
 
 export const TENANT_ID = '11111111-2222-4333-8444-555555555555';
@@ -99,6 +103,11 @@ export async function signToken(opts: SignOptions): Promise<string> {
   return jwt.sign(opts.signWith ?? opts.keys.privateKey);
 }
 
+class EchoBodyDto extends createZodDto(
+  z.object({ name: z.string().min(1), count: z.number().int() }),
+) {}
+class PageQueryDto extends createZodDto(cursorPageQuerySchema) {}
+
 /** Routes that exist only in tests, one per access mode. */
 @Controller('test-auth')
 export class TestAuthController {
@@ -124,6 +133,18 @@ export class TestAuthController {
   @Get('admin')
   admin(): { ok: true } {
     return { ok: true };
+  }
+
+  @AnySignedIn()
+  @Post('echo')
+  echo(@Body() body: EchoBodyDto): EchoBodyDto {
+    return body;
+  }
+
+  @AnySignedIn()
+  @Get('page')
+  page(@Query() query: PageQueryDto): PageQueryDto {
+    return query;
   }
 
   @RequirePermission('project.read')
@@ -180,6 +201,11 @@ export interface TestApp {
   config: AppConfig;
   token: (opts?: Partial<Omit<SignOptions, 'keys'>>) => Promise<string>;
   get: (url: string, token?: string) => ReturnType<NestFastifyApplication['inject']>;
+  post: (
+    url: string,
+    payload: object,
+    token?: string,
+  ) => ReturnType<NestFastifyApplication['inject']>;
 }
 
 export async function createTestApp(
@@ -190,6 +216,8 @@ export async function createTestApp(
     /** Replaces the local JWKS, e.g. createKeyResolver(url) against a test server. */
     resolver?: JWTVerifyGetKey;
     env?: Record<string, string>;
+    /** Mount /docs and /openapi.json as main.ts does (not in prod). */
+    docs?: boolean;
   } = {},
 ): Promise<TestApp> {
   const keys = await makeKeys();
@@ -208,6 +236,7 @@ export async function createTestApp(
     )
     .compile();
   const app = moduleRef.createNestApplication<NestFastifyApplication>(new FastifyAdapter());
+  if (options.docs) mountDocs(app, config.appEnv);
   await app.init();
   await app.getHttpAdapter().getInstance().ready();
   return {
@@ -220,6 +249,13 @@ export async function createTestApp(
       app.inject({
         method: 'GET',
         url,
+        ...(token ? { headers: { authorization: `Bearer ${token}` } } : {}),
+      }),
+    post: (url, payload, token) =>
+      app.inject({
+        method: 'POST',
+        url,
+        payload,
         ...(token ? { headers: { authorization: `Bearer ${token}` } } : {}),
       }),
   };

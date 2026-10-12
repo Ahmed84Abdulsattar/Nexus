@@ -11,6 +11,7 @@
   "scripts": {
     "dev": "turbo run dev",
     "build": "turbo run build",
+    "openapi:generate": "pnpm --filter @nexus/shared build && pnpm --filter @nexus/api build && pnpm --filter @nexus/web api:generate",
     "lint": "eslint .",
     "format": "prettier --write .",
     "format:check": "prettier --check .",

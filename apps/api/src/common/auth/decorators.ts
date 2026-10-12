@@ -1,4 +1,5 @@
-import { SetMetadata } from '@nestjs/common';
+import { applyDecorators, SetMetadata } from '@nestjs/common';
+import { ApiBearerAuth } from '@nestjs/swagger';
 import type { PermissionKey } from '@nexus/shared';
 
 /**
@@ -10,12 +11,16 @@ export const PUBLIC_KEY = 'nexus:public';
 export const ANY_SIGNED_IN_KEY = 'nexus:any-signed-in';
 export const REQUIRE_PERMISSION_KEY = 'nexus:require-permission';
 
+/** The OpenAPI security scheme name (see openapi/setup.ts). */
+export const BEARER_AUTH = 'entra';
+
 /** No token needed. Only /health/* (docs/10). */
 export const Public = (): MethodDecorator => SetMetadata(PUBLIC_KEY, true);
 
 /** Any valid, active Nexus user: /me, /config, /live/token, /live/subscriptions (docs/10). */
-export const AnySignedIn = (): MethodDecorator => SetMetadata(ANY_SIGNED_IN_KEY, true);
+export const AnySignedIn = (): MethodDecorator =>
+  applyDecorators(SetMetadata(ANY_SIGNED_IN_KEY, true), ApiBearerAuth(BEARER_AUTH));
 
 /** The user needs every listed permission. */
 export const RequirePermission = (...keys: [PermissionKey, ...PermissionKey[]]): MethodDecorator =>
-  SetMetadata(REQUIRE_PERMISSION_KEY, keys);
+  applyDecorators(SetMetadata(REQUIRE_PERMISSION_KEY, keys), ApiBearerAuth(BEARER_AUTH));
