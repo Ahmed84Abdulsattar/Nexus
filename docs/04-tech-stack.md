@@ -79,7 +79,7 @@ Versions: use the current stable major at project start and pin exact versions i
 |---|---|---|
 | `NODE_ENV` | all | `development` / `production` |
 | `APP_ENV` | all | `local` / `dev` / `prod` (no `test` environment, ADR 0008) |
-| `DATABASE_URL` | api, worker, migrations | `postgres://nexus_api@localhost:5432/nexus` (in Azure: host + Entra token through managed identity) |
+| `DATABASE_URL` | api, worker, migrations | Local: `postgres://nexus_api_local@localhost:5432/nexus` for the api and `postgres://nexus_worker_local@localhost:5432/nexus` for the worker. These passwordless LOGIN users are members of `nexus_api` / `nexus_worker` and are created only when `APP_ENV=local` by `db/seeds/dev-login-roles.sql` (the roles in `db/roles.sql` are NOLOGIN). In Azure: host + Entra token through managed identity. |
 | `DATABASE_POOL_MAX` | api, worker | `10` |
 | `ENTRA_TENANT_ID` | api, web (`VITE_ENTRA_TENANT_ID`) | Innovo tenant GUID (public identifier, not a secret) |
 | `ENTRA_API_CLIENT_ID` / `ENTRA_API_AUDIENCE` | api | `nexus-api` app id / `api://nexus-api` |
@@ -99,7 +99,7 @@ Versions: use the current stable major at project start and pin exact versions i
 | `VITE_API_BASE_URL` | web | `http://localhost:3000/v1` |
 | `LOG_LEVEL` | api, worker | `info` |
 
-Local development: Postgres from docker-compose, `DATOMS_LIVE=false`, `LIVE_MODE=poll`, and either `AUTH_MODE=dev` or a real dev Entra app registration.
+Local development: Postgres from docker-compose (or `scripts/pg-local.ps1` on Windows without Docker), `DATOMS_LIVE=false`, `LIVE_MODE=poll`, and either `AUTH_MODE=dev` or a real dev Entra app registration.
 
 There is no Microsoft Graph secret: the `nexus-api` token carries only the groups assigned to the application, so the 200-group overage path is not used (ADR 0008, Q16). Poll scope and budget share per environment are **settings** (`poll.subset_external_ids`, `budget.max_share`) set by `db/seeds/`, not environment variables (ADR 0005).
 

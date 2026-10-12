@@ -166,6 +166,7 @@
   4. Every asset has project_id and optional building/level/zone ids (what BIM links to later).
   5. Add pnpm db:migrate / db:check / db:seed; run the 100-site seed and record query timings.
   6. From the S1-02 security review (L3, accepted for now): when roles, project scope or active status change, clear the access cache on every API instance (Postgres LISTEN/NOTIFY or a per-user access version), check is_active on a cache hit, and never cache a load that started before the change.
+  7. Wire db/seeds/dev-login-roles.sql into pnpm db:seed for APP_ENV=local only: the runner skips it in every other environment and sets nexus.app_env before running it (the file refuses otherwise). It creates passwordless LOGIN users nexus_api_local / nexus_worker_local, members of nexus_api / nexus_worker from db/roles.sql, and needs a role that can create roles (locally the superuser nexus). Locally the api connects as nexus_api_local and the worker as nexus_worker_local, each with its own DATABASE_URL (docs/04).
 - **Output when done:** Database structure in place
 - **Now done by:** You (backend)
 - **Requirement:** Foundation (BIM-ready)

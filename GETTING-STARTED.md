@@ -4,6 +4,7 @@ This file covers setting up your machine, creating the repo, checking the agents
 
 ## Pending
 - **Docker engine not running yet** on Ahmed's laptop: the Windows "Virtual Machine Platform" feature is off (needs admin or Innovo IT, plus a restart). Once Docker Desktop shows **"Engine running"**, run the schema check: start a throwaway `postgres:16` container, apply `db/schema.sql` then `db/roles.sql`, report the result, then remove the container. Do this before Prompt 2 (local database).
+- **Local PostgreSQL without Docker** (Ahmed's laptop): run `powershell -ExecutionPolicy Bypass -File scripts/pg-local.ps1 start` after every reboot (it does not start on its own).
 
 ---
 

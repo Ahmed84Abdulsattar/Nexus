@@ -45,7 +45,8 @@ nexus/
 │                                     # (agents read these)
 │
 ├── scripts/                          # repo tools, not app code
-│   └── gen-backlog.py                # regenerates docs/source/backlog.md from the sprint sheet
+│   ├── gen-backlog.py                # regenerates docs/source/backlog.md from the sprint sheet
+│   └── pg-local.ps1                  # start/stop a portable PostgreSQL 16 on Windows (no Docker, no admin)
 │
 ├── db/
 │   ├── schema.sql                    # reference schema: the target state, kept in sync with migrations
@@ -53,6 +54,7 @@ nexus/
 │   ├── migrations/                   # 0001_init.sql, 0002_….sql (node-pg-migrate, SQL, up + down)
 │   ├── seeds/
 │   │   ├── dev-roles.sql             # roles, permissions, demo group mappings
+│   │   ├── dev-login-roles.sql       # APP_ENV=local only: passwordless LOGIN users nexus_api_local / nexus_worker_local
 │   │   ├── dev-settings.sql          # dev only: poll.subset_external_ids, small budget.max_share (ADR 0005)
 │   │   ├── datoms-parameters.sql     # every env: DATOMS parameter list per source type + category → asset type names (ADR 0011)
 │   │   └── scale-100-sites.ts        # generates 100 sites / 5,000 assets from fixtures
