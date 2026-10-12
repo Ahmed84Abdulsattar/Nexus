@@ -7,11 +7,12 @@ Rules followed: never merge; one backlog task per branch; stacked PRs when a tas
 
 | Task | Branch | Base branch | PR | Status | Needs my decision |
 |---|---|---|---|---|---|
-| S2-02 DATOMS client (priority 1) | `S2-02-datoms-client` | `main` | — | In progress: phase A (CLI + live test) | — |
+| S2-02 DATOMS client (priority 1) | `S2-02-datoms-client` | `main` | — | Phase A done (live test reported; bulk enabled, 22 assets, 8 DG Set). Phase B (full client, mapping, tests) in progress | Missing bulk fields (site, status, location, alerts) to raise with DATOMS |
 | S1-01 Core data model and migrations | `S1-01-database` | `main` | — | In progress | — |
-| S0-05 Web app shell and routing | `S0-05-web-shell` | `main` | — | In progress | — |
+| S0-05 Web app shell and routing | `S0-05-web-shell` | `main` | [#10](https://github.com/Ahmed84Abdulsattar/Nexus/pull/10) | PR open; qa running | — |
+| S0-06 Design tokens and base components | `S0-06-design-tokens` | `S0-05-web-shell` | — | In progress | — |
 | GETTING-STARTED pg-local command | `docs/getting-started-pg-local` | `main` | [#8](https://github.com/Ahmed84Abdulsattar/Nexus/pull/8) | PR open (docs only) | — |
-| This progress file | `docs/progress-today` | `main` | — | Updated through the day | — |
+| This progress file | `docs/progress-today` | `main` | [#9](https://github.com/Ahmed84Abdulsattar/Nexus/pull/9) | Updated through the day | — |
 
 ## Queue (next unblocked, backlog order)
 
@@ -19,7 +20,6 @@ Rules followed: never merge; one backlog task per branch; stacked PRs when a tas
 |---|---|---|---|
 | S1-09 API baseline protections | backend-api | `S1-01-database` | Both edit `apps/api` config, `.env.example`, `docs/04` |
 | S1-04 Audit log | backend-api | `S1-09-api-protections` | Needs the DB (S1-01); edits `app.module.ts`, `docs/10`, OpenAPI like S1-09 |
-| S0-06 Design tokens and base components | frontend | `S0-05-web-shell` | Needs the router |
 | S1-07 Loading, error and empty states | frontend | after S0-06 | Shares `components/feedback/` |
 | S0-09 Map wrapper (key read from config; map check blocked) | frontend | after S0-06 | Needs the status tokens |
 | S2-01 Projects API | backend-api | after S1-04 | Needs S1-09 (backlog) and the DB |
