@@ -29,3 +29,8 @@ jobs:
       - run: pnpm typecheck
       - run: pnpm test
       - run: pnpm build
+      # S1-03: the committed OpenAPI spec and the web client types must match the code.
+      - name: OpenAPI and generated client are up to date
+        run: |
+          pnpm openapi:generate
+          git diff --exit-code -- apps/api/openapi.json apps/web/src/api/schema.d.ts

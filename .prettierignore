@@ -13,3 +13,6 @@ scripts
 CLAUDE.md
 GETTING-STARTED.md
 PROMPTS.md
+# Generated (S1-03): apps/api/openapi.json by the API build, schema.d.ts by openapi-typescript.
+apps/api/openapi.json
+apps/web/src/api/schema.d.ts

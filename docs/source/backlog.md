@@ -193,8 +193,8 @@
 - **Week:** W2
 - **Work package:** Foundation
 - **Steps (how to do it):** 1. Turn on NestJS Swagger/OpenAPI generation.
-  2. Publish the spec at /api/docs on dev.
-  3. Generate a TypeScript client into packages/shared.
+  2. Publish the spec at /docs and /openapi.json on local and dev (not in prod).
+  3. Generate the typed client (openapi-typescript + openapi-fetch) into apps/web/src/api/.
   4. Show the frontend how to use it.
 - **Output when done:** Shared API contract the frontend codes against
 - **Now done by:** You (backend)
