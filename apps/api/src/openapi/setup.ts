@@ -67,13 +67,15 @@ export function buildOpenApiDocument(app: INestApplication): OpenAPIObject {
 }
 
 /**
- * Swagger UI at /docs and the spec at /openapi.json, for local and dev only. In prod neither is
- * mounted (docs/10). Returns whether they were mounted.
+ * Swagger UI at /docs and the spec at /openapi.json, for APP_ENV local and dev only (an
+ * allow-list); in prod or any other value neither is mounted (docs/10). Returns whether they were mounted.
  */
 export function mountDocs(app: INestApplication, appEnv: 'local' | 'dev' | 'prod'): boolean {
-  if (appEnv === 'prod') return false;
+  // Allow-list: a new or misspelled environment name gets no docs.
+  if (appEnv !== 'local' && appEnv !== 'dev') return false;
   SwaggerModule.setup(DOCS_PATH, app, buildOpenApiDocument(app), {
     jsonDocumentUrl: OPENAPI_JSON_PATH,
+    raw: ['json'], // no /docs-yaml
   });
   return true;
 }

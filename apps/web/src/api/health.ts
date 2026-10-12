@@ -1,16 +1,11 @@
-import { createApiClient } from './client';
+import { createApiClient, resolveApiBase } from './client';
 
 /**
  * Health is the one area outside /v1 (docs/10), so it is called on the API origin, not on
- * VITE_API_BASE_URL (which ends in /v1).
+ * VITE_API_BASE_URL (which ends in /v1). The client never sends the token to /health/*.
  */
-const origin = (): string => {
-  const base = import.meta.env.VITE_API_BASE_URL;
-  return base ? new URL(base).origin : '';
-};
-
-/** GET /health/live. The reference call that shows how to use the typed client. */
 export async function getHealthLive() {
-  const { data } = await createApiClient({ baseUrl: origin() }).GET('/health/live');
+  const client = createApiClient({ baseUrl: resolveApiBase().origin });
+  const { data } = await client.GET('/health/live');
   return data; // typed { status: 'ok' } | undefined, from the OpenAPI contract
 }

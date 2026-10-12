@@ -1,5 +1,7 @@
 import { problemDetailsSchema } from '@nexus/shared';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { HttpException, Logger } from '@nestjs/common';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+import { ProblemJsonFilter } from '../src/common/http/problem-json.filter.js';
 import { createTestApp, type TestApp } from './helpers/auth.js';
 
 const SITE_USER = 'aaaaaaaa-0000-4000-8000-0000000000a1';
@@ -64,6 +66,69 @@ describe('errors are application/problem+json matching problemDetailsSchema', ()
   });
 });
 
+describe('error details do not leak', () => {
+  it('gives out-of-scope and malformed project ids identical 404 bodies', async () => {
+    const token = await t.token({ claims: { oid: SITE_USER } });
+    const a = await t.get(`/v1/test-auth/projects/${OTHER_PROJECT}`, token);
+    const b = await t.get('/v1/test-auth/projects/not-a-uuid', token);
+    expect(a.statusCode).toBe(404);
+    expect(b.statusCode).toBe(404);
+    const strip = (r: Res) => ({ ...r.json<object>(), correlationId: undefined });
+    expect(strip(a)).toEqual(strip(b));
+    expect(a.json<{ detail: string }>().detail).toBe('Not found.');
+  });
+
+  it('does not echo the requested path on an unknown route', async () => {
+    const res = await t.get('/v1/secret-probe-xyz');
+    expect(res.json<{ detail: string }>().detail).toBe('Not found.');
+    expect(res.body).not.toContain('secret-probe-xyz');
+  });
+
+  it('answers 500 with fixed text and logs status, correlationId and stack', async () => {
+    const logs: string[] = [];
+    const spy = vi.spyOn(Logger.prototype, 'error').mockImplementation((m: unknown) => {
+      logs.push(String(m));
+    });
+    try {
+      const filter = new ProblemJsonFilter();
+      const sent: unknown[] = [];
+      const reply = {
+        status: () => reply,
+        header: () => reply,
+        send: (b: unknown) => (sent.push(b), reply),
+      };
+      const host = {
+        switchToHttp: () => ({
+          getResponse: () => reply,
+          getRequest: () => ({ headers: { 'x-correlation-id': 'cid-1' } }),
+        }),
+      };
+      filter.catch(new Error('db password is hunter2'), host as never);
+      filter.catch(new HttpException('internal detail', 503), host as never);
+      expect(JSON.stringify(sent)).not.toContain('hunter2');
+      expect(JSON.stringify(sent)).not.toContain('internal detail');
+      expect(logs).toHaveLength(2);
+      expect(logs[0]).toMatch(/status=500 correlationId=cid-1 Error: db password/);
+      expect(logs[1]).toMatch(/status=503 correlationId=cid-1/);
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  it('turns malformed JSON into a 400 problem, not a 500', async () => {
+    const res = await t.app.inject({
+      method: 'POST',
+      url: '/v1/test-auth/echo',
+      headers: {
+        'content-type': 'application/json',
+        authorization: `Bearer ${await t.token()}`,
+      },
+      payload: '{ not json',
+    });
+    expectProblem(res, 400);
+  });
+});
+
 describe('zod DTO validation', () => {
   it('accepts a valid body', async () => {
     const res = await t.post('/v1/test-auth/echo', { name: 'x', count: 2 }, await t.token());
@@ -82,6 +147,18 @@ describe('zod DTO validation', () => {
 
   it.each(['limit=0', 'limit=501', 'limit=abc', 'cursor='])('rejects ?%s with 422', async (q) => {
     expectProblem(await t.get(`/v1/test-auth/page?${q}`, await t.token()), 422);
+  });
+
+  it('caps the 422 errors list at 20 and says how many were left out', async () => {
+    const res = await t.post(
+      '/v1/test-auth/many',
+      { items: Array.from({ length: 30 }, () => 'x') },
+      await t.token(),
+    );
+    expectProblem(res, 422);
+    const body = problemDetailsSchema.parse(res.json());
+    expect(body.errors).toHaveLength(20);
+    expect(body.detail).toContain('10 more errors not shown');
   });
 
   it('checks authentication before validation (401 beats 422)', async () => {

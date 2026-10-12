@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { afterAll, describe, expect, it } from 'vitest';
+import { mountDocs } from '../src/openapi/setup.js';
 import { createTestApp, type TestApp } from './helpers/auth.js';
 
 const apps: TestApp[] = [];
@@ -24,6 +25,11 @@ describe('/docs and /openapi.json by APP_ENV', () => {
     expect(spec.json<{ openapi: string }>().openapi).toBe('3.1.0');
   });
 
+  it('serves no /docs-yaml', async () => {
+    const t = await appFor('local');
+    expect((await t.get('/docs-yaml')).statusCode).toBe(404);
+  });
+
   it('are not mounted when APP_ENV=prod (404 problem+json)', async () => {
     const t = await appFor('prod');
     for (const url of ['/docs', '/docs/', '/openapi.json']) {
@@ -32,6 +38,12 @@ describe('/docs and /openapi.json by APP_ENV', () => {
       expect(res.headers['content-type']).toContain('application/problem+json');
     }
   });
+});
+
+it('mounts docs only for an allow-list of environments', () => {
+  const noApp = {} as never;
+  expect(mountDocs(noApp, 'prod')).toBe(false);
+  expect(mountDocs(noApp, 'staging' as never)).toBe(false);
 });
 
 describe('the /v1 prefix', () => {

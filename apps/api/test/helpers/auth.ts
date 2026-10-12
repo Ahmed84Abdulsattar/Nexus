@@ -107,6 +107,7 @@ export async function signToken(opts: SignOptions): Promise<string> {
 class EchoBodyDto extends createZodDto(
   z.object({ name: z.string().min(1), count: z.number().int() }),
 ) {}
+class ManyBodyDto extends createZodDto(z.object({ items: z.array(z.number()) })) {}
 class PageQueryDto extends createZodDto(cursorPageQuerySchema) {}
 
 /** Routes that exist only in tests, one per access mode. */
@@ -139,6 +140,12 @@ export class TestAuthController {
   @AnySignedIn()
   @Post('echo')
   echo(@Body() body: EchoBodyDto): EchoBodyDto {
+    return body;
+  }
+
+  @AnySignedIn()
+  @Post('many')
+  many(@Body() body: ManyBodyDto): ManyBodyDto {
     return body;
   }
 

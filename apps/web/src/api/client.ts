@@ -28,35 +28,70 @@ export function setAccessTokenProvider(provider: AccessTokenProvider): void {
   accessTokenProvider = provider;
 }
 
-const authMiddleware: Middleware = {
-  async onRequest({ request }) {
-    const token = await accessTokenProvider();
-    if (token) request.headers.set('Authorization', `Bearer ${token}`);
-    return request;
-  },
-  async onResponse({ response }) {
-    if (response.ok) return undefined;
-    const problem = (await response
-      .clone()
-      .json()
-      .catch(() => undefined)) as ProblemDetails | undefined;
-    throw new ApiError(response.status, problem);
-  },
-};
+/**
+ * Resolves the API base URL once. A relative value (`/v1`) is resolved against the page origin.
+ * A production build must set VITE_API_BASE_URL; there is no silent fallback to the page origin.
+ */
+export function resolveApiBase(
+  configured: string | undefined = import.meta.env.VITE_API_BASE_URL,
+  isProd: boolean = import.meta.env.PROD,
+  pageOrigin: string = typeof window === 'undefined' ? 'http://localhost' : window.location.origin,
+): URL {
+  if (!configured) {
+    if (isProd) throw new Error('VITE_API_BASE_URL is required in a production build.');
+    return new URL('/v1', pageOrigin);
+  }
+  return new URL(configured, pageOrigin);
+}
+
+/**
+ * Whether the Entra token may be sent to this request URL: only the API origin, and never to
+ * /health/* (public, and a token there would be pointless exposure).
+ */
+export function shouldSendToken(requestUrl: string, apiOrigin: string): boolean {
+  const url = new URL(requestUrl);
+  return url.origin === apiOrigin && !/^\/health(\/|$)/.test(url.pathname);
+}
+
+function authMiddleware(apiOrigin: string): Middleware {
+  return {
+    async onRequest({ request }) {
+      if (!shouldSendToken(request.url, apiOrigin)) return request;
+      const token = await accessTokenProvider();
+      if (token) request.headers.set('Authorization', `Bearer ${token}`);
+      return request;
+    },
+    async onResponse({ response }) {
+      if (response.ok) return undefined;
+      const problem = (await response
+        .clone()
+        .json()
+        .catch(() => undefined)) as ProblemDetails | undefined;
+      throw new ApiError(response.status, problem);
+    },
+  };
+}
 
 /**
  * The typed API client. Every path, parameter and response type comes from `schema.d.ts`, which is
  * generated from apps/api/openapi.json (`pnpm openapi:generate`), so a contract change that breaks
- * a call site fails `pnpm typecheck`. Non-2xx responses throw `ApiError`.
+ * a call site fails `pnpm typecheck`. Non-2xx responses throw `ApiError`. The bearer token is
+ * attached only to requests for the API origin (not /health/*, not any other origin).
+ * `baseUrl` defaults to VITE_API_BASE_URL (e.g. https://host/v1). `apiOrigin` is the only origin
+ * that receives the token; it defaults to the origin of VITE_API_BASE_URL.
  */
-export function createApiClient(options: { baseUrl?: string; fetch?: typeof fetch } = {}) {
+export function createApiClient(
+  options: { baseUrl?: string; apiOrigin?: string; fetch?: typeof fetch } = {},
+) {
+  const configured = resolveApiBase();
+  const base = options.baseUrl ? new URL(options.baseUrl, configured.origin) : configured;
   const client = createClient<paths>({
-    baseUrl: options.baseUrl ?? import.meta.env.VITE_API_BASE_URL ?? '',
+    baseUrl: base.href.replace(/\/$/, ''),
     ...(options.fetch ? { fetch: options.fetch } : {}),
   });
-  client.use(authMiddleware);
+  client.use(authMiddleware(options.apiOrigin ?? configured.origin));
   return client;
 }
 
-/** The app-wide client (base URL from VITE_API_BASE_URL, docs/04). */
+/** The app-wide client (base URL from VITE_API_BASE_URL, docs/04). Throws in a prod build without it. */
 export const api = createApiClient();

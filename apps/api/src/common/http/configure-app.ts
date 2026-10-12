@@ -8,5 +8,5 @@ export const API_PREFIX = 'v1';
  * /health/* (docs/10). /docs and /openapi.json are mounted by mountDocs() and stay unprefixed.
  */
 export function configureApp(app: INestApplication): void {
-  app.setGlobalPrefix(API_PREFIX, { exclude: ['health/(.*)'] });
+  app.setGlobalPrefix(API_PREFIX, { exclude: ['health/{*path}'] });
 }

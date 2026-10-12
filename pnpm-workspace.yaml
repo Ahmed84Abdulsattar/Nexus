@@ -10,7 +10,7 @@ catalog:
   '@eslint/js': ^9.39.5
   '@nestjs/common': ^11.2.7
   '@nestjs/core': ^11.2.7
-  '@fastify/static': ^9.0.0
+  '@fastify/static': ^10.1.2
   '@nestjs/platform-fastify': ^11.2.7
   '@nestjs/swagger': ^11.4.7
   '@nestjs/testing': ^11.2.7
@@ -51,3 +51,7 @@ allowBuilds:
   '@swc/core': true
   esbuild: true
   unrs-resolver: true
+
+# Security: platform-fastify pins an older fastify; advisories fixed in 5.12.5 (S1-03 review).
+overrides:
+  fastify: ^5.12.5
