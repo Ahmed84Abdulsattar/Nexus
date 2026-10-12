@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Header } from '../../app/layout';
 import { applyTheme, initialTheme, type Theme } from '../../app/theme';
 import {
   Button,
@@ -57,6 +58,11 @@ export function ComponentsPage() {
             </li>
           ))}
         </ul>
+      </Card>
+
+      <Card aria-labelledby="hd">
+        <CardTitle id="hd">Header (sample user)</CardTitle>
+        <Header session={{ user: { name: 'Sample User' }, signOut: () => undefined }} />
       </Card>
 
       <Card aria-labelledby="bt">
