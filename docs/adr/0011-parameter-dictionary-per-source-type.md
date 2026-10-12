@@ -12,7 +12,7 @@
   - `core.asset.source_type_name`: the asset's type exactly as the source names it.
   - `core.asset_type`: Nexus's own classification (icon, category for Box 2 vs Box 3, poll interval). `asset_type.source_names` maps source names to it. New source names start as `generic` until an admin maps them (`07` §6).
 - `telemetry.parameter.category` already exists and means the parameter group as reported (for example "electrical"), not the asset category. A new column must not reuse that word.
-- The exact way the API names an asset's category is not known yet. The markdown heading says "DG Set (18)", and it is not clear if "(18)" is part of the name or a category id (Q35). The Asset List and the bulk field list will show it (Q22).
+- The exact category strings the API returns are not confirmed yet (Q35). The list gives "DG Set", "Fuel Tank", "AC Sub-Meter" and "Solar Inverter" (the sheet's DG tab is named "DG Set (18)", where "(18)" is very likely the count of DG sets, not part of the name). S2-02 records the real values from the Asset List.
 
 ## Decision
 **`telemetry.parameter` is keyed by `(source_system, source_type_name, key)`.** `source_type_name` is the asset category **exactly as the source names it**, the same string that `core.asset.source_type_name` holds for the assets that report the key. Display name and unit are stored per row, so the same key can carry different names and units per category.
@@ -26,7 +26,7 @@ Details:
 
   | DATOMS category (as in the list) | `core.asset_type.code` | `category` |
   |---|---|---|
-  | DG Set (18) | `diesel_generator` | energy |
+  | DG Set | `diesel_generator` | energy |
   | Fuel Tank | `fuel_tank` (new type) | energy |
   | AC Sub-Meter | `mains` | energy |
   | Solar Inverter | `solar` | energy |
@@ -47,12 +47,12 @@ Details:
 |---|---|---|
 | Key by `(source_system, source_type_name, key)`, raw source string (chosen) | Source words keyed by source identity; independent of Nexus type mapping; no new table | String key with no FK: a renamed DATOMS category would start a new set of rows (same risk as Q11 for ids); needs the exact category string (Q35) |
 | Key by `(source_system, asset_type_id, key)`, FK to `core.asset_type` | Referential integrity; short join | Collides when several source categories map to one Nexus type or to `generic`; an admin remap changes display names; mixes Nexus classification with source data |
-| New table `core.source_asset_type (source_system, external_id, name, asset_type_id)` and an FK from `parameter` | Strongest source identity (would hold a DATOMS category id if there is one) | Duplicates `asset_type.source_names`; we do not know yet whether DATOMS exposes a category id (Q35). Can be added later if Q35 shows a stable id. |
+| New table `core.source_asset_type (source_system, external_id, name, asset_type_id)` and an FK from `parameter` | Strongest source identity (would hold a DATOMS category id if there is one) | Duplicates `asset_type.source_names`; we do not know yet whether DATOMS exposes a category id (the Asset List in S2-02 will show it). Can be added later if it does. |
 | Keep one row per key; store per-category names in a jsonb column | No key change | Lookup logic in every query; units per category still awkward; hides the real identity |
 
 ## Consequences
 - `db/schema.sql`: `telemetry.parameter` gets `source_type_name` and the new unique constraint; `core.asset_type` gets the `fuel_tank` row. No view joins `telemetry.parameter`, so no view changes. `db/roles.sql` is unchanged (the API still updates display columns only).
 - `06` §3 and §4, `07` §3 to §5, `10` (`GET /parameters`, `GET /assets/{id}`), `11` rule 2 and the `14` review checklist describe the per-type lookup.
 - The explorer may chart one key from assets of different types; each series is labelled with its own asset's name for the key.
-- **Watch:** Q35 (the exact category string). If the API names it differently from the list (for example "DG Set" without "(18)"), the seeded rows simply do not match: values show raw keys, never wrong names. The fix is a change to the seed file only.
+- **Watch:** Q35 (the exact category strings). If the API names a category differently from the list (for example "DG set" or "Diesel Generator"), the seeded rows simply do not match: values show raw keys, never wrong names. The fix is a change to the seed file only.
 - **To reverse:** collapse rows to one per key in a migration (choosing one name per key), and drop the column. Not expected: the list proves names differ per category.

@@ -1,8 +1,9 @@
 # DATOMS parameter list (markdown copy of datoms-parameters.xlsx)
 > Provided by DATOMS on 12 Oct 2026 with the test key. Read-only copy for agents; the .xlsx is the source.
 > Keys are the JSON keys in the API `parameters` object. Units are DATOMS defaults. Nexus shows these exactly as reported.
+> The DG tab in the .xlsx is named "DG Set (18)". The "(18)" is very likely the number of DG sets connected, not part of the category name, so this copy uses "DG Set" (Q35, `docs/07` section 3.2).
 
-## DG Set (18) (103 parameters)
+## DG Set (103 parameters)
 
 | Parameter name | Key | Default unit |
 |---|---|---|
@@ -192,31 +193,31 @@ Same key, possibly different display name per category. The parameter dictionary
 
 | Key | Category: name (unit) |
 |---|---|
-| `fuel` | DG Set (18): Fuel Level (%); Fuel Tank: Fuel Level (%) |
-| `fuel_consumption` | DG Set (18): Fuel Consumption (L); Fuel Tank: Fuel Consumption (Dispensed) (L) |
-| `fuel_filled` | DG Set (18): Fuel Filled (L); Fuel Tank: Fuel Filled (L) |
-| `ma_energy` | DG Set (18): Mains Apparent Energy (kVAh); AC Sub-Meter: Apparent Energy (kVAh); Solar Inverter: AC Apparent Energy (kVAh) |
-| `ma_power` | DG Set (18): Mains Total Apparent Power (kVA); AC Sub-Meter: Total Apparent Power (kVA); Solar Inverter: AC Total Apparent Power (kVA) |
-| `mapow_b` | DG Set (18): Mains L3 Apparent Power (kVA); AC Sub-Meter: L3 Apparent Power (kVA) |
-| `mapow_r` | DG Set (18): Mains L1 Apparent Power (kVA); AC Sub-Meter: L1 Apparent Power (kVA) |
-| `mapow_y` | DG Set (18): Mains L2 Apparent Power (kVA); AC Sub-Meter: L2 Apparent Power (kVA) |
-| `mcur_ib` | DG Set (18): Mains Current Phase3 (B) (A); AC Sub-Meter: Phase Current L3 (A); Solar Inverter: AC Phase Current L3 (A) |
-| `mcur_ir` | DG Set (18): Mains Current Phase1 (R) (A); AC Sub-Meter: Phase Current L1 (A); Solar Inverter: AC Phase Current L1 (A) |
-| `mcur_iy` | DG Set (18): Mains Current Phase2 (Y) (A); AC Sub-Meter: Phase Current L2 (A); Solar Inverter: AC Phase Current L2 (A) |
-| `mcurr` | DG Set (18): Mains Current Total (A); AC Sub-Meter: Average Phase Current (A); Solar Inverter: AC Average Phase Current (A) |
-| `mpow_b` | DG Set (18): Mains L3 Active Power (kW); AC Sub-Meter: L3 Active Power (kW); Solar Inverter: AC  L3 Active Power (kW) |
-| `mpow_r` | DG Set (18): Mains L1 Active Power (kW); AC Sub-Meter: L1 Active Power (kW); Solar Inverter: AC  L1 Active Power (kW) |
-| `mpow_y` | DG Set (18): Mains L2 Active Power (kW); AC Sub-Meter: L2 Active Power (kW); Solar Inverter: AC  L2 Active Power (kW) |
-| `mr_energy` | DG Set (18): Mains Reactive Energy (kVARh); AC Sub-Meter: Reactive Energy (kVARh); Solar Inverter: AC Reactive Energy (kVArh) |
-| `mr_power` | DG Set (18): Mains Total Reactive Power (kVAR); AC Sub-Meter: Total Reactive Power (kVAR); Solar Inverter: AC Total Reactive Power (kVAr) |
-| `mrpow_b` | DG Set (18): Mains L3 Reactive Power (kVAR); AC Sub-Meter: L3 Reactive Power (kVAR) |
-| `mrpow_r` | DG Set (18): Mains L1 Reactive Power (kVAR); AC Sub-Meter: L1 Reactive Power (kVAR) |
-| `mrpow_y` | DG Set (18): Mains L2 Reactive Power (kVAR); AC Sub-Meter: L2 Reactive Power (kVAR) |
-| `mrun_hr` | DG Set (18): Mains Runhour (Hr); AC Sub-Meter: Mains Runhour (Hr) |
-| `mt_energy` | DG Set (18): Mains Active Energy (kWh); AC Sub-Meter: Active Energy (kWh) |
-| `mt_pf` | DG Set (18): Mains Avg Power Factor (—); AC Sub-Meter: Avg Power Factor (—); Solar Inverter: AC Average Power Factor (—) |
-| `mt_power` | DG Set (18): Mains Total Active Power (kW); AC Sub-Meter: Total Active Power (kW) |
-| `mvol` | DG Set (18): Mains Avg L-N Voltage (V); AC Sub-Meter: Avg L-N Voltage (V); Solar Inverter: Phase Voltage (V) |
+| `fuel` | DG Set: Fuel Level (%); Fuel Tank: Fuel Level (%) |
+| `fuel_consumption` | DG Set: Fuel Consumption (L); Fuel Tank: Fuel Consumption (Dispensed) (L) |
+| `fuel_filled` | DG Set: Fuel Filled (L); Fuel Tank: Fuel Filled (L) |
+| `ma_energy` | DG Set: Mains Apparent Energy (kVAh); AC Sub-Meter: Apparent Energy (kVAh); Solar Inverter: AC Apparent Energy (kVAh) |
+| `ma_power` | DG Set: Mains Total Apparent Power (kVA); AC Sub-Meter: Total Apparent Power (kVA); Solar Inverter: AC Total Apparent Power (kVA) |
+| `mapow_b` | DG Set: Mains L3 Apparent Power (kVA); AC Sub-Meter: L3 Apparent Power (kVA) |
+| `mapow_r` | DG Set: Mains L1 Apparent Power (kVA); AC Sub-Meter: L1 Apparent Power (kVA) |
+| `mapow_y` | DG Set: Mains L2 Apparent Power (kVA); AC Sub-Meter: L2 Apparent Power (kVA) |
+| `mcur_ib` | DG Set: Mains Current Phase3 (B) (A); AC Sub-Meter: Phase Current L3 (A); Solar Inverter: AC Phase Current L3 (A) |
+| `mcur_ir` | DG Set: Mains Current Phase1 (R) (A); AC Sub-Meter: Phase Current L1 (A); Solar Inverter: AC Phase Current L1 (A) |
+| `mcur_iy` | DG Set: Mains Current Phase2 (Y) (A); AC Sub-Meter: Phase Current L2 (A); Solar Inverter: AC Phase Current L2 (A) |
+| `mcurr` | DG Set: Mains Current Total (A); AC Sub-Meter: Average Phase Current (A); Solar Inverter: AC Average Phase Current (A) |
+| `mpow_b` | DG Set: Mains L3 Active Power (kW); AC Sub-Meter: L3 Active Power (kW); Solar Inverter: AC  L3 Active Power (kW) |
+| `mpow_r` | DG Set: Mains L1 Active Power (kW); AC Sub-Meter: L1 Active Power (kW); Solar Inverter: AC  L1 Active Power (kW) |
+| `mpow_y` | DG Set: Mains L2 Active Power (kW); AC Sub-Meter: L2 Active Power (kW); Solar Inverter: AC  L2 Active Power (kW) |
+| `mr_energy` | DG Set: Mains Reactive Energy (kVARh); AC Sub-Meter: Reactive Energy (kVARh); Solar Inverter: AC Reactive Energy (kVArh) |
+| `mr_power` | DG Set: Mains Total Reactive Power (kVAR); AC Sub-Meter: Total Reactive Power (kVAR); Solar Inverter: AC Total Reactive Power (kVAr) |
+| `mrpow_b` | DG Set: Mains L3 Reactive Power (kVAR); AC Sub-Meter: L3 Reactive Power (kVAR) |
+| `mrpow_r` | DG Set: Mains L1 Reactive Power (kVAR); AC Sub-Meter: L1 Reactive Power (kVAR) |
+| `mrpow_y` | DG Set: Mains L2 Reactive Power (kVAR); AC Sub-Meter: L2 Reactive Power (kVAR) |
+| `mrun_hr` | DG Set: Mains Runhour (Hr); AC Sub-Meter: Mains Runhour (Hr) |
+| `mt_energy` | DG Set: Mains Active Energy (kWh); AC Sub-Meter: Active Energy (kWh) |
+| `mt_pf` | DG Set: Mains Avg Power Factor (—); AC Sub-Meter: Avg Power Factor (—); Solar Inverter: AC Average Power Factor (—) |
+| `mt_power` | DG Set: Mains Total Active Power (kW); AC Sub-Meter: Total Active Power (kW) |
+| `mvol` | DG Set: Mains Avg L-N Voltage (V); AC Sub-Meter: Avg L-N Voltage (V); Solar Inverter: Phase Voltage (V) |
 | `mvol_b` | AC Sub-Meter: L3-N Voltage (V); Solar Inverter: AC L3-N Voltage (V) |
 | `mvol_br` | AC Sub-Meter: L3-L1 Voltage (V); Solar Inverter: AC L3-L1 Voltage (V) |
 | `mvol_r` | AC Sub-Meter: L1-N Voltage (V); Solar Inverter: AC L1-N Voltage (V) |

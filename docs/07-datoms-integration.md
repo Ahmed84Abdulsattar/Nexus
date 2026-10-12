@@ -78,10 +78,12 @@
 
   | DATOMS category (as in the list) | Parameters |
   |---|---|
-  | DG Set (18) | 103 |
+  | DG Set | 103 |
   | Fuel Tank | 4 |
   | AC Sub-Meter | 34 |
   | Solar Inverter | 23 |
+
+  **DATOMS currently has 18 DG sets connected**: the sheet's DG tab is named "DG Set (18)". This count comes from the tab name only; the Asset List confirms it in S2-02. The "(18)" is not part of the category name (Q35).
 
   **31 keys are used in more than one category with different display names** (the table at the end of the markdown copy). So `telemetry.parameter` stores names and units per (source system, source type, key), never per key alone (ADR 0011). The list is loaded by `db/seeds/datoms-parameters.sql`, exactly as given (a blank unit stays `NULL`). The list gives no data types (Q22).
 - **Not shared yet:** the site list, location and the other fields (status, the asset type field, alerts). DATOMS said on 12 Oct 2026 that they will arrive "in the coming week" (Q1, Q21, Q22).
@@ -103,12 +105,12 @@ The mapping is data, not code: the seed appends each DATOMS category name to `co
 
 | DATOMS category | `core.asset_type.code` | `category` |
 |---|---|---|
-| DG Set (18) | `diesel_generator` | energy |
+| DG Set | `diesel_generator` | energy |
 | Fuel Tank | `fuel_tank` (new) | energy |
 | AC Sub-Meter | `mains` | energy |
 | Solar Inverter | `solar` | energy |
 
-- The exact category string the API returns is not confirmed: the list says "DG Set (18)", and "(18)" may be a category id rather than part of the name (Q35). If it differs, only the seed file changes.
+- The category strings are taken from the parameter list and not yet confirmed by the API (Q35). S2-02 records the real values from `GET /assets`; if they differ, only the seed file changes.
 - Which screens show fuel tanks (the energy table names DGs, solar and mains) is Q36.
 
 ### 3.5 Confirmed by DATOMS, waiting for field names
