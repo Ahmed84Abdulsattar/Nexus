@@ -12,7 +12,13 @@ import {
   type MappedBulkPage,
   type MappedReading,
 } from './mapping.js';
-import { defaultSleep, withRetry, type RetryOptions } from './retry.js';
+import {
+  DEFAULT_RETRY_AFTER_MS,
+  defaultSleep,
+  parseRetryAfter,
+  withRetry,
+  type RetryOptions,
+} from './retry.js';
 
 export interface Logger {
   info(msg: string, fields?: Record<string, unknown>): void;
@@ -70,6 +76,7 @@ export class BudgetSkippedError extends Error {
 }
 
 export const MAX_BULK_LIMIT = 500;
+export const MAX_CATALOGUE_ASSETS = 20_000;
 export const DAY_MS = 24 * 60 * 60 * 1000;
 
 export interface DatomsApiOptions {
@@ -142,17 +149,19 @@ export class DatomsApi {
     fn: () => Promise<DatomsResponse<T>>,
     creditsOf: (body: T | undefined) => number,
   ): Promise<DatomsResponse<T>> {
-    if (estimatedCredits > 0) {
-      const d = this.o.budget.check(estimatedCredits);
-      if (!d.allowed) {
-        const max = this.o.maxBudgetWaitMs ?? 10_000;
-        if (d.waitMs > max) throw new BudgetSkippedError(d.waitMs, d.reason);
-        this.log.warn('DATOMS budget wait', { waitMs: d.waitMs, reason: d.reason });
-        await this.sleep(d.waitMs);
+    // Always checked, also for the catalogue (0 credits): the request window counts.
+    const d = this.o.budget.check(estimatedCredits);
+    if (!d.allowed) {
+      const max = this.o.maxBudgetWaitMs ?? 10_000;
+      // A non-finite wait means the call can never fit: always skip.
+      if (!Number.isFinite(d.waitMs) || d.waitMs > max) {
+        throw new BudgetSkippedError(d.waitMs, d.reason);
       }
+      this.log.warn('DATOMS budget wait', { waitMs: d.waitMs, reason: d.reason });
+      await this.sleep(d.waitMs);
     }
     const correlationId = randomUUID();
-    return withRetry(
+    const result = await withRetry(
       async () => {
         const res = await fn();
         // 422 is refunded, errors are not charged: only successful rows cost credits.
@@ -166,6 +175,13 @@ export class DatomsApi {
         onWait: (w) => this.log.warn('DATOMS retry wait', { ...info, ...w, correlationId }),
       },
     );
+    if (result.status === 429) {
+      // Retry-After too long, or still limited after the retries: skip this tick.
+      const waitMs = parseRetryAfter(result.rateLimit.retryAfter) ?? DEFAULT_RETRY_AFTER_MS;
+      this.log.warn('DATOMS 429: skipping this tick', { ...info, waitMs, correlationId });
+      throw new BudgetSkippedError(waitMs, 'DATOMS rate limit (429)');
+    }
+    return result;
   }
 
   private account(
@@ -228,9 +244,19 @@ export class DatomsApi {
   // -------------------------------------------------------------------------------------------
 
   /** Walks `GET /assets` page by page; the caller processes and releases each page. */
-  async *walkAssets(limit = 1000): AsyncGenerator<AssetListPage> {
+  async *walkAssets(
+    limit = 1000,
+    state: { capped?: boolean } = {},
+  ): AsyncGenerator<AssetListPage> {
     let page = 1;
+    // Hard stop for a server that reports absurd pagination: the fleet is at most 20,000 assets.
+    const maxPages = Math.ceil(MAX_CATALOGUE_ASSETS / limit) + 2;
     for (;;) {
+      if (page > maxPages) {
+        state.capped = true;
+        this.log.error('catalogue walk hit the page cap', { maxPages });
+        return;
+      }
       const info: CallInfo = { endpoint: '/assets', mode: 'assets', page };
       const res = await this.call(
         info,
@@ -256,11 +282,16 @@ export class DatomsApi {
   ): Promise<{ assets: MappedAsset[]; total: number | undefined; complete: boolean }> {
     const assets: MappedAsset[] = [];
     let total: number | undefined;
-    for await (const p of this.walkAssets(limit)) {
+    const state: { capped?: boolean } = {};
+    for await (const p of this.walkAssets(limit, state)) {
       assets.push(...p.assets);
       total = p.pagination?.total ?? total;
     }
-    return { assets, total, complete: total !== undefined && assets.length === total };
+    return {
+      assets,
+      total,
+      complete: !state.capped && total !== undefined && assets.length === total,
+    };
   }
 
   // -------------------------------------------------------------------------------------------

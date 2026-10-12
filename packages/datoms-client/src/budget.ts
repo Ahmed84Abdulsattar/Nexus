@@ -116,6 +116,19 @@ export class BudgetTracker {
   private server: ServerView | undefined;
 
   constructor(private readonly opts: BudgetOptions) {
+    // Fail closed: bad numbers would silently disable the caps.
+    if (!Number.isFinite(opts.fleetSize) || opts.fleetSize < 0) {
+      throw new RangeError('budget: fleetSize must be a finite number >= 0');
+    }
+    if (!Number.isFinite(opts.maxShare) || opts.maxShare <= 0 || opts.maxShare > 1) {
+      throw new RangeError('budget: maxShare must be in (0, 1]');
+    }
+    if (
+      opts.monthlyAllowance !== undefined &&
+      (!Number.isFinite(opts.monthlyAllowance) || opts.monthlyAllowance <= 0)
+    ) {
+      throw new RangeError('budget: monthlyAllowance must be undefined or a finite number > 0');
+    }
     this.now = opts.now ?? Date.now;
     this.f = fleetUnit(opts.fleetSize);
   }
@@ -226,6 +239,8 @@ export class BudgetTracker {
 
     for (const w of windows) {
       const est = w.kind === 'credits' ? estimatedCredits : 1;
+      // A call that spends no credits (the catalogue) only counts against the request window.
+      if (w.kind === 'credits' && est <= 0) continue;
       const limit = CALL_THRESHOLD * w.cap;
       if (est > limit) {
         return {

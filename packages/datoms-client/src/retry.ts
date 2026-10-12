@@ -14,8 +14,13 @@ export const BACKOFF_BASE_MS = [1_000, 2_000, 4_000, 8_000];
 /** Used when a 429 comes without a usable Retry-After. */
 export const DEFAULT_RETRY_AFTER_MS = 5_000;
 
+/** Longest Retry-After we wait for. Above this we give up and the caller skips the tick. */
+export const MAX_RETRY_AFTER_MS = 120_000;
+/** setTimeout overflows above 2^31-1 ms and then fires at once. */
+export const MAX_TIMER_MS = 2 ** 31 - 1;
+
 export const defaultSleep = (ms: number): Promise<void> =>
-  new Promise((resolve) => setTimeout(resolve, ms));
+  new Promise((resolve) => setTimeout(resolve, Number.isNaN(ms) ? 0 : Math.min(Math.max(ms, 0), MAX_TIMER_MS)));
 
 /** Retry-After in seconds (the form DATOMS sends); an HTTP date is also accepted. */
 export function parseRetryAfter(value: string | undefined, nowMs = Date.now()): number | undefined {
@@ -63,6 +68,8 @@ export async function withRetry<T>(
       res.status === 429
         ? (parseRetryAfter(res.rateLimit.retryAfter) ?? DEFAULT_RETRY_AFTER_MS)
         : backoffMs(attempt, random);
+    // A Retry-After above the cap: do not wait, hand the 429 back (the poll skips this tick).
+    if (res.status === 429 && waitMs > MAX_RETRY_AFTER_MS) return res;
     opts.onWait?.({ attempt, waitMs, why: `HTTP ${res.status}` });
     await sleep(waitMs);
   }
