@@ -7,11 +7,12 @@ Rules followed: never merge; one backlog task per branch; stacked PRs when a tas
 
 | Task | Branch | Base branch | PR | Status | Needs my decision |
 |---|---|---|---|---|---|
-| S2-02 DATOMS client (priority 1) | `S2-02-datoms-client` | `main` | [#11](https://github.com/Ahmed84Abdulsattar/Nexus/pull/11) | PR open; live test reported (bulk enabled, 22 assets, 8 DG Set); security: approve with fixes (3 Medium, 9 Low), qa: PASS with 1 Medium + 4 Low (81 tests added); fixes for both reviews in progress on the branch | (1) keep `null` parameter values as reported (shown as —) vs drop them; (2) are the 4 "Source -2 DG-xxxx (Channel n)" assets separate generators?; (3) raise missing bulk fields (site, status, location, type, alerts) with DATOMS; (4) the API's `pnpm dev` loads the root `.env`, so in local dev the API process also holds `DATOMS_TOKEN`: move the test key to a separate git-ignored file read only by the DATOMS CLI/worker (e.g. `packages/datoms-client/.env.datoms`)? |
+| S2-02 DATOMS client (priority 1) | `S2-02-datoms-client` | `main` | [#11](https://github.com/Ahmed84Abdulsattar/Nexus/pull/11) | PR open; live test reported (bulk enabled, 22 assets, 8 DG Set); security: approve with fixes (3 Medium, 9 Low), Ready: qa + security findings all fixed (208 tests). Note: also adds one ignore line to `packages/config/eslint/index.js`, which #10 edits too | (1) keep `null` parameter values as reported (shown as —) vs drop them; (2) are the 4 "Source -2 DG-xxxx (Channel n)" assets separate generators?; (3) raise missing bulk fields (site, status, location, type, alerts) with DATOMS; (4) the API's `pnpm dev` loads the root `.env`, so in local dev the API process also holds `DATOMS_TOKEN`: move the test key to a separate git-ignored file read only by the DATOMS CLI/worker (e.g. `packages/datoms-client/.env.datoms`)? |
 | S1-01 Core data model and migrations | `S1-01-database` | `main` | — | In progress | — |
 | S0-05 Web app shell and routing | `S0-05-web-shell` | `main` | [#10](https://github.com/Ahmed84Abdulsattar/Nexus/pull/10) | Ready: qa PASS (9 tests added) | — |
 | S0-06 Design tokens and base components | `S0-06-design-tokens` | `S0-05-web-shell` | [#12](https://github.com/Ahmed84Abdulsattar/Nexus/pull/12) | PR open (stacked on #10); qa FAIL (no axe/Playwright evidence; SidePanel focus not returned), fixes in progress | Confirm the provisional colour values (e.g. In bid = lime `#4d7c0f` because a light yellow fails AA); dark mode follows the OS by default; add Playwright later? |
 | S1-05 App header and user menu | `S1-05-app-header` | `S0-06-design-tokens` | — | In progress (user menu shows "Not signed in" until S0-08/Entra) | — |
+| S5-04 Load-test harness | `S5-04-load-harness` | `main` | — | In progress (runs against `/health/live` now; data endpoints disabled until they exist) | — |
 | GETTING-STARTED pg-local command | `docs/getting-started-pg-local` | `main` | [#8](https://github.com/Ahmed84Abdulsattar/Nexus/pull/8) | PR open (docs only) | — |
 | This progress file | `docs/progress-today` | `main` | [#9](https://github.com/Ahmed84Abdulsattar/Nexus/pull/9) | Updated through the day | — |
 
@@ -26,7 +27,6 @@ Rules followed: never merge; one backlog task per branch; stacked PRs when a tas
 | S2-01 Projects API | backend-api | after S1-04 | Needs S1-09 (backlog) and the DB |
 | S2-06 Users and roles API | backend-api | after S2-01 | Needs the audit log |
 | S3-01 Catalogue sync (assets only; sites wait for Q21/Q22) | datoms-integration | `S2-02-datoms-client` + `S1-01-database` | Needs both |
-| S5-04 Load-test harness | devops | `main` | No dependency; most useful once S2-01 exists |
 
 ## Blocked (skipped)
 
