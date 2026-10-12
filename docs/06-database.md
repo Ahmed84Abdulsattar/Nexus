@@ -57,12 +57,13 @@ erDiagram
 9. **Access is data.** Entra groups map to roles in `group_role`. Project scope sits in `project_access` (per user or per group). Roles with `all_projects = true` (admin, leadership) skip the project filter.
 10. **Asset kind (ADR 0009).** `core.asset.kind` is `physical` for physical sensored items of any category (including DGs, solar and mains) or `site_metric` for site-level values as the source reports them, such as energy site totals. **Every equipment list, count, map layer and view filters `kind = 'physical'`.** `v_asset_live` and `v_project_asset_counts` already do. Site-level values are read through `v_site_metric_live`.
 11. **Read state that doesn't grow with users × events.** "Mark all read" moves one row in `events.read_marker` (per user, either global or per project). `events.event_read` holds only events read one by one after the marker. It is partitioned by `occurred_at` like `events.event` and dropped with it. Unread = events in scope with `occurred_at` later than the user's latest applicable marker and no `event_read` row.
+12. **Parameter dictionary per source type (ADR 0011).** `telemetry.parameter` is unique on `(source_system, source_type_name, key)`, not on the key alone, because the same DATOMS key has different names (and unit spellings) in different categories: 31 keys are shared across DG Set, Fuel Tank, AC Sub-Meter and Solar Inverter (`docs/source/datoms-parameters.md`). `source_type_name` is the category exactly as the source names it, the same string as `core.asset.source_type_name`; `NULL` means the type is not known yet (the constraint is `NULLS NOT DISTINCT`). It is a raw source string, not an FK to `core.asset_type`, so a Nexus type remap never changes a source name. Look up an asset's names with `source_type_name IS NOT DISTINCT FROM asset.source_type_name`; with no row, show the raw key and no unit, and never borrow another type's name. The DATOMS list of 12 Oct 2026 is loaded by `db/seeds/datoms-parameters.sql`, which also appends the four category names to `core.asset_type.source_names` (DG Set → `diesel_generator`, Fuel Tank → `fuel_tank`, AC Sub-Meter → `mains`, Solar Inverter → `solar`).
 
 ## 4. Write paths (worker)
 | Job | Writes | Rule |
 |---|---|---|
 | Catalogue sync (hourly, `GET /assets`) | `core.asset` (names, nameplate) | Upsert on `(source_system, external_id)` and set `last_seen_at`. **Retire safely:** only after a complete page walk where the number seen equals `pagination.total`, and only for rows missed in `catalogue.retire_after_misses` (2) consecutive complete walks. If more than `catalogue.retire_max_fraction` (5%) of active assets would be retired, retire nothing and alert. |
-| Live poll (60 s, bulk endpoint only, ADR 0010) | `core.project` (sites), `core.asset_type` (new source type names become `generic` plus a `link_todo`), `core.asset` (site link, `kind`), `telemetry.parameter` (new keys), `telemetry.packet` (insert … ON CONFLICT DO NOTHING), `telemetry.latest_packet` (upsert only if `ts` is newer), `telemetry.asset_parameter` (**insert new pairs only**), `asset_status_current` + `asset_status_history` (**on change only**), `asset_location_*` (on change only), `events.event` (alerts from the bulk rows) | Skip a packet whose `ts` is not newer than the stored `latest_packet.ts`. Reject a `ts` more than 10 minutes in the future (log it). **No per-poll bookkeeping updates:** the worker keeps known (asset, parameter) pairs in memory and refreshes `asset_parameter.last_seen_at` at most daily. `asset_status_current.observed_at` is written on change only. Rows for DATOMS ids that the catalogue doesn't know yet are skipped, counted in `sync_run` and trigger an early catalogue sync (at most once per 5 min). |
+| Live poll (60 s, bulk endpoint only, ADR 0010) | `core.project` (sites), `core.asset_type` (new source type names become `generic` plus a `link_todo`), `core.asset` (site link, `kind`), `telemetry.parameter` (new `(source_type_name, key)` pairs, ADR 0011; `data_type` set once from the first value seen), `telemetry.packet` (insert … ON CONFLICT DO NOTHING), `telemetry.latest_packet` (upsert only if `ts` is newer), `telemetry.asset_parameter` (**insert new pairs only**), `asset_status_current` + `asset_status_history` (**on change only**), `asset_location_*` (on change only), `events.event` (alerts from the bulk rows) | Skip a packet whose `ts` is not newer than the stored `latest_packet.ts`. Reject a `ts` more than 10 minutes in the future (log it). **No per-poll bookkeeping updates:** the worker keeps known (asset, parameter) pairs in memory and refreshes `asset_parameter.last_seen_at` at most daily. `asset_status_current.observed_at` is written on change only. Rows for DATOMS ids that the catalogue doesn't know yet are skipped, counted in `sync_run` and trigger an early catalogue sync (at most once per 5 min). |
 | Rollups (ADR 0007) | `rollup_5m`, `rollup_1h`, `rollup_1d` | **5 min:** `refresh_rollup_5m(bucket_start, bucket_end)` runs **once per closed bucket**, at bucket end + `rollup.close_grace_intervals` × the current poll interval (default 2 × 60 s). The poll job records the oldest `ts` it wrote. If that falls in an already-closed bucket, only those buckets are refreshed again. **1 h:** `refresh_rollup_combine` right after the hour's last 5-minute bucket is refreshed, in batches of 1,000 assets. **1 d:** once per closed Dubai day. No sliding window, no per-minute refresh, and no in-memory accumulators in phase 1 (that is a scale trigger in `12` §2). The live screen never waits for rollups; charts of the current hour or day read the finer table for the open part. |
 | Alerts (in the live poll) | `events.event` | Upsert on `(source_system, external_id, occurred_at)`. Alerts come from the bulk response (ADR 0010); there is no separate events-sync job. |
 | Maintenance (daily 02:00 Dubai) | Creates 7 days of future daily partitions and 2 months of future monthly ones (including `event_read`); drops partitions past retention. Archiving to Blob is **deferred** (`archive.enabled = false`, ADR 0008, Q15). | Settings in `core.setting`: `retention.packet_days` (90, stays until Q15), `rollup_5m_days` (**60**), `rollup_1h_days`, `event_days` (also used for `event_read`), `status_history_days`, `location_history_days`, `api_call_days`, `audit_days`. `rollup_1d` is kept forever. |
@@ -96,6 +97,19 @@ ORDER BY bucket;
 -- Raw values for short ranges
 SELECT ts, values->$2 AS v FROM telemetry.packet
 WHERE asset_id = $1 AND ts >= $3 AND ts < $4 ORDER BY ts;
+
+-- Device card: latest values with names and units for THIS asset's source type (ADR 0011).
+-- No dictionary row (or no name) = the API returns the raw key and no unit. Never join on key alone.
+-- Project scope applies as on every asset query (withProjectScope on a.project_id).
+SELECT e.key, e.value, p.display_name, p.unit, p.data_type, lp.ts
+FROM core.asset a
+JOIN telemetry.latest_packet lp ON lp.asset_id = a.id
+CROSS JOIN LATERAL jsonb_each(lp.values) e
+LEFT JOIN telemetry.parameter p
+       ON p.source_system = a.source_system
+      AND p.source_type_name IS NOT DISTINCT FROM a.source_type_name
+      AND p.key = e.key
+WHERE a.id = $1 AND (p.is_hidden IS NOT TRUE);
 
 -- Project scope for a user (the API caches the result for 5 min per user)
 SELECT * FROM access.user_project_ids($user_id, $group_ids);
@@ -164,7 +178,7 @@ Add indexes (~10–20%), and remember that zone-redundant HA keeps a second copy
 2. Every `up` has a working `down`.
 3. No locking changes on hot tables during the day: build indexes `CONCURRENTLY` and add columns as nullable first.
 4. Update `db/schema.sql` in the same PR, and run `pnpm db:check`. It applies all migrations to one empty DB and `schema.sql` to another, then diffs `pg_dump --schema-only` of both, excluding partition child tables (`*_pYYYYMM*`). Reference data (the INSERTs) is compared separately with a sorted `COPY` of those tables. This keeps the check stable whatever the date.
-5. Seed data that differs between environments goes in `db/seeds/`, not in migrations.
+5. Seed data that differs between environments goes in `db/seeds/`, not in migrations. So does **source data delivered outside the API**: `db/seeds/datoms-parameters.sql` (the DATOMS parameter list and category → asset type names, ADR 0011) runs in every environment, is idempotent, and is the only file to change when DATOMS updates the list or Q35 corrects a category name.
 
 ## 9. Database security
 - App roles and exact grants are in `db/roles.sql` (run once per environment):

@@ -168,7 +168,7 @@ Two cloud environments only (ADR 0008):
 | Env | Purpose | Data | Deploy |
 |---|---|---|---|
 | local | developer machines | fixtures (recorded DATOMS responses), docker-compose PostgreSQL 16 | `pnpm dev` |
-| dev | shared integration | fixtures, or a small id-mode subset of live DATOMS with a small `budget.max_share` (ADR 0005); a DATOMS test org if provided (Q7, Q10) | automatic on merge to `main` |
+| dev | shared integration | fixtures, or a small id-mode subset of live DATOMS with a small `budget.max_share` (ADR 0005); a DATOMS test org if provided (Q7, Q10). The provisional test key (until 10 Nov 2026) is only in developers' local `.env`, so cloud dev stays on fixtures for now (`07` §3.1) | automatic on merge to `main` |
 | prod | all users, and the pilot (S9: only pilot users are assigned to the Entra app) | live DATOMS, full fleet; the only environment that polls the full fleet | manual approval |
 
 - All infrastructure is defined in Bicep (`infra/`). The same templates are used for every environment, with different parameter files (`dev`, `prod`).

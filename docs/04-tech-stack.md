@@ -88,7 +88,7 @@ Versions: use the current stable major at project start and pin exact versions i
 | `ENTRA_WEB_CLIENT_ID` | web (`VITE_ENTRA_WEB_CLIENT_ID`) | `nexus-web` app id |
 | `AUTH_MODE` | api, web | `entra` (default). `dev` is allowed **only when `APP_ENV=local`**: it signs local test tokens for seeded users. The API refuses to start with `dev` anywhere else. |
 | `KEY_VAULT_URI` | api, worker | `https://kv-nexus-dev.vault.azure.net/` (secrets below are read from here in Azure) |
-| `DATOMS_BASE_URL` / `DATOMS_ORG_ID` / `DATOMS_TOKEN` | worker, CLI | Token comes from Key Vault in Azure |
+| `DATOMS_BASE_URL` / `DATOMS_ORG_ID` / `DATOMS_TOKEN` | worker, CLI | `DATOMS_ORG_ID` = `20283` (Innovo's org; public). Token comes from Key Vault in Azure. The provisional read-only **test key** (valid until 10 Nov 2026) is set **only** in a developer's local git-ignored `.env` as `DATOMS_TOKEN`: never in Key Vault, CI, code, docs, fixtures or logs (`07` §3.1). |
 | `DATOMS_LIVE` | worker, CLI | `false` = use fixtures (default locally) |
 | `DATOMS_MONTHLY_CREDIT_ALLOWANCE` | worker | From the contract (Q5) |
 | `WEB_PUBSUB_ENDPOINT` / `WEB_PUBSUB_HUB` | api, worker | `https://wps-nexus-dev.webpubsub.azure.com` / `nexus` |

@@ -31,5 +31,6 @@ Nexus reads telemetry **only** from `POST /assets/telemetry/latest/query`, and s
 - `02` (data note, sources), `07` §2.3 and §3, `03` §4.2 and §5, `05` and `06` §4 say "bulk only".
 - Q9 is answered, and Q1 is narrowed to field names only (Q21, Q22).
 - S2-02 (DATOMS client) needs the sample and the field list before it starts. They do **not** block S0 or S1.
+  - *Update 2026-10-12 (facts only; the decision is unchanged):* S2-02 is unblocked by a provisional read-only test key (`07` §3.1). The sample and field list are still needed to map sites, status, location and alerts. Whether the bulk endpoint is enabled for that key is checked in S2-02 with one call (Q34). If it is not, the worker stays on fixtures; `data/latest` is **not** used as a fallback.
 - **Not decided by this ADR:** whether Nexus may later use a DATOMS **history** feed for gap repair (S3-04) or a dedicated **events** feed. Both would need a new ADR. Until then, `history-backfill` is on hold, and alerts are as present in the bulk response at poll time.
 - To reverse: a new ADR naming the extra endpoint and its credit cost, implemented inside `packages/datoms-client` only.
