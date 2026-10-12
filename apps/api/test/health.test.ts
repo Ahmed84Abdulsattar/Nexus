@@ -1,24 +1,18 @@
-import 'reflect-metadata';
-import { FastifyAdapter, type NestFastifyApplication } from '@nestjs/platform-fastify';
-import { Test } from '@nestjs/testing';
 import { afterAll, beforeAll, expect, it } from 'vitest';
-import { AppModule } from '../src/app.module.js';
+import { createTestApp, type TestApp } from './helpers/auth.js';
 
-let app: NestFastifyApplication;
+let t: TestApp;
 
 beforeAll(async () => {
-  const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
-  app = moduleRef.createNestApplication<NestFastifyApplication>(new FastifyAdapter());
-  await app.init();
-  await app.getHttpAdapter().getInstance().ready();
+  t = await createTestApp();
 });
 
 afterAll(async () => {
-  await app.close();
+  await t.app.close();
 });
 
-it('GET /health/live answers 200', async () => {
-  const res = await app.inject({ method: 'GET', url: '/health/live' });
+it('GET /health/live answers 200 without a token (@Public)', async () => {
+  const res = await t.get('/health/live');
   expect(res.statusCode).toBe(200);
   expect(res.json()).toEqual({ status: 'ok' });
 });

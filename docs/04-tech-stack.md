@@ -83,6 +83,7 @@ Versions: use the current stable major at project start and pin exact versions i
 | `DATABASE_POOL_MAX` | api, worker | `10` |
 | `ENTRA_TENANT_ID` | api, web (`VITE_ENTRA_TENANT_ID`) | Innovo tenant GUID (public identifier, not a secret) |
 | `ENTRA_API_CLIENT_ID` / `ENTRA_API_AUDIENCE` | api | `nexus-api` app id / `api://nexus-api` |
+| `ENTRA_JWKS_URL` | api | Optional, and an override is accepted **only when `APP_ENV=local`**; elsewhere it must be unset or exactly the default. Default: `https://login.microsoftonline.com/<ENTRA_TENANT_ID>/discovery/v2.0/keys`. The API accepts both `ENTRA_API_AUDIENCE` and `ENTRA_API_CLIENT_ID` as the token `aud` (see Q29). |
 | `VITE_ENTRA_API_SCOPE` | web | `api://nexus-api/access_as_user` (the scope MSAL requests; matches `ENTRA_API_AUDIENCE`) |
 | `ENTRA_WEB_CLIENT_ID` | web (`VITE_ENTRA_WEB_CLIENT_ID`) | `nexus-web` app id |
 | `AUTH_MODE` | api, web | `entra` (default). `dev` is allowed **only when `APP_ENV=local`**: it signs local test tokens for seeded users. The API refuses to start with `dev` anywhere else. |

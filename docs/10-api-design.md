@@ -11,8 +11,8 @@
 - **Coverage:** every rollup bucket returned carries `packets` (samples Nexus stored) and `expectedPackets` (bucket width × `telemetry.expected_packets_per_minute`, interim until Q12), so charts can show data coverage (ADR 0007). Nexus never fills a thin bucket.
 - **Errors:** RFC 7807 `application/problem+json` `{ type, title, status, detail, correlationId }`.
   - 401: bad or missing token.
-  - 403: missing permission.
-  - 404: not found or out of scope.
+  - 403: valid token, but missing the `access_as_user` scope or the required permission.
+  - 404: not found or out of project scope.
   - 422: validation.
   - 429: rate-limited.
 - **Freshness:** every live value carries `ts` (the source time), `receivedAt` and `stale: boolean`. `stale` uses the DATOMS rule when known; otherwise it uses the interim `display.stale_after_seconds`, but never less than twice the asset type's poll interval (Q8, ADR 0006). Responses that hold live data include `X-Data-Lag-Seconds`. A field the DATOMS bulk response doesn't carry is returned as absent (`null`), and the UI shows "no data yet" (ADR 0010).
