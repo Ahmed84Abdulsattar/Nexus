@@ -186,5 +186,6 @@ Add indexes (~10–20%), and remember that zone-redundant HA keeps a second copy
   - `nexus_worker`: read on everything. Writes on synced `core.project/asset/asset_type`, `telemetry.*`, `events.event`, `integration.*`. No writes on per-user read state. Partition maintenance goes through SECURITY DEFINER functions.
   - `nexus_migrator`: DDL, and owns the functions.
   Every role has the least access it needs.
+- These roles are NOLOGIN. Locally only (`APP_ENV=local`), `db/seeds/dev-login-roles.sql` adds passwordless LOGIN users `nexus_api_local` and `nexus_worker_local`, each a member of one role and nothing else, so local runs hit the same permission errors as Azure. The seed refuses to run unless the session has `nexus.app_env = 'local'`.
 - The API never connects as the owner. Entra (managed identity) is used for database auth in Azure where possible.
 - Prod: private endpoint only, TLS required, PITR backups for 35 days, and a restore test every quarter (S8-02).
