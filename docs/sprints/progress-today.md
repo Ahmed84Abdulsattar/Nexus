@@ -11,7 +11,7 @@ Rules followed: never merge; one backlog task per branch; stacked PRs when a tas
 | S1-01 Core data model and migrations | `S1-01-database` | `main` | — | In progress | — |
 | S0-05 Web app shell and routing | `S0-05-web-shell` | `main` | [#10](https://github.com/Ahmed84Abdulsattar/Nexus/pull/10) | Ready: qa PASS (9 tests added) | — |
 | S0-06 Design tokens and base components | `S0-06-design-tokens` | `S0-05-web-shell` | [#12](https://github.com/Ahmed84Abdulsattar/Nexus/pull/12) | PR open (stacked on #10); qa FAIL (no axe/Playwright evidence; SidePanel focus not returned), fixes in progress | Confirm the provisional colour values (e.g. In bid = lime `#4d7c0f` because a light yellow fails AA); dark mode follows the OS by default; add Playwright later? |
-| S1-05 App header and user menu | `S1-05-app-header` | `S0-06-design-tokens` | — | In progress (user menu shows "Not signed in" until S0-08/Entra) | — |
+| S1-05 App header and user menu | `S1-05-app-header` | `S0-06-design-tokens` | [#13](https://github.com/Ahmed84Abdulsattar/Nexus/pull/13) | PR open (stacked on #12 → #10); qa running. User menu shows "Not signed in" until S0-08 (Entra) | Is there a header mockup image? (brief/structure don't describe it; built from the backlog list with a text wordmark) |
 | S5-04 Load-test harness | `S5-04-load-harness` | `main` | — | In progress (runs against `/health/live` now; data endpoints disabled until they exist) | — |
 | GETTING-STARTED pg-local command | `docs/getting-started-pg-local` | `main` | [#8](https://github.com/Ahmed84Abdulsattar/Nexus/pull/8) | PR open (docs only) | — |
 | This progress file | `docs/progress-today` | `main` | [#9](https://github.com/Ahmed84Abdulsattar/Nexus/pull/9) | Updated through the day | — |
