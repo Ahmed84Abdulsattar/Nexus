@@ -1,4 +1,4 @@
-# Progress today (2026-10-12)
+# Progress log (started 2026-10-12)
 
 Running log kept by the orchestrator session. Nothing here is merged by an agent; Ahmed merges at the end of the day.
 Rules followed: never merge; one backlog task per branch; stacked PRs when a task needs unmerged work; no two parallel tasks edit the same files; qa on every PR, security-reviewer on auth, access, secrets, infra or DATOMS credentials.
@@ -10,11 +10,14 @@ Rules followed: never merge; one backlog task per branch; stacked PRs when a tas
 | S2-02 DATOMS client (priority 1) | `S2-02-datoms-client` | `main` | [#11](https://github.com/Ahmed84Abdulsattar/Nexus/pull/11) | PR open; live test reported (bulk enabled, 22 assets, 8 DG Set); security: approve with fixes (3 Medium, 9 Low), Ready: qa + security findings all fixed (208 tests). Note: also adds one ignore line to `packages/config/eslint/index.js`, which #10 edits too | (1) keep `null` parameter values as reported (shown as —) vs drop them; (2) are the 4 "Source -2 DG-xxxx (Channel n)" assets separate generators?; (3) raise missing bulk fields (site, status, location, type, alerts) with DATOMS; (4) the API's `pnpm dev` loads the root `.env`, so in local dev the API process also holds `DATOMS_TOKEN`: move the test key to a separate git-ignored file read only by the DATOMS CLI/worker (e.g. `packages/datoms-client/.env.datoms`)? |
 | S1-01 Core data model and migrations | `S1-01-database` | `main` | — | In progress | — |
 | S0-05 Web app shell and routing | `S0-05-web-shell` | `main` | [#10](https://github.com/Ahmed84Abdulsattar/Nexus/pull/10) | Ready: qa PASS (9 tests added) | — |
-| S0-06 Design tokens and base components | `S0-06-design-tokens` | `S0-05-web-shell` | [#12](https://github.com/Ahmed84Abdulsattar/Nexus/pull/12) | PR open (stacked on #10); qa FAIL (no axe/Playwright evidence; SidePanel focus not returned), fixes in progress | Confirm the provisional colour values (e.g. In bid = lime `#4d7c0f` because a light yellow fails AA); dark mode follows the OS by default; add Playwright later? |
+| S0-06 Design tokens and base components | `S0-06-design-tokens` | `S0-05-web-shell` | [#12](https://github.com/Ahmed84Abdulsattar/Nexus/pull/12) | PR open (stacked on #10); Ready: qa findings fixed (axe in CI tests, Playwright spec + 4 screenshots, SidePanel focus, typed Tag tokens). Follow-up: wire Playwright into ci.yml | Confirm the provisional colour values (e.g. In bid = lime `#4d7c0f` because a light yellow fails AA); dark mode follows the OS by default; add Playwright later? |
 | S1-05 App header and user menu | `S1-05-app-header` | `S0-06-design-tokens` | [#13](https://github.com/Ahmed84Abdulsattar/Nexus/pull/13) | PR open (stacked on #12 → #10); qa running. User menu shows "Not signed in" until S0-08 (Entra) | Is there a header mockup image? (brief/structure don't describe it; built from the backlog list with a text wordmark) |
+| S0-09 Map wrapper and ArcGIS adapter | `S0-09-map-wrapper` | `S0-06-design-tokens` | — | In progress (key read from `/v1/config` MSW mock; real map render blocked: no ArcGIS key, Q4/Q23) | — |
 | S5-04 Load-test harness | `S5-04-load-harness` | `main` | — | In progress (runs against `/health/live` now; data endpoints disabled until they exist) | — |
 | GETTING-STARTED pg-local command | `docs/getting-started-pg-local` | `main` | [#8](https://github.com/Ahmed84Abdulsattar/Nexus/pull/8) | PR open (docs only) | — |
 | This progress file | `docs/progress-today` | `main` | [#9](https://github.com/Ahmed84Abdulsattar/Nexus/pull/9) | Updated through the day | — |
+
+Note 2026-10-14: all running agents were stopped on 2026-10-12 by the Claude session limit; resumed 2026-10-14 from their uncommitted work. Nothing was lost.
 
 ## Queue (next unblocked, backlog order)
 
@@ -23,7 +26,6 @@ Rules followed: never merge; one backlog task per branch; stacked PRs when a tas
 | S1-09 API baseline protections | backend-api | `S1-01-database` | Both edit `apps/api` config, `.env.example`, `docs/04` |
 | S1-04 Audit log | backend-api | `S1-09-api-protections` | Needs the DB (S1-01); edits `app.module.ts`, `docs/10`, OpenAPI like S1-09 |
 | S1-07 Loading, error and empty states | frontend | after S0-06 | Shares `components/feedback/` |
-| S0-09 Map wrapper (key read from config; map check blocked) | frontend | after S0-06 | Needs the status tokens |
 | S2-01 Projects API | backend-api | after S1-04 | Needs S1-09 (backlog) and the DB |
 | S2-06 Users and roles API | backend-api | after S2-01 | Needs the audit log |
 | S3-01 Catalogue sync (assets only; sites wait for Q21/Q22) | datoms-integration | `S2-02-datoms-client` + `S1-01-database` | Needs both |
