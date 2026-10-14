@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { DatabaseConfigError, describeDatabaseUrl, resolveDatabaseUrl } from '../src/urls.js';
+import { DatabaseConfigError, describeDatabaseUrl, requireTlsUnlessLocal, resolveDatabaseUrl } from '../src/urls.js';
 
 const API = 'postgres://nexus_api_local@localhost:5432/nexus';
 const WORKER = 'postgres://nexus_worker_local@localhost:5432/nexus';
@@ -7,10 +7,11 @@ const ADMIN = 'postgres://nexus@localhost:5432/nexus';
 
 describe('resolveDatabaseUrl', () => {
   it('uses each role own variable', () => {
-    const env = { APP_ENV: 'prod', DATABASE_URL: API, WORKER_DATABASE_URL: WORKER, DATABASE_ADMIN_URL: ADMIN };
-    expect(resolveDatabaseUrl(env, 'api')).toEqual({ url: API, variable: 'DATABASE_URL', fellBack: false });
-    expect(resolveDatabaseUrl(env, 'worker').url).toBe(WORKER);
-    expect(resolveDatabaseUrl(env, 'admin').url).toBe(ADMIN);
+    const tls = (u: string): string => u + '?sslmode=verify-full';
+    const env = { APP_ENV: 'prod', DATABASE_URL: tls(API), WORKER_DATABASE_URL: tls(WORKER), DATABASE_ADMIN_URL: tls(ADMIN) };
+    expect(resolveDatabaseUrl(env, 'api')).toEqual({ url: tls(API), variable: 'DATABASE_URL', fellBack: false });
+    expect(resolveDatabaseUrl(env, 'worker').url).toBe(tls(WORKER));
+    expect(resolveDatabaseUrl(env, 'admin').url).toBe(tls(ADMIN));
   });
 
   it('falls back to DATABASE_URL for admin and worker only when APP_ENV=local', () => {
@@ -47,6 +48,35 @@ describe('resolveDatabaseUrl', () => {
       expect((error as Error).message).not.toContain('hunter2');
     }
     expect(() => resolveDatabaseUrl({ DATABASE_URL: 'not a url hunter2' }, 'api')).toThrow(/not a valid URL/);
+  });
+});
+
+describe('TLS outside local (L9)', () => {
+  const plain = 'postgres://u:secret@db.example:5432/nexus';
+  it.each(['dev', 'prod', undefined])('requires TLS for all three URLs when APP_ENV is %s', (appEnv) => {
+    const base = appEnv ? { APP_ENV: appEnv } : {};
+    for (const [role, variable] of [['api', 'DATABASE_URL'], ['worker', 'WORKER_DATABASE_URL'], ['admin', 'DATABASE_ADMIN_URL']] as const) {
+      expect(() => resolveDatabaseUrl({ ...base, [variable]: plain }, role)).toThrow(/must use TLS/);
+      expect(() => resolveDatabaseUrl({ ...base, [variable]: plain + '?sslmode=prefer' }, role)).toThrow(/must use TLS/);
+      expect(() => resolveDatabaseUrl({ ...base, [variable]: plain + '?sslmode=disable' }, role)).toThrow(/must use TLS/);
+      for (const ok of ['require', 'verify-ca', 'verify-full']) {
+        expect(resolveDatabaseUrl({ ...base, [variable]: plain + '?sslmode=' + ok }, role).url).toContain(ok);
+      }
+    }
+  });
+
+  it('does not print the URL when it refuses', () => {
+    try {
+      resolveDatabaseUrl({ APP_ENV: 'prod', DATABASE_URL: plain }, 'api');
+      expect.unreachable();
+    } catch (error) {
+      expect((error as Error).message).not.toContain('secret');
+    }
+  });
+
+  it('does not require TLS locally', () => {
+    expect(resolveDatabaseUrl({ APP_ENV: 'local', DATABASE_URL: plain }, 'api').url).toBe(plain);
+    expect(requireTlsUnlessLocal(plain, 'X', 'local')).toBe(plain);
   });
 });
 

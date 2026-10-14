@@ -7,7 +7,6 @@ import { AccessChangeListener } from '../src/common/auth/access-change-listener.
 import {
   AccessContextService,
   InactiveUserError,
-  SIGN_IN_IDLE_MINUTES,
   type AccessDirectory,
   type SignedInIdentity,
 } from '../src/common/auth/access-context.js';
@@ -168,7 +167,7 @@ describe.skipIf(testDatabaseAdminUrl === undefined)('access directory on Postgre
       expect(await auditRows(userId)).toHaveLength(1);
       await admin.query(
         `UPDATE access.app_user SET last_seen_at = now() - make_interval(mins => $2) WHERE id = $1`,
-        [userId, SIGN_IN_IDLE_MINUTES + 1],
+        [userId, 61],
       );
       await directory.upsertUser(who(oid));
       expect(await auditRows(userId)).toHaveLength(2);
@@ -202,6 +201,40 @@ describe.skipIf(testDatabaseAdminUrl === undefined)('access directory on Postgre
       expect(a.userId).not.toBe(b.userId);
     });
 
+    it('reads the audit gap from core.setting (default 60) and re-reads it after the cache time', async () => {
+      const readGap = async (): Promise<number> => {
+        const d = new PostgresAccessDirectory(db);
+        const oid = newOid();
+        const { userId } = await d.upsertUser(who(oid));
+        // 30 minutes idle: audited only if the gap is shorter than that.
+        await admin.query(
+          `UPDATE access.app_user SET last_seen_at = now() - interval '30 minutes' WHERE id = $1`,
+          [userId],
+        );
+        await d.upsertUser(who(oid));
+        const rows = await admin.query(
+          `SELECT count(*)::int AS n FROM audit.log WHERE user_id = $1 AND action = 'auth.sign_in'`,
+          [userId],
+        );
+        return rows.rows[0].n as number;
+      };
+      expect(await readGap()).toBe(1); // 60 minute default: 30 minutes idle is the same session
+      await admin.query(
+        `UPDATE core.setting SET value = '15' WHERE key = 'audit.sign_in_gap_minutes'`,
+      );
+      try {
+        expect(await readGap()).toBe(2); // 15 minute gap: a new sign-in
+        await admin.query(
+          `UPDATE core.setting SET value = '"abc"' WHERE key = 'audit.sign_in_gap_minutes'`,
+        );
+        expect(await readGap()).toBe(1); // unreadable value falls back to 60
+      } finally {
+        await admin.query(
+          `UPDATE core.setting SET value = '60' WHERE key = 'audit.sign_in_gap_minutes'`,
+        );
+      }
+    });
+
     it('still signs the user in when the audit write fails (no partition), and logs it', async () => {
       // Remove every audit partition, so no row can be stored for now().
       const parts = await admin.query<{ n: string }>(
@@ -210,8 +243,10 @@ describe.skipIf(testDatabaseAdminUrl === undefined)('access directory on Postgre
       for (const p of parts.rows)
         await admin.query(`ALTER TABLE audit.log DETACH PARTITION ${p.n}`);
       try {
+        const before = directory.auditWriteFailures;
         const r = await directory.upsertUser(who(newOid()));
         expect(r.isActive).toBe(true);
+        expect(directory.auditWriteFailures).toBe(before + 1); // L8: counted, and logged as event=audit.write_failed
       } finally {
         for (const p of parts.rows) await admin.query(`DROP TABLE ${p.n}`);
         await admin.query(
@@ -402,14 +437,41 @@ describe.skipIf(testDatabaseAdminUrl === undefined)('access directory on Postgre
       expect(await names(await directory.loadAccess(userId, []))).toEqual([]);
     });
 
-    it('does not filter a user whose role has all_projects', async () => {
+    it('does not filter a user whose role has all_projects by project, but still hides unlinked assets (L4)', async () => {
       const { userId } = await directory.upsertUser(who(newOid(), [GROUP_LEAD]));
       expect(await names(await directory.loadAccess(userId, [GROUP_LEAD]))).toEqual([
         'a1',
         'a2',
         'a3',
-        'unlinked',
       ]);
+    });
+
+    it('shows unlinked assets only when the admin linking screen asks for them', async () => {
+      const { userId } = await directory.upsertUser(who(newOid(), [GROUP_LEAD]));
+      const ctx = await directory.loadAccess(userId, [GROUP_LEAD]);
+      const rows = await withProjectScope(
+        db
+          .selectFrom('core.asset as a')
+          .select('a.name')
+          .where('a.name', 'in', ['a1', 'unlinked'])
+          .orderBy('a.name'),
+        ctx,
+        'a.project_id',
+        { includeUnlinked: true },
+      ).execute();
+      expect(rows.map((r) => r.name)).toEqual(['a1', 'unlinked']);
+      // a scoped user never gets them, even with the flag
+      const scoped = await directory.loadAccess(
+        (await directory.upsertUser(who(newOid(), [GROUP_PM]))).userId,
+        [GROUP_PM],
+      );
+      const none = await withProjectScope(
+        db.selectFrom('core.asset as a').select('a.name').where('a.name', '=', 'unlinked'),
+        scoped,
+        'a.project_id',
+        { includeUnlinked: true },
+      ).execute();
+      expect(none).toEqual([]);
     });
 
     it('puts the ids in a bound parameter, never into the SQL text', () => {

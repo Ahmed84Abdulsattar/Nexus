@@ -15,7 +15,13 @@ export const testDatabaseAdminUrl: string | undefined = process.env['TEST_DATABA
 export const SKIP_MESSAGE =
   'TEST_DATABASE_ADMIN_URL is not set: PostgreSQL integration tests are skipped (see docs/14-testing-quality.md).';
 
-if (testDatabaseAdminUrl === undefined) console.warn(SKIP_MESSAGE);
+if (testDatabaseAdminUrl === undefined) {
+  // In CI the database tests must never skip silently: a missing variable is a broken pipeline.
+  if (process.env['CI']) {
+    throw new Error('TEST_DATABASE_ADMIN_URL is not set but CI is: the PostgreSQL tests would be skipped. Set it in the workflow (postgres:16 service).');
+  }
+  console.warn(SKIP_MESSAGE);
+}
 
 export interface TestDatabase {
   name: string;

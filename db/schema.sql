@@ -99,7 +99,12 @@ END $$;
 
 -- Drop partitions whose upper bound is <= p_before. Returns names dropped.
 -- Archive to Blob (Parquet) BEFORE calling this if archiving is enabled.
--- p_before may not be in the future, so a wrong argument cannot drop the live partitions.
+-- Guards (the worker is trusted to run maintenance, not to destroy history):
+--   * p_before may not be in the future, so a wrong argument cannot drop the live partitions;
+--   * audit.log, events.event and events.event_read keep at least 730 days, whatever the argument
+--     (the settings retention.audit_days / retention.event_days default to 730; shortening them
+--     needs a migration that changes this floor);
+--   * every dropped partition is written to audit.log, inside this function.
 CREATE OR REPLACE FUNCTION core.drop_partitions_before(p_parent text, p_before timestamptz)
 RETURNS SETOF text
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, pg_temp AS $$
@@ -111,6 +116,10 @@ DECLARE
 BEGIN
   IF p_before IS NULL OR p_before > now() THEN
     RAISE EXCEPTION 'p_before must not be in the future';
+  END IF;
+  IF (v_schema = 'audit' OR (v_schema = 'events' AND v_table IN ('event', 'event_read')))
+     AND p_before > now() - interval '730 days' THEN
+    RAISE EXCEPTION '% keeps at least 730 days; p_before is too recent', p_parent;
   END IF;
   IF v_schema NOT IN ('telemetry', 'events', 'integration', 'audit') OR NOT EXISTS (
        SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
@@ -126,6 +135,10 @@ BEGIN
     v_upper := substring(r.bound FROM 'TO \(''([^'']+)''\)')::timestamptz;
     IF v_upper IS NOT NULL AND v_upper <= p_before THEN
       EXECUTE format('DROP TABLE %s', r.part);
+      INSERT INTO audit.log (action, target_type, target_id, details)
+      VALUES ('maintenance.partition_dropped', 'partition', r.part,
+              jsonb_build_object('parent', format('%I.%I', v_schema, v_table),
+                                 'before', p_before, 'upper_bound', v_upper, 'caller', session_user));
       RETURN NEXT r.part;
     END IF;
   END LOOP;
@@ -417,6 +430,10 @@ DECLARE
   v_row     jsonb;
   v_payload jsonb;
 BEGIN
+  IF TG_OP = 'TRUNCATE' THEN   -- statement trigger: no rows; everybody may be affected
+    PERFORM pg_notify('nexus_access', '{"scope":"all"}');
+    RETURN NULL;
+  END IF;
   FOR v_row IN
     SELECT r FROM unnest(ARRAY[
       CASE WHEN TG_OP IN ('UPDATE', 'DELETE') THEN to_jsonb(OLD) END,
@@ -453,6 +470,21 @@ CREATE TRIGGER app_user_active_notify  AFTER UPDATE OF is_active ON access.app_u
   EXECUTE FUNCTION access.notify_access_change();
 CREATE TRIGGER app_user_delete_notify  AFTER DELETE ON access.app_user
   FOR EACH ROW EXECUTE FUNCTION access.notify_access_change();
+-- TRUNCATE fires no row triggers: announce it too. (To remove a user, set is_active = false; do not delete the row.)
+CREATE TRIGGER user_role_truncate_notify       AFTER TRUNCATE ON access.user_role
+  FOR EACH STATEMENT EXECUTE FUNCTION access.notify_access_change();
+CREATE TRIGGER group_role_truncate_notify      AFTER TRUNCATE ON access.group_role
+  FOR EACH STATEMENT EXECUTE FUNCTION access.notify_access_change();
+CREATE TRIGGER project_access_truncate_notify  AFTER TRUNCATE ON access.project_access
+  FOR EACH STATEMENT EXECUTE FUNCTION access.notify_access_change();
+CREATE TRIGGER role_truncate_notify            AFTER TRUNCATE ON access.role
+  FOR EACH STATEMENT EXECUTE FUNCTION access.notify_access_change();
+CREATE TRIGGER role_permission_truncate_notify AFTER TRUNCATE ON access.role_permission
+  FOR EACH STATEMENT EXECUTE FUNCTION access.notify_access_change();
+CREATE TRIGGER permission_truncate_notify      AFTER TRUNCATE ON access.permission
+  FOR EACH STATEMENT EXECUTE FUNCTION access.notify_access_change();
+CREATE TRIGGER app_user_truncate_notify        AFTER TRUNCATE ON access.app_user
+  FOR EACH STATEMENT EXECUTE FUNCTION access.notify_access_change();
 
 -- =====================================================================
 -- TELEMETRY
@@ -645,12 +677,19 @@ END $$;
 -- Combine finer rollups into coarser ones (weighted average by n).
 --   p_source 'telemetry.rollup_5m' -> p_target 'telemetry.rollup_1h', p_width '1 hour'
 --   p_source 'telemetry.rollup_1h' -> p_target 'telemetry.rollup_1d', p_width '1 day', p_tz 'Asia/Dubai'
+-- SECURITY INVOKER (the caller needs INSERT on the target; only nexus_worker has it). The tables are
+-- regclass parameters checked against the two allowed pairs, so the dynamic SQL below can only touch them.
 CREATE OR REPLACE FUNCTION telemetry.refresh_rollup_combine(
-  p_source text, p_target text, p_width interval,
+  p_source regclass, p_target regclass, p_width interval,
   p_from timestamptz, p_to timestamptz, p_tz text DEFAULT 'UTC'
 ) RETURNS int LANGUAGE plpgsql AS $$
 DECLARE v_rows int;
 BEGIN
+  IF (p_source, p_target) NOT IN (
+       ('telemetry.rollup_5m'::regclass, 'telemetry.rollup_1h'::regclass),
+       ('telemetry.rollup_1h'::regclass, 'telemetry.rollup_1d'::regclass)) THEN
+    RAISE EXCEPTION 'refresh_rollup_combine: only rollup_5m to rollup_1h and rollup_1h to rollup_1d are allowed';
+  END IF;
   EXECUTE format($f$
     INSERT INTO %s AS r (asset_id, bucket, stats, packets)
     SELECT asset_id, bucket,
@@ -835,7 +874,8 @@ LEFT JOIN telemetry.status_map m            ON m.source_system = a.source_system
 LEFT JOIN telemetry.latest_packet lp        ON lp.asset_id = a.id
 LEFT JOIN telemetry.asset_location_current l ON l.asset_id = a.id
 WHERE a.retired_at IS NULL
-  AND a.kind = 'physical';
+  AND a.kind = 'physical'
+  AND a.project_id IS NOT NULL;   -- unlinked assets are not shown anywhere (admin linking reads core.asset)
 
 -- Info box 2 / equipment counts per project, type and display status (equipment only, via v_asset_live)
 CREATE OR REPLACE VIEW core.v_project_asset_counts AS
@@ -858,7 +898,8 @@ SELECT a.id               AS asset_id,
 FROM core.asset a
 LEFT JOIN telemetry.latest_packet lp ON lp.asset_id = a.id
 WHERE a.retired_at IS NULL
-  AND a.kind = 'site_metric';
+  AND a.kind = 'site_metric'
+  AND a.project_id IS NOT NULL;
 
 -- =====================================================================
 -- SEED DATA (reference values; environment-specific seeds live in db/seeds)
@@ -879,6 +920,7 @@ INSERT INTO core.setting (key, value, description) VALUES
   ('retention.rollup_1h_days',    '1830','Hourly rollups kept (days)'),
   ('retention.api_call_days',     '30',  'External API call log kept (days)'),
   ('retention.audit_days',        '730', 'Audit log kept (days)'),
+  ('audit.sign_in_gap_minutes',   '60',  'A sign-in is audited (auth.sign_in) when the access cache misses and the user previous last_seen_at is older than this many minutes (docs/08 section 2 step 6). TODO: switch to the Entra sid claim if S0-04 confirms tokens carry it (Q38).'),
   ('retention.event_days',        '730', 'Events kept (days)'),
   ('retention.status_history_days','730','Status change history kept (days)'),
   ('retention.location_history_days','400','Location history kept (days)'),

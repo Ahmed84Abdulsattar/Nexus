@@ -53,7 +53,7 @@ export const TEST_ENV = {
   ENTRA_WEB_CLIENT_ID: WEB_CLIENT_ID,
   ENTRA_API_AUDIENCE: API_AUDIENCE,
   // Nothing in the unit tests connects (the pool is lazy and the directory below is in memory).
-  DATABASE_URL: 'postgres://nexus_api_local@127.0.0.1:1/nexus_unit_tests',
+  DATABASE_URL: 'postgres://nexus_api_local@127.0.0.1:1/nexus_unit_tests?sslmode=require',
 } as const;
 
 /** Stored profiles by user id, for /v1/me in tests without a database. */
