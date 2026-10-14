@@ -15,13 +15,13 @@ PostgreSQL 16, native partitions and Nexus rollup tables, one extension (`pg_trg
 ## Commands (from the repo root)
 | Command | Does |
 |---|---|
-| `pnpm db:migrate` | Applies pending migrations as the role `nexus_migrator`, then `roles.sql`. `pnpm db:migrate down` reverts one (`down 3`, `down all`), `redo` = down + up. |
+| `pnpm db:migrate` | Applies pending migrations as the role `nexus_migrator`, then `roles.sql`. `pnpm db:migrate down` reverts one (`down 3`, `down all`), `redo` = down + up. `down` and `redo` drop tables, so outside `APP_ENV=local` they need `--confirm-database=<name>`. |
 | `pnpm db:seed` | Runs the seeds that belong to `APP_ENV`. Safe to repeat. |
 | `pnpm db:check` | Applies all migrations to one empty database, loads `schema.sql` into another, and fails if `pg_dump --schema-only`, the reference data or `src/types.ts` differ. Needs `pg_dump` (see below). |
 | `pnpm db:seed:scale` | Loads 100 sites / 5,000 assets / 7 days of packets into a **benchmark database** and prints sizes and screen timings (`bench/`). |
 | `pnpm --filter @nexus/db codegen` | Regenerates `src/types.ts` from the migrated database in `DATABASE_ADMIN_URL`. |
 
-Connection strings (see `docs/04-tech-stack.md`): `DATABASE_ADMIN_URL` for these commands, `DATABASE_URL` for the API and `WORKER_DATABASE_URL` for the worker. When `APP_ENV=local`, an unset `DATABASE_ADMIN_URL` or `WORKER_DATABASE_URL` falls back to `DATABASE_URL`; in dev and prod there is no fallback.
+Connection strings (see `docs/04-tech-stack.md`): `DATABASE_ADMIN_URL` for these commands, `DATABASE_URL` for the API and `WORKER_DATABASE_URL` for the worker. When `APP_ENV=local`, an unset `DATABASE_ADMIN_URL` or `WORKER_DATABASE_URL` falls back to `DATABASE_URL`; in dev and prod there is no fallback, and all three URLs must use TLS (`sslmode=verify-full`). `dev-login-roles.sql` needs exactly `nexus.app_env = local` (the runner sets it from `APP_ENV`; unset is refused) and a local database host.
 
 ## First run on a new machine
 ```

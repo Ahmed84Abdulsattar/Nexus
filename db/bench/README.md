@@ -14,3 +14,5 @@ What `db/seeds/scale-100-sites.ts` loads: 100 projects, 5,000 assets (48 physica
 `screens.ts` holds the main-screen queries of `docs/06` section 5 with their targets (live screens 300 ms, charts 1 s). Each is run once right after the load ("first") and five more times ("warm", median) with `EXPLAIN (ANALYZE)`. The first run is not a true cold-cache run (the load just touched the data); a real cold run needs a server restart.
 
 Disk: about 10 to 15 GB for the default dataset. Takes 30 to 60 minutes on a laptop-class machine, mostly the packet generation and the bulk rollup backfill (the production rollups run once per closed bucket and are timed separately at the end). Never run it on a shared or production database.
+
+The script runs `db:seed` first for `APP_ENV=local`, which includes `dev-login-roles.sql`. That file accepts exactly `nexus.app_env = local` (unset is refused) and the runner only runs it against a local database host, so the benchmark cannot be pointed at a remote server by mistake.

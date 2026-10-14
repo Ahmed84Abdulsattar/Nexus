@@ -11,7 +11,7 @@
     },
     "test": {
       "dependsOn": ["^build"],
-      "passThroughEnv": ["TEST_DATABASE_ADMIN_URL", "PG_DUMP", "NEXUS_PG_BIN"]
+      "passThroughEnv": ["CI", "TEST_DATABASE_ADMIN_URL", "PG_DUMP", "NEXUS_PG_BIN"]
     },
     "dev": {
       "dependsOn": ["^build"],
