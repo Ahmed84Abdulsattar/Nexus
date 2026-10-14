@@ -14,6 +14,8 @@
 | `integration` | `sync_run`, `api_call`, `link_todo`, `cursor` | integrations |
 | `audit` | `log` | audit |
 
+Settings added in S1-01: `audit.sign_in_gap_minutes` (default 60, see `08` §2 step 6).
+
 ## 2. Entity relationships
 ```mermaid
 erDiagram
@@ -232,6 +234,8 @@ Add indexes (~10–20%), and remember that zone-redundant HA keeps a second copy
   - `nexus_worker`: read on everything. Writes on synced `core.project/asset/asset_type`, `telemetry.*`, `events.event`, `integration.*`. No writes on per-user read state. Partition maintenance goes through SECURITY DEFINER functions.
   - `nexus_migrator`: DDL, and owns the functions.
   Every role has the least access it needs.
+- **One server per environment.** The database-level PUBLIC rights (CONNECT, TEMPORARY) are revoked and only the three Nexus roles get CONNECT, but roles are cluster-wide: dev and prod must be different servers, never two databases on one server, and no other application shares a Nexus server.
+- Review hardening (PR #16): the worker has no access to `access.*`, `audit.log` or the per-user read-state tables (not even their partitions), has `INSERT, UPDATE` on `events.event` only, and `DELETE` only on `integration.sync_run`; the API's `UPDATE` on projects, districts and spatial rows is limited to the admin-held columns (source identity, `*_seen_at` and the project's `retired_at` stay with the connector); there are no default privileges, and functions are granted one by one (the API gets only `access.user_roles` and `user_project_ids`; a new SECURITY DEFINER function is executable by nobody until granted); `drop_partitions_before` keeps 730 days of `audit.log` and `events`, and writes an `audit.log` row for every partition it drops; `refresh_rollup_combine` takes `regclass` arguments limited to the two allowed pairs and is SECURITY INVOKER (like `refresh_rollup_5m`). `db:migrate down`/`redo` need `--confirm-database=<name>` unless `APP_ENV=local`, and `dev-login-roles.sql` runs only against localhost, loopback or a unix socket.
 - Migrations and seeds connect with `DATABASE_ADMIN_URL`, the API with `DATABASE_URL` and the worker with `WORKER_DATABASE_URL` (three different logins; `docs/04`). Only the local environment may fall back to `DATABASE_URL`. `nexus_migrator` owns every table and function; `nexus_api` cannot change `access.role`, `role_permission` or `permission` (reference data changed only by migrations), cannot delete users and can only insert into `audit.log`; the partition functions are executable by `nexus_worker` only.
 - These roles are NOLOGIN. Locally only (`APP_ENV=local`), `db/seeds/dev-login-roles.sql` adds passwordless LOGIN users `nexus_api_local` and `nexus_worker_local`, each a member of one role and nothing else, so local runs hit the same permission errors as Azure. The seed refuses to run unless the session has `nexus.app_env = 'local'`.
 - The API never connects as the owner. Entra (managed identity) is used for database auth in Azure where possible.

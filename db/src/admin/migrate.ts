@@ -98,7 +98,11 @@ export async function bootstrapRoles(client: pg.Client): Promise<void> {
         IF NOT pg_has_role(current_user, 'nexus_migrator', 'MEMBER') THEN
           EXECUTE format('GRANT nexus_migrator TO %I', current_user);
         END IF;
-        EXECUTE format('GRANT CREATE, CONNECT ON DATABASE %I TO nexus_migrator', current_database());
+        EXECUTE format('GRANT CREATE ON DATABASE %I TO nexus_migrator', current_database());
+        -- Only the Nexus roles (and the owner / superusers) may connect or create temp tables: every
+        -- other role of the server loses the default PUBLIC rights. One server per environment (docs/06 section 9).
+        EXECUTE format('REVOKE CONNECT, TEMPORARY ON DATABASE %I FROM PUBLIC', current_database());
+        EXECUTE format('GRANT CONNECT ON DATABASE %I TO nexus_migrator, nexus_api, nexus_worker', current_database());
       END $$;
       GRANT USAGE, CREATE ON SCHEMA public TO nexus_migrator;`);
   } finally {

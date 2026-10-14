@@ -12,11 +12,21 @@ describe('worker config', () => {
   it('reads WORKER_DATABASE_URL and the pool size', () => {
     const c = loadWorkerConfig({
       APP_ENV: 'prod',
-      WORKER_DATABASE_URL: WORKER_URL,
+      WORKER_DATABASE_URL: WORKER_URL + '?sslmode=verify-full',
       DATABASE_URL: API_URL,
       DATABASE_POOL_MAX: '4',
     });
-    expect(c.database).toEqual({ url: WORKER_URL, poolMax: 4, fellBack: false });
+    expect(c.database).toEqual({
+      url: WORKER_URL + '?sslmode=verify-full',
+      poolMax: 4,
+      fellBack: false,
+    });
+  });
+
+  it('requires TLS outside APP_ENV=local', () => {
+    expect(() => loadWorkerConfig({ APP_ENV: 'prod', WORKER_DATABASE_URL: WORKER_URL })).toThrow(
+      /must use TLS/,
+    );
   });
 
   it('falls back to DATABASE_URL only when APP_ENV=local', () => {

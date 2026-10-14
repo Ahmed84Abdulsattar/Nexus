@@ -4,6 +4,7 @@ export {
   DATABASE_URL_VARIABLE,
   DatabaseConfigError,
   describeDatabaseUrl,
+  requireTlsUnlessLocal,
   resolveDatabaseUrl,
   type DatabaseRole,
   type ResolvedDatabaseUrl,

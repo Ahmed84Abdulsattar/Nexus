@@ -8,24 +8,37 @@ import {
 } from 'kysely';
 import type { AccessContext } from './access-context.js';
 
+export interface ProjectScopeOptions {
+  /**
+   * Also return rows with no project (assets not yet linked, docs/06 decision 8). Only the admin
+   * linking screen (`admin.projects.manage`, R-63) passes this; everything else never sees them.
+   */
+  includeUnlinked?: boolean;
+}
+
 /**
  * Project scope for Kysely queries (docs/08 section 2 step 5, docs/06 section 5, CLAUDE.md rule 6).
  * Every repository query that returns project data goes through this, never a controller:
  *
  *   withProjectScope(db.selectFrom('core.asset as a').select(...), access, 'a.project_id')
  *
- * - a user whose role has all_projects is not filtered;
- * - everybody else sees only rows whose project is in their project ids;
+ * - a user whose role has all_projects is not filtered by project, but rows without a project (unlinked
+ *   assets) are still left out unless `{ includeUnlinked: true }` is passed;
+ * - everybody else sees only rows whose project is in their project ids (rows without a project never match);
  * - a user with no projects sees nothing (never "no filter").
- * Pass the column that holds the project id (`p.id` when the table is core.project). Rows whose
- * column is NULL (an asset not yet linked to a project) are never visible to a scoped user.
+ * Pass the column that holds the project id (`p.id` when the table is core.project).
  */
 export function projectScope<DB, TB extends keyof DB>(
   access: AccessContext,
   column: StringReference<DB, TB>,
+  options: ProjectScopeOptions = {},
 ): (eb: ExpressionBuilder<DB, TB>) => Expression<SqlBool> {
   return (eb) => {
-    if (access.allProjects) return sql<SqlBool>`true`;
+    if (access.allProjects) {
+      return options.includeUnlinked
+        ? sql<SqlBool>`true`
+        : sql<SqlBool>`${eb.ref(column)} is not null`;
+    }
     const ids = [...access.projectIds];
     if (ids.length === 0) return sql<SqlBool>`false`;
     return sql<SqlBool>`${eb.ref(column)} = any(${ids}::uuid[])`;
@@ -37,7 +50,7 @@ export function withProjectScope<DB, TB extends keyof DB, O>(
   qb: SelectQueryBuilder<DB, TB, O>,
   access: AccessContext,
   column: StringReference<DB, TB>,
+  options: ProjectScopeOptions = {},
 ): SelectQueryBuilder<DB, TB, O> {
-  if (access.allProjects) return qb;
-  return qb.where(projectScope<DB, TB>(access, column));
+  return qb.where(projectScope<DB, TB>(access, column, options));
 }

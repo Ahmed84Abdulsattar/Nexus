@@ -81,7 +81,7 @@ export interface SignedInIdentity {
 export interface AccessDirectory {
   /**
    * Upsert access.app_user by oid (name, email, last_seen_at). When the user is active and has been
-   * idle for SIGN_IN_IDLE_MINUTES (or is new), also writes the `auth.sign_in` audit row.
+   * idle for the setting audit.sign_in_gap_minutes (or is new), also writes the `auth.sign_in` audit row.
    */
   upsertUser(identity: SignedInIdentity): Promise<{ userId: string; isActive: boolean }>;
   /** Roles, permissions and project scope for a user and the group ids of the token. */
@@ -90,8 +90,8 @@ export interface AccessDirectory {
   isUserActive(userId: string): Promise<boolean>;
 }
 
-/** A user idle for this long starts a new "session": the next request is audited as a sign-in. */
-export const SIGN_IN_IDLE_MINUTES = 30;
+/** Used when the setting core.setting audit.sign_in_gap_minutes is missing or unreadable. */
+export const DEFAULT_SIGN_IN_GAP_MINUTES = 60;
 
 export const ACCESS_DIRECTORY = Symbol('ACCESS_DIRECTORY');
 export const CLOCK = Symbol('CLOCK');
@@ -124,7 +124,8 @@ export class AccessContextService {
   private readonly cache = new Map<string, CacheEntry>();
   /** Bumped by every invalidation. */
   private epoch = 0;
-  private channelUp = true;
+  /** Fails closed: the cache is used only after the change listener has proved it is hearing the database. */
+  private channelUp = false;
 
   constructor(
     @Inject(ACCESS_DIRECTORY) private readonly directory: AccessDirectory,

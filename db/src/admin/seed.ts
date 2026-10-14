@@ -1,4 +1,5 @@
 import pg from 'pg';
+import { isLocalHost } from './guards.js';
 import { MIGRATOR_ROLE } from './migrate.js';
 import { readSql, SEEDS_DIR } from './paths.js';
 
@@ -16,6 +17,8 @@ interface SeedFile {
   /** true: runs as the administrator (it creates roles); false: as nexus_migrator, the table owner. */
   asAdmin: boolean;
   why: string;
+  /** true: refuse unless the database host is this machine (loopback, localhost or a unix socket). */
+  localHostOnly?: boolean;
 }
 
 /**
@@ -39,6 +42,7 @@ export const SEEDS: readonly SeedFile[] = [
     file: 'dev-login-roles.sql',
     envs: ['local'],
     asAdmin: true,
+    localHostOnly: true,
     why: 'passwordless LOGIN users nexus_api_local / nexus_worker_local (APP_ENV=local only)',
   },
 ];
@@ -74,6 +78,9 @@ export async function seed(options: {
         result.skipped.push(s.file);
         log(`skip  ${s.file} (not for APP_ENV=${options.appEnv})`);
         continue;
+      }
+      if (s.localHostOnly && !isLocalHost(options.url)) {
+        throw new Error(`${s.file} creates passwordless login users and runs only against a local database (localhost, 127.0.0.1, ::1 or a unix socket); this host is remote.`);
       }
       log(`seed  ${s.file}: ${s.why}`);
       if (!s.asAdmin) await client.query(`SET ROLE ${MIGRATOR_ROLE}`);
