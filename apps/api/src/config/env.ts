@@ -111,6 +111,15 @@ const envSchema = z
       z.coerce.number().int().min(1024).max(50_000_000).default(1_048_576),
     ),
     TRUST_PROXY: z.preprocess(blankToUndefined, z.string().optional()),
+    /**
+     * The referrer-restricted ArcGIS browser key (docs/09 section 1), served to signed-in users by
+     * GET /v1/config. Optional: unset means the web shows "Map key not configured". The only
+     * credential the API ever returns to a browser. Key Vault in Azure.
+     */
+    ARCGIS_API_KEY: z.preprocess(
+      (v) => (typeof v === 'string' && v.trim() === '' ? undefined : v),
+      z.string().trim().optional(),
+    ),
   })
   .superRefine((env, ctx) => {
     for (const message of parseOrigins(env.CORS_ALLOWED_ORIGINS ?? '', env.APP_ENV).problems) {
@@ -172,6 +181,10 @@ export interface AppConfig {
     trustProxy: TrustProxy;
     rateLimit: { userPerMinute: number; ipPerMinute: number };
   };
+  arcgis: {
+    /** A credential (referrer-restricted, but still): never log it. Undefined when not configured. */
+    apiKey: string | undefined;
+  };
 }
 
 export class ConfigError extends Error {}
@@ -210,6 +223,7 @@ export function loadConfig(env: NodeJS.ProcessEnv): AppConfig {
         ipPerMinute: e.RATE_LIMIT_IP_PER_MINUTE,
       },
     },
+    arcgis: { apiKey: e.ARCGIS_API_KEY },
   };
 }
 

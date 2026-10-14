@@ -103,7 +103,7 @@ Versions: use the current stable major at project start and pin exact versions i
 | `WEB_PUBSUB_ENDPOINT` / `WEB_PUBSUB_HUB` | api, worker | `https://wps-nexus-dev.webpubsub.azure.com` / `nexus` |
 | `LIVE_MODE` | api, worker, web | `pubsub` (default) or `poll`. Locally, `poll` turns off push and the web app refetches every 60 s. |
 | `ARCGIS_API_KEY` | api (served via `/v1/config`) | Referrer-restricted; Key Vault in Azure. One key per environment. |
-| `VITE_DEV_ARCGIS_API_KEY` | web, **local only** | Interim (S0-09) until `GET /v1/config` runs locally (S1-02). Read only by the MSW `/v1/config` mock in Vite dev mode, from the developer's git-ignored `.env`. Never set in CI or Azure: the web build fails if it is set. Remove after S1-02. |
+| `VITE_DEV_ARCGIS_API_KEY` | web, **local only** | Only for running the web app **without the API** locally. The real path is `GET /v1/config` (S1-10), which serves `ARCGIS_API_KEY`. Read only by the MSW `/v1/config` mock in Vite dev mode, from the developer's git-ignored `.env`. Never set in CI or Azure: the web build fails if it is set. Remove once the web uses the typed `/v1/config` client (follow-up to S1-10). |
 | `APPLICATIONINSIGHTS_CONNECTION_STRING` | all | |
 | `VITE_API_BASE_URL` | web | `http://localhost:3000/v1` |
 | `LOG_LEVEL` | api, worker | `info` |

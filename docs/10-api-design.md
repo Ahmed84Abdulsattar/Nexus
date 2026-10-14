@@ -36,8 +36,8 @@
 ## Endpoints (phase 1)
 | Method & path | Permission | Purpose | Req |
 |---|---|---|---|
-| GET `/me` | (any signed-in) | User, roles, permissions, feature flags | R-01–R-04 |
-| GET `/config` | (any signed-in) | ArcGIS key and settings, enums (project states, display statuses), feature flags | — |
+| GET `/me` | (any signed-in) | The caller only: `{ id, name, email, roles[], permissions[], projectScope: { all, projectIds[] } }`. `name` and `email` are as stored (null if never sent). `projectIds` is empty when `all` is true. Sorted, `Cache-Control: no-store`. Feature flags are in `/config`. | R-01–R-04 |
+| GET `/config` | (any signed-in) | `{ arcgis: { apiKey, basemaps: { map2d, satellite, scene3d }, extent: { xmin, ymin, xmax, ymax }, initialView: { latitude, longitude, zoom } }, enums: { projectStates[], displayStatuses[] }, featureFlags: { key: boolean } }`. Enum entries are `{ key, label }`; display statuses come from `telemetry.status_map` (plus `unknown`), flags from `core.feature_flag`. `apiKey` is the referrer-restricted browser key from `ARCGIS_API_KEY`, `""` when not set (the web shows "Map key not configured"); it is the only credential in any response. `Cache-Control: no-store`. A test pins the key allow-list. | — |
 | GET `/projects` | portfolio.read · scoped | List with filters `state, district, type, q`; includes lat/lng, state, asset counts | R-10, R-13 |
 | GET `/projects/summary` | portfolio.read · scoped | Tiles: counts by state and by district | R-13 |
 | GET `/projects/{projectId}` | project.read · scoped | Project details, boundary | R-20 |
