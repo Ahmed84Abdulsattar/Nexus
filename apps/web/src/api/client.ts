@@ -9,6 +9,8 @@ export class ApiError extends Error {
   constructor(
     readonly status: number,
     readonly problem: ProblemDetails | undefined,
+    /** Seconds from the `Retry-After` header (429), when the API sent a valid one. */
+    readonly retryAfterSeconds?: number,
   ) {
     super(problem?.detail ?? `Request failed with status ${status}`);
     this.name = 'ApiError';
@@ -53,6 +55,11 @@ export function shouldSendToken(requestUrl: string, apiOrigin: string): boolean 
   return url.origin === apiOrigin && !/^\/health(\/|$)/.test(url.pathname);
 }
 
+function parseRetryAfter(value: string | null): number | undefined {
+  if (value === null || !/^\d+$/.test(value.trim())) return undefined;
+  return Number(value.trim());
+}
+
 function authMiddleware(apiOrigin: string): Middleware {
   return {
     async onRequest({ request }) {
@@ -67,7 +74,11 @@ function authMiddleware(apiOrigin: string): Middleware {
         .clone()
         .json()
         .catch(() => undefined)) as ProblemDetails | undefined;
-      throw new ApiError(response.status, problem);
+      throw new ApiError(
+        response.status,
+        problem,
+        parseRetryAfter(response.headers.get('Retry-After')),
+      );
     },
   };
 }
