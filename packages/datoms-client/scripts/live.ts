@@ -19,7 +19,10 @@ import {
   loadEnvFileKeepingLiveGate,
   validateIds,
 } from './guards.js';
-import { saveFixture } from './record.js';
+import { FIXTURES_DIR, fixturePath, saveFixture } from './record.js';
+import { cadence, median, nullStats, type RawRow } from './fleet-analysis.js';
+import { readFileSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 
 const argv = process.argv.slice(2);
 const envIdx = argv.indexOf('--env-file');
@@ -134,7 +137,83 @@ if (cmd === 'list') {
       );
     }
   }
+} else if (cmd === 'fleet-watch') {
+  // Exactly 4 fleet-mode calls (page 1, limit 500), 60 s apart. Needs --fleet. Stops on the first failure.
+  if (!fleet) throw new Error('fleet-watch needs --fleet');
+  const RUNS = 4;
+  const GAP_MS = 60_000;
+  const runs: RawRow[][] = [];
+  let lastStatus = 0;
+  let lastRateLimit: DatomsResponse['rateLimit'] = {};
+  for (let i = 1; i <= RUNS; i++) {
+    if (i > 1) await new Promise((resolve) => setTimeout(resolve, GAP_MS));
+    const res = await client.bulkLatestFleet(1, 500);
+    show(`fleet run ${i}`, res);
+    lastStatus = res.status;
+    lastRateLimit = res.rateLimit;
+    saveFixture(
+      `bulk-fleet-page1-run${i}.json`,
+      'POST',
+      '/assets/telemetry/latest/query',
+      res,
+      config.token,
+    );
+    if (!res.ok || !res.body) break;
+    const rows = res.body.data as RawRow[];
+    runs.push(rows);
+    console.log(
+      `  rows=${rows.length} success=${rows.filter((r) => r.success).length} failed=${rows.filter((r) => !r.success).length} pagination=${JSON.stringify(res.body.pagination)}`,
+    );
+  }
+  const list = JSON.parse(readFileSync(join(FIXTURES_DIR, 'assets-list-page1.json'), 'utf8')) as {
+    body: { data: { id: string; category_name: string }[] };
+  };
+  const cat = new Map(list.body.data.map((a) => [String(a.id), a.category_name]));
+  const categoryOf = (id: string) => cat.get(id) ?? 'unknown';
+  const perAsset = cadence(runs);
+  const allDeltas = perAsset.flatMap((a) => a.deltasSeconds);
+  const neverUpdated = perAsset.filter((a) => !a.advanced.some(Boolean)).map((a) => a.assetId);
+  const last = runs[runs.length - 1] ?? [];
+  const nulls = nullStats(last, categoryOf);
+  const summary = {
+    runs: runs.length,
+    gapSeconds: GAP_MS / 1000,
+    deltaSeconds: {
+      count: allDeltas.length,
+      median: median(allDeltas),
+      min: allDeltas.length ? Math.min(...allDeltas) : undefined,
+      max: allDeltas.length ? Math.max(...allDeltas) : undefined,
+    },
+    neverUpdated,
+    perAsset: perAsset.map((a) => ({ ...a, category: categoryOf(a.assetId) })),
+    nullsByCategory: nulls,
+  };
+  const meta = {
+    endpoint: '/assets/telemetry/latest/query',
+    method: 'POST',
+    date: new Date().toISOString(),
+    status: lastStatus,
+    rateLimit: lastRateLimit,
+  };
+  writeFileSync(
+    fixturePath('bulk-fleet-summary.json'),
+    JSON.stringify({ meta, body: summary }, null, 2) + '\n',
+  );
+  console.log('delta seconds', JSON.stringify(summary.deltaSeconds));
+  console.log('never updated', JSON.stringify(neverUpdated));
+  for (const a of perAsset) {
+    console.log(
+      `  ${a.assetId} [${categoryOf(a.assetId)}] advanced=${JSON.stringify(a.advanced)} deltas=${JSON.stringify(a.deltasSeconds)}`,
+    );
+  }
+  for (const [c, n] of Object.entries(nulls)) {
+    console.log(
+      `${c}: assets=${n.assets} keys=${n.keys} nulls=${n.nullCount}/${n.valueCount} neverNull=${n.neverNull.length} alwaysNull=${n.alwaysNull.length}`,
+    );
+    console.log(`  neverNull: ${JSON.stringify(n.neverNull)}`);
+    console.log(`  alwaysNull: ${JSON.stringify(n.alwaysNull)}`);
+  }
 } else {
-  console.log('usage: live.ts list | latest <id>... | bulk <id>...');
+  console.log('usage: live.ts list | latest <id>... | bulk <id>... | fleet-watch --fleet');
   process.exitCode = 1;
 }

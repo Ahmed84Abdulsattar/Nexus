@@ -1,0 +1,626 @@
+{
+  "meta": {
+    "endpoint": "/assets/telemetry/latest/query",
+    "method": "POST",
+    "date": "2026-10-14T11:35:50.504Z",
+    "status": 200,
+    "rateLimit": {
+      "unit": "asset-read-credits",
+      "limit": "2000",
+      "remaining": "1956",
+      "reset": "1"
+    }
+  },
+  "body": {
+    "runs": 4,
+    "gapSeconds": 60,
+    "deltaSeconds": {
+      "count": 51,
+      "median": 61,
+      "min": 45,
+      "max": 2342
+    },
+    "neverUpdated": ["33851", "42484", "42485"],
+    "perAsset": [
+      {
+        "assetId": "33850",
+        "times": [
+          "2026-10-14T11:32:37.000Z",
+          "2026-10-14T11:33:38.000Z",
+          "2026-10-14T11:34:38.000Z",
+          "2026-10-14T11:35:38.000Z"
+        ],
+        "advanced": [true, true, true],
+        "deltasSeconds": [61, 60, 60],
+        "category": "AC Sub-Meter"
+      },
+      {
+        "assetId": "33851",
+        "times": [
+          "2026-09-20T09:15:10.000Z",
+          "2026-09-20T09:15:10.000Z",
+          "2026-09-20T09:15:10.000Z",
+          "2026-09-20T09:15:10.000Z"
+        ],
+        "advanced": [false, false, false],
+        "deltasSeconds": [],
+        "category": "AC Sub-Meter"
+      },
+      {
+        "assetId": "33853",
+        "times": [
+          "2026-10-14T11:32:44.000Z",
+          "2026-10-14T11:33:34.000Z",
+          "2026-10-14T11:34:44.000Z",
+          "2026-10-14T11:35:44.000Z"
+        ],
+        "advanced": [true, true, true],
+        "deltasSeconds": [50, 70, 60],
+        "category": "AC Sub-Meter"
+      },
+      {
+        "assetId": "33854",
+        "times": [
+          "2026-10-14T11:32:33.000Z",
+          "2026-10-14T11:33:34.000Z",
+          "2026-10-14T11:34:34.000Z",
+          "2026-10-14T11:35:44.000Z"
+        ],
+        "advanced": [true, true, true],
+        "deltasSeconds": [61, 60, 70],
+        "category": "AC Sub-Meter"
+      },
+      {
+        "assetId": "33852",
+        "times": [
+          "2026-10-14T11:32:41.000Z",
+          "2026-10-14T11:33:35.000Z",
+          "2026-10-14T11:34:32.000Z",
+          "2026-10-14T11:35:38.000Z"
+        ],
+        "advanced": [true, true, true],
+        "deltasSeconds": [54, 57, 66],
+        "category": "AC Sub-Meter"
+      },
+      {
+        "assetId": "33900",
+        "times": [
+          "2026-10-14T11:32:34.000Z",
+          "2026-10-14T11:33:35.000Z",
+          "2026-10-14T11:34:34.000Z",
+          "2026-10-14T11:35:34.000Z"
+        ],
+        "advanced": [true, true, true],
+        "deltasSeconds": [61, 59, 60],
+        "category": "AC Sub-Meter"
+      },
+      {
+        "assetId": "33899",
+        "times": [
+          "2026-10-14T11:32:33.000Z",
+          "2026-10-14T11:33:33.000Z",
+          "2026-10-14T11:34:33.000Z",
+          "2026-10-14T11:35:44.000Z"
+        ],
+        "advanced": [true, true, true],
+        "deltasSeconds": [60, 60, 71],
+        "category": "AC Sub-Meter"
+      },
+      {
+        "assetId": "33903",
+        "times": [
+          "2026-10-14T11:32:34.000Z",
+          "2026-10-14T11:33:28.000Z",
+          "2026-10-14T11:34:36.000Z",
+          "2026-10-14T11:35:40.000Z"
+        ],
+        "advanced": [true, true, true],
+        "deltasSeconds": [54, 68, 64],
+        "category": "AC Sub-Meter"
+      },
+      {
+        "assetId": "33902",
+        "times": [
+          "2026-10-14T10:56:10.000Z",
+          "2026-10-14T10:56:10.000Z",
+          "2026-10-14T10:56:10.000Z",
+          "2026-10-14T11:35:12.000Z"
+        ],
+        "advanced": [false, false, true],
+        "deltasSeconds": [2342],
+        "category": "AC Sub-Meter"
+      },
+      {
+        "assetId": "42424",
+        "times": [
+          "2026-10-14T11:32:33.000Z",
+          "2026-10-14T11:33:42.000Z",
+          "2026-10-14T11:34:43.000Z",
+          "2026-10-14T11:35:43.000Z"
+        ],
+        "advanced": [true, true, true],
+        "deltasSeconds": [69, 61, 60],
+        "category": "AC Sub-Meter"
+      },
+      {
+        "assetId": "42425",
+        "times": [
+          "2026-10-14T11:32:32.000Z",
+          "2026-10-14T11:33:33.000Z",
+          "2026-10-14T11:34:33.000Z",
+          "2026-10-14T11:35:43.000Z"
+        ],
+        "advanced": [true, true, true],
+        "deltasSeconds": [61, 60, 70],
+        "category": "AC Sub-Meter"
+      },
+      {
+        "assetId": "42426",
+        "times": [
+          "2026-10-14T11:32:35.000Z",
+          "2026-10-14T11:33:35.000Z",
+          "2026-10-14T11:34:35.000Z",
+          "2026-10-14T11:35:35.000Z"
+        ],
+        "advanced": [true, true, true],
+        "deltasSeconds": [60, 60, 60],
+        "category": "AC Sub-Meter"
+      },
+      {
+        "assetId": "42482",
+        "times": [
+          "2026-10-14T11:32:14.000Z",
+          "2026-10-14T11:33:44.000Z",
+          "2026-10-14T11:34:29.000Z",
+          "2026-10-14T11:35:14.000Z"
+        ],
+        "advanced": [true, true, true],
+        "deltasSeconds": [90, 45, 45],
+        "category": "DG Set"
+      },
+      {
+        "assetId": "42483",
+        "times": [
+          "2026-10-14T11:32:39.000Z",
+          "2026-10-14T11:33:24.000Z",
+          "2026-10-14T11:34:54.000Z",
+          "2026-10-14T11:35:39.000Z"
+        ],
+        "advanced": [true, true, true],
+        "deltasSeconds": [45, 90, 45],
+        "category": "DG Set"
+      },
+      {
+        "assetId": "42484",
+        "times": [
+          "2026-09-19T02:00:55.000Z",
+          "2026-09-19T02:00:55.000Z",
+          "2026-09-19T02:00:55.000Z",
+          "2026-09-19T02:00:55.000Z"
+        ],
+        "advanced": [false, false, false],
+        "deltasSeconds": [],
+        "category": "DG Set"
+      },
+      {
+        "assetId": "42485",
+        "times": [
+          "2026-10-05T04:28:45.000Z",
+          "2026-10-05T04:28:45.000Z",
+          "2026-10-05T04:28:45.000Z",
+          "2026-10-05T04:28:45.000Z"
+        ],
+        "advanced": [false, false, false],
+        "deltasSeconds": [],
+        "category": "DG Set"
+      },
+      {
+        "assetId": "43507",
+        "times": [
+          "2026-10-14T11:31:29.000Z",
+          "2026-10-14T11:32:48.000Z",
+          "2026-10-14T11:34:08.000Z",
+          "2026-10-14T11:34:08.000Z"
+        ],
+        "advanced": [true, true, false],
+        "deltasSeconds": [79, 80],
+        "category": "DG Set"
+      },
+      {
+        "assetId": "43508",
+        "times": [
+          "2026-10-14T11:31:48.000Z",
+          "2026-10-14T11:33:07.000Z",
+          "2026-10-14T11:34:28.000Z",
+          "2026-10-14T11:34:28.000Z"
+        ],
+        "advanced": [true, true, false],
+        "deltasSeconds": [79, 81],
+        "category": "DG Set"
+      },
+      {
+        "assetId": "43510",
+        "times": [
+          "2026-10-14T11:30:49.000Z",
+          "2026-10-14T11:32:08.000Z",
+          "2026-10-14T11:33:28.000Z",
+          "2026-10-14T11:33:28.000Z"
+        ],
+        "advanced": [true, true, false],
+        "deltasSeconds": [79, 80],
+        "category": "DG Set"
+      },
+      {
+        "assetId": "43512",
+        "times": [
+          "2026-10-14T11:31:09.000Z",
+          "2026-10-14T11:32:28.000Z",
+          "2026-10-14T11:33:48.000Z",
+          "2026-10-14T11:33:48.000Z"
+        ],
+        "advanced": [true, true, false],
+        "deltasSeconds": [79, 80],
+        "category": "DG Set"
+      },
+      {
+        "assetId": "43514",
+        "times": [
+          "2026-10-14T11:32:45.000Z",
+          "2026-10-14T11:33:45.000Z",
+          "2026-10-14T11:34:35.000Z",
+          "2026-10-14T11:35:45.000Z"
+        ],
+        "advanced": [true, true, true],
+        "deltasSeconds": [60, 50, 70],
+        "category": "Solar Inverter"
+      },
+      {
+        "assetId": "43644",
+        "times": [
+          "2026-10-14T11:32:06.000Z",
+          "2026-10-14T11:33:36.000Z",
+          "2026-10-14T11:34:21.000Z",
+          "2026-10-14T11:35:06.000Z"
+        ],
+        "advanced": [true, true, true],
+        "deltasSeconds": [90, 45, 45],
+        "category": "Fuel Tank"
+      }
+    ],
+    "nullsByCategory": {
+      "AC Sub-Meter": {
+        "assets": 12,
+        "keys": 34,
+        "nullCount": 0,
+        "valueCount": 408,
+        "neverNull": [
+          "mrun_hr",
+          "mt_energy",
+          "mt_power",
+          "mvol",
+          "mcurr",
+          "tot_curr",
+          "mvol_r",
+          "mvol_y",
+          "mvol_b",
+          "mvol_ry",
+          "mvol_yb",
+          "mvol_br",
+          "mvolt_p",
+          "mcur_ir",
+          "mcur_iy",
+          "mcur_ib",
+          "mpow_r",
+          "mpow_y",
+          "mpow_b",
+          "mr_power",
+          "mrpow_r",
+          "mrpow_y",
+          "mrpow_b",
+          "ma_power",
+          "mapow_r",
+          "mapow_y",
+          "mapow_b",
+          "mt_pf",
+          "mpf_r",
+          "mpf_y",
+          "mpf_b",
+          "mfreq",
+          "ma_energy",
+          "mr_energy"
+        ],
+        "alwaysNull": [],
+        "nullAssetsPerKey": {
+          "mrun_hr": 0,
+          "mt_energy": 0,
+          "mt_power": 0,
+          "mvol": 0,
+          "mcurr": 0,
+          "tot_curr": 0,
+          "mvol_r": 0,
+          "mvol_y": 0,
+          "mvol_b": 0,
+          "mvol_ry": 0,
+          "mvol_yb": 0,
+          "mvol_br": 0,
+          "mvolt_p": 0,
+          "mcur_ir": 0,
+          "mcur_iy": 0,
+          "mcur_ib": 0,
+          "mpow_r": 0,
+          "mpow_y": 0,
+          "mpow_b": 0,
+          "mr_power": 0,
+          "mrpow_r": 0,
+          "mrpow_y": 0,
+          "mrpow_b": 0,
+          "ma_power": 0,
+          "mapow_r": 0,
+          "mapow_y": 0,
+          "mapow_b": 0,
+          "mt_pf": 0,
+          "mpf_r": 0,
+          "mpf_y": 0,
+          "mpf_b": 0,
+          "mfreq": 0,
+          "ma_energy": 0,
+          "mr_energy": 0
+        }
+      },
+      "DG Set": {
+        "assets": 8,
+        "keys": 103,
+        "nullCount": 673,
+        "valueCount": 824,
+        "neverNull": ["mt_pf", "mvol", "calculated_energy", "lat", "long", "mcurr"],
+        "alwaysNull": [
+          "vbat",
+          "temp",
+          "press",
+          "fuel_consumption",
+          "fuel_filled",
+          "fuel_theft",
+          "rm_temp",
+          "mpow_r",
+          "mpow_y",
+          "mpow_b",
+          "mapow_r",
+          "mapow_y",
+          "mapow_b",
+          "mrpow_r",
+          "mrpow_y",
+          "mrpow_b",
+          "mt_power",
+          "mr_power",
+          "ma_power",
+          "ma_energy",
+          "mr_energy",
+          "mt_energy",
+          "mrun_hr",
+          "gr_energy",
+          "ser_due_hr",
+          "bts_vbat1",
+          "bts_vbat2",
+          "dg_lock_status",
+          "mcur_ir",
+          "mcur_iy",
+          "mcur_ib",
+          "is_moving",
+          "fuel_consume",
+          "fuel_press",
+          "fuel_rate",
+          "fuel_consumption_rate",
+          "amb_temp",
+          "def_con",
+          "no_of_trips",
+          "gt_under_fault",
+          "gt_availability",
+          "com_shtdn_st",
+          "com_elec_trip_st",
+          "com_warn_st",
+          "com_notificatn_st",
+          "under_maintenance",
+          "fuel_filling_start_value",
+          "fuel_filling_end_value",
+          "fuel_filling_start_time",
+          "fuel_filling_end_time",
+          "fuel_drain_start_value",
+          "fuel_drain_end_value",
+          "fuel_drain_start_time",
+          "fuel_drain_end_time",
+          "def_aft_t1",
+          "oil_flt_dp",
+          "fuel_flt_dp",
+          "air_flt_dp",
+          "eng_oil_lvl",
+          "cool_lvl",
+          "no_of_estops",
+          "fuel_consumption_perc",
+          "fuel_filled_perc",
+          "fuel_theft_perc",
+          "calculated_energy_p_fuel_consumption",
+          "offline_trip_consumption",
+          "fuel_filling_start_value_lt",
+          "fuel_filling_end_value_lt",
+          "fuel_drain_start_value_lt",
+          "fuel_drain_end_value_lt"
+        ],
+        "nullAssetsPerKey": {
+          "mc_st": 4,
+          "hz": 4,
+          "vbat": 8,
+          "rpm": 4,
+          "curr": 4,
+          "watt": 4,
+          "rnhr": 4,
+          "volt": 4,
+          "pf": 4,
+          "fuel": 7,
+          "temp": 8,
+          "press": 8,
+          "fuel_consumption": 8,
+          "fuel_filled": 8,
+          "fuel_theft": 8,
+          "enrg": 4,
+          "apow": 4,
+          "rpow": 4,
+          "rm_temp": 8,
+          "cur_ir": 4,
+          "cur_iy": 4,
+          "cur_ib": 4,
+          "mpow_r": 8,
+          "mpow_y": 8,
+          "mpow_b": 8,
+          "mapow_r": 8,
+          "mapow_y": 8,
+          "mapow_b": 8,
+          "mrpow_r": 8,
+          "mrpow_y": 8,
+          "mrpow_b": 8,
+          "mt_pf": 0,
+          "mt_power": 8,
+          "mr_power": 8,
+          "ma_power": 8,
+          "ma_energy": 8,
+          "mr_energy": 8,
+          "mt_energy": 8,
+          "mrun_hr": 8,
+          "gpow_r": 4,
+          "gpow_y": 4,
+          "gpow_b": 4,
+          "gapow_r": 4,
+          "gapow_y": 4,
+          "gapow_b": 4,
+          "grpow_r": 4,
+          "grpow_y": 4,
+          "grpow_b": 4,
+          "ga_energy": 4,
+          "gr_energy": 8,
+          "ser_due_hr": 8,
+          "mvol": 0,
+          "bts_vbat1": 8,
+          "bts_vbat2": 8,
+          "calculated_energy": 0,
+          "load_percentage": 4,
+          "dg_lock_status": 8,
+          "lat": 0,
+          "long": 0,
+          "mcur_ir": 8,
+          "mcur_iy": 8,
+          "mcur_ib": 8,
+          "mcurr": 0,
+          "is_moving": 8,
+          "fuel_consume": 8,
+          "fuel_press": 8,
+          "fuel_rate": 8,
+          "fuel_consumption_rate": 8,
+          "amb_temp": 8,
+          "def_con": 8,
+          "no_of_trips": 8,
+          "gt_under_fault": 8,
+          "gt_availability": 8,
+          "com_shtdn_st": 8,
+          "com_elec_trip_st": 8,
+          "com_warn_st": 8,
+          "com_notificatn_st": 8,
+          "under_maintenance": 8,
+          "fuel_filling_start_value": 8,
+          "fuel_filling_end_value": 8,
+          "fuel_filling_start_time": 8,
+          "fuel_filling_end_time": 8,
+          "fuel_drain_start_value": 8,
+          "fuel_drain_end_value": 8,
+          "fuel_drain_start_time": 8,
+          "fuel_drain_end_time": 8,
+          "def_aft_t1": 8,
+          "oil_flt_dp": 8,
+          "fuel_flt_dp": 8,
+          "air_flt_dp": 8,
+          "eng_oil_lvl": 8,
+          "cool_lvl": 8,
+          "no_of_estops": 8,
+          "fuel_consumption_perc": 8,
+          "fuel_filled_perc": 8,
+          "fuel_theft_perc": 8,
+          "calculated_energy_p_fuel_consumption": 8,
+          "offline_trip_consumption": 8,
+          "fuel_filling_start_value_lt": 8,
+          "fuel_filling_end_value_lt": 8,
+          "fuel_drain_start_value_lt": 8,
+          "fuel_drain_end_value_lt": 8,
+          "calculated_idle_hour": 6
+        }
+      },
+      "Solar Inverter": {
+        "assets": 1,
+        "keys": 23,
+        "nullCount": 1,
+        "valueCount": 23,
+        "neverNull": [
+          "mpow_r",
+          "mpow_y",
+          "mpow_b",
+          "ma_energy",
+          "mcurr",
+          "mt_pf",
+          "mvol_ry",
+          "mvol_r",
+          "mvol_yb",
+          "mvol_y",
+          "mvol_br",
+          "mvol_b",
+          "mcur_ir",
+          "mcur_iy",
+          "mcur_ib",
+          "mr_energy",
+          "ma_power",
+          "mr_power",
+          "freq",
+          "mvol",
+          "sol_enrg",
+          "inv_power"
+        ],
+        "alwaysNull": ["calculated_sol_enrg"],
+        "nullAssetsPerKey": {
+          "mpow_r": 0,
+          "mpow_y": 0,
+          "mpow_b": 0,
+          "ma_energy": 0,
+          "mcurr": 0,
+          "mt_pf": 0,
+          "mvol_ry": 0,
+          "mvol_r": 0,
+          "mvol_yb": 0,
+          "mvol_y": 0,
+          "mvol_br": 0,
+          "mvol_b": 0,
+          "mcur_ir": 0,
+          "mcur_iy": 0,
+          "mcur_ib": 0,
+          "mr_energy": 0,
+          "ma_power": 0,
+          "mr_power": 0,
+          "freq": 0,
+          "mvol": 0,
+          "calculated_sol_enrg": 1,
+          "sol_enrg": 0,
+          "inv_power": 0
+        }
+      },
+      "Fuel Tank": {
+        "assets": 1,
+        "keys": 4,
+        "nullCount": 1,
+        "valueCount": 4,
+        "neverNull": ["fuel", "fuel_litre", "fuel_consumption"],
+        "alwaysNull": ["fuel_filled"],
+        "nullAssetsPerKey": {
+          "fuel": 0,
+          "fuel_litre": 0,
+          "fuel_consumption": 0,
+          "fuel_filled": 1
+        }
+      }
+    }
+  }
+}

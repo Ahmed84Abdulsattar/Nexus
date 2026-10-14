@@ -56,7 +56,7 @@ describe('asset list mapping', () => {
 });
 
 describe('bulk mapping', () => {
-  it('maps the recorded rows; keys and values pass through unchanged', () => {
+  it('maps the recorded rows; non-null values pass through unchanged', () => {
     const page = mapBulkPage(bulk);
     expect(page.readings).toHaveLength(4);
     expect(page.noData).toEqual([]);
@@ -64,16 +64,46 @@ describe('bulk mapping', () => {
     for (const row of bulk.data) {
       const r = page.readings.find((x) => x.externalAssetId === row.asset_id)!;
       expect(r.ts).toEqual(new Date(row.data!.time));
-      expect(r.values).toEqual(row.data!.parameters);
-      expect(Object.keys(r.values)).toEqual(Object.keys(row.data!.parameters));
+      const p = row.data!.parameters;
+      expect(r.values).toEqual(Object.fromEntries(Object.entries(p).filter(([, v]) => v !== null)));
+      expect(r.seenKeys).toEqual(Object.keys(p));
     }
   });
 
-  it('keeps null as reported (never 0, never dropped)', () => {
+  it('drops null values (null means no data) but keeps every key in seenKeys', () => {
     const dg = mapBulkPage(bulk).readings.find((r) => r.externalAssetId === '42485')!;
-    expect(dg.values['mc_st']).toBeNull();
-    expect('mc_st' in dg.values).toBe(true);
-    expect(Object.values(dg.values).filter((v) => v === null).length).toBe(96);
+    expect('mc_st' in dg.values).toBe(false);
+    expect(Object.values(dg.values).some((v) => v === null)).toBe(false);
+    expect(Object.keys(dg.values)).toHaveLength(103 - 96);
+    expect(dg.seenKeys).toHaveLength(103);
+    expect(dg.seenKeys).toContain('mc_st');
+  });
+
+  it('a real 0 is kept', () => {
+    const rows: RawBulkRow[] = [
+      {
+        asset_id: '1',
+        success: true,
+        data: { time: '2026-10-12T11:00:00Z', parameters: { a: 0, b: null, c: false, d: '' } },
+      },
+    ];
+    const r = mapBulkRows(rows).readings[0]!;
+    expect(r.values).toStrictEqual({ a: 0, c: false, d: '' });
+    expect(r.seenKeys).toEqual(['a', 'b', 'c', 'd']);
+  });
+
+  it('a reading where every value is null has empty values but full seenKeys', () => {
+    const rows: RawBulkRow[] = [
+      {
+        asset_id: '1',
+        success: true,
+        data: { time: '2026-10-12T11:00:00Z', parameters: { x: null, y: null } },
+      },
+    ];
+    const out = mapBulkRows(rows);
+    expect(out.readings).toHaveLength(1); // still a reading: the device did report
+    expect(out.readings[0]!.values).toStrictEqual({});
+    expect(out.readings[0]!.seenKeys).toEqual(['x', 'y']);
   });
 
   it('leaves status, location, site, type, kind and alerts absent', () => {

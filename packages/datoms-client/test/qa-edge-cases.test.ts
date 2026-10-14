@@ -526,13 +526,14 @@ describe('QA: ADR 0010 at run time', () => {
 describe('QA: hard rule 1 in the mapping', () => {
   const T = '2026-10-12T10:00:00Z';
 
-  it('null stays null, 0/false/"" stay as sent, a missing key stays missing', () => {
+  it('null is dropped, 0/false/"" stay as sent, a missing key stays missing', () => {
     const parameters = { a: null, b: 0, c: false, d: '', mc_st: null, lat: 25.2, long: 55.3 };
     const out = mapBulkRows([{ asset_id: '9', success: true, data: { time: T, parameters } }]);
     const v = out.readings[0]!.values;
-    expect(v).toStrictEqual(parameters);
-    expect(v['a']).toBeNull();
+    expect(v).toStrictEqual({ b: 0, c: false, d: '', lat: 25.2, long: 55.3 });
+    expect('a' in v).toBe(false);
     expect('zzz' in v).toBe(false);
+    expect(out.readings[0]!.seenKeys).toEqual(Object.keys(parameters));
   });
 
   it('lat/long/mc_st/under_maintenance create no status, location, site, type, kind or alert', () => {
@@ -540,11 +541,11 @@ describe('QA: hard rule 1 in the mapping', () => {
     const [reading] = mapBulkRows([
       { asset_id: '9', success: true, data: { time: T, parameters } },
     ]).readings;
-    expect(Object.keys(reading!).sort()).toEqual(['externalAssetId', 'ts', 'values']);
+    expect(Object.keys(reading!).sort()).toEqual(['externalAssetId', 'seenKeys', 'ts', 'values']);
     expect(reading!.values).toStrictEqual(parameters);
   });
 
-  it('every recorded bulk row passes through unchanged, null for null', () => {
+  it('every recorded bulk row passes through unchanged, minus its null keys', () => {
     const body = fixture<{ data: Parameters<typeof mapBulkRows>[0] }>(
       'bulk-latest-id-mode.json',
     ).body;
@@ -552,7 +553,11 @@ describe('QA: hard rule 1 in the mapping', () => {
     expect(out.readings.length).toBe(body.data.length);
     for (const row of body.data) {
       const m = out.readings.find((x) => x.externalAssetId === row.asset_id)!;
-      expect(m.values).toStrictEqual(row.data!.parameters);
+      const p = row.data!.parameters;
+      expect(m.values).toStrictEqual(
+        Object.fromEntries(Object.entries(p).filter(([, v]) => v !== null)),
+      );
+      expect(m.seenKeys).toEqual(Object.keys(p));
     }
   });
 
