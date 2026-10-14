@@ -1,13 +1,13 @@
+import { fileURLToPath } from 'node:url';
 import { expect, test } from '@playwright/test';
+import { loadEnv } from 'vite';
 
 // The dev server (and its MSW /v1/config mock) reads the key from the git-ignored repo-root .env.
-// This process needs it only to decide whether the real-map specs can run, so load the same file.
-try {
-  process.loadEnvFile(new URL('../../../.env', import.meta.url));
-} catch {
-  // No .env: the real-map specs below skip.
-}
-const hasKey = Boolean(process.env['VITE_DEV_ARCGIS_API_KEY']);
+// This process reads ONLY VITE_DEV_ARCGIS_API_KEY from it (never the whole file), just to decide
+// whether the real-map specs can run. Traces and videos stay off (playwright.config.ts) because
+// the SDK puts the key in tile URLs.
+const repoRoot = fileURLToPath(new URL('../../../', import.meta.url));
+const hasKey = Boolean(loadEnv('development', repoRoot, 'VITE_DEV_')['VITE_DEV_ARCGIS_API_KEY']);
 
 const viewports = {
   xl: { width: 1440, height: 900 },

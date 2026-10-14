@@ -1,10 +1,10 @@
 // Measures the JavaScript the browser downloads (gzipped) when a page opens vs. when the map opens.
 // Run against `vite preview` of a production build:
-//   VITE_API_BASE_URL=http://localhost:4173/v1 pnpm --filter @nexus/web build
+//   VITE_API_BASE_URL=https://api.example.test/v1 pnpm --filter @nexus/web build
 //   pnpm --filter @nexus/web preview --port 4173 &
 //   node apps/web/scripts/measure-map-load.mjs [baseUrl]
 // /v1/config and /v1/projects are answered by the script with a placeholder, non-working key, and
-// every request to a non-local host is aborted, so no real key is needed and nothing leaves the
+// every other request to a non-local host is aborted, so no real key is needed and nothing leaves the
 // machine. The numbers are a lower bound: basemap layer modules load after the basemap answers,
 // which needs a real key.
 import process from 'node:process';
@@ -20,9 +20,9 @@ async function measure(path, withMap) {
   const files = new Set();
   await page.route('**/*', async (route) => {
     const url = new URL(route.request().url());
-    if (url.origin !== base) return route.abort();
     if (url.pathname.endsWith('/v1/config')) {
       return route.fulfill({
+        headers: { 'access-control-allow-origin': '*' },
         json: {
           arcgis: { apiKey: withMap ? 'placeholder-not-a-real-key' : '' },
           enums: { projectStates: [], displayStatuses: [] },
@@ -31,8 +31,9 @@ async function measure(path, withMap) {
       });
     }
     if (url.pathname.endsWith('/v1/projects')) {
-      return route.fulfill({ json: { items: [], nextCursor: null } });
+      return route.fulfill({ headers: { 'access-control-allow-origin': '*' }, json: { items: [], nextCursor: null } });
     }
+    if (url.origin !== base) return route.abort();
     return route.continue();
   });
   page.on('response', async (response) => {

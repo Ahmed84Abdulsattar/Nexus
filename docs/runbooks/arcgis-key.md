@@ -21,13 +21,16 @@ Rules that apply to every step:
 5. Set the expiry to **90 days** from today.
 6. Create the credential and copy the key straight into the next step. Do not keep it anywhere else.
 
-## 2. Restrict it by referrer
+## 2. Restrict it by referrer, and keep the privileges minimal
+**The privileges are the real control.** A referrer restriction can be spoofed by anyone who calls ArcGIS directly with the key, so assume the key is public and give it only what Nexus needs (step 1.4).
 
 1. Open the credential, then Referrers.
 2. Add only the Nexus origins for that environment:
-   - dev: the dev Static Web App host (`https://<dev-swa-host>/*`) and `http://localhost:5173/*` for developers.
-   - prod: the production host only. No `localhost`.
+   - dev: the dev Static Web App host (`https://<dev-swa-host>/*`).
+   - prod: the production host only.
+   - **Environment keys never include `localhost`.** Developers use their own key limited to `http://localhost:5173/*` (section 4).
 3. Save. Check that the list has no wildcard host (`*`) and no other site.
+4. Set a **usage alert or a spending cap** on the credential (ArcGIS usage dashboard, then alerts or the credit limit), so a leaked key cannot run up cost unnoticed. Do this for every key, including developer keys.
 
 ## 3. Store it in Key Vault
 
@@ -61,7 +64,10 @@ Rules that apply to every step:
 3. Check the ArcGIS usage dashboard for requests you do not recognise.
 4. If it was committed, tell the Nexus lead. Removing it from git history does not make it safe again; the old key must stay deleted.
 
-## 7. Check it works
+## 7. Deploy note (S0-07)
+The deploy job must build the web app with `pnpm --filter @nexus/web build`. That build runs the checks in `apps/web/plugins/checkDist.ts` (no key, no MSW, no sample data, no ArcGIS chunk on first load, source maps included) and refuses `NODE_ENV=development`, a `VITE_DEV_ARCGIS_API_KEY` value and any `VITE_` name outside the allow-list. A job that runs `vite build` directly gets the same checks, but the package script sets the Node heap size the ArcGIS bundle needs. `VITE_API_BASE_URL` must be an https URL.
+
+## 8. Check it works
 
 - `GET /v1/config` as a signed-in user returns a non-empty `arcgis.apiKey` (do not paste the value anywhere).
 - The Portfolio and project maps draw basemap tiles. In 3D, the elevation and buildings load.

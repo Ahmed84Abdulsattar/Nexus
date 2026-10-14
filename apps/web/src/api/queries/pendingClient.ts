@@ -1,5 +1,5 @@
 import createClient from 'openapi-fetch';
-import { authMiddleware, resolveApiBase } from '../client';
+import { apiAuthMiddleware, resolveApiBase } from '../client';
 
 /**
  * Endpoints the web app already calls but that are not in the generated `schema.d.ts` yet (the API
@@ -15,6 +15,6 @@ interface PendingPaths {
 export function createPendingClient() {
   const base = resolveApiBase();
   const client = createClient<PendingPaths>({ baseUrl: base.href.replace(/\/$/, '') });
-  client.use(authMiddleware(base.origin));
+  client.use(apiAuthMiddleware());
   return client;
 }

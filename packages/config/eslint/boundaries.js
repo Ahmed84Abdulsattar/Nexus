@@ -27,6 +27,12 @@ const connectorsDatoms = {
   message: 'Only apps/worker may import @nexus/connectors-datoms.',
 };
 
+const mocks = {
+  group: ['msw', 'msw/*', '**/test', '**/test/**'],
+  message:
+    'MSW and apps/web/src/test/ are dev-only mocks. Only src/test/ and main.tsx (behind import.meta.env.DEV) may import them.',
+};
+
 const rule = (...patterns) => ['error', { patterns }];
 
 const files = ['**/*.{ts,tsx,js,jsx,mjs,cjs}'];
@@ -37,7 +43,17 @@ export const boundaries = [
   // The one place ArcGIS is allowed.
   {
     files: ['apps/web/src/components/map/arcgis/**'],
-    rules: { 'no-restricted-imports': rule(datomsClient, connectors) },
+    rules: { 'no-restricted-imports': rule(datomsClient, connectors, mocks) },
+  },
+  // Web source: no importing the dev-only mocks (they must never reach a production bundle).
+  {
+    files: ['apps/web/src/**'],
+    ignores: [
+      'apps/web/src/components/map/arcgis/**',
+      'apps/web/src/test/**',
+      'apps/web/src/main.tsx',
+    ],
+    rules: { 'no-restricted-imports': rule(arcgis, datomsClient, connectors, mocks) },
   },
   // The worker owns the connectors.
   { files: ['apps/worker/**'], rules: { 'no-restricted-imports': rule(arcgis, datomsClient) } },

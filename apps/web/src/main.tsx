@@ -13,8 +13,13 @@ async function start(rootElement: HTMLElement) {
   // Dev only: MSW answers /v1/config and /v1/projects until the API serves them (S1-02, S1-04).
   // `import.meta.env.DEV` is false in a build, so this branch, MSW and the sample data are dropped.
   if (import.meta.env.DEV) {
-    const { startMockWorker } = await import('./test/browser');
-    await startMockWorker();
+    try {
+      const { startMockWorker } = await import('./test/browser');
+      await startMockWorker();
+    } catch (error) {
+      // The app still renders; requests then go to the real API base, which may not exist yet.
+      console.warn('Dev mock API (MSW) could not start:', error);
+    }
   }
   createRoot(rootElement).render(
     <StrictMode>
