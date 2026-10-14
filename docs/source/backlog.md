@@ -3,6 +3,7 @@
 > Read-only copy for agents. The spreadsheet is the source and tracks status. Regenerate this file when the sheet changes.
 > Map decided: Esri ArcGIS (docs/adr/0002). Database: PostgreSQL 16 without TimescaleDB (docs/adr/0003). Where a task disagrees with docs/, docs/ wins.
 > Regenerated from the spreadsheet on 2026-10-08 after architecture review 1 (ADRs 0005–0010). Changed rows: the sprint dependencies for S2–S6, S0-04, S2-02, S3-01, S3-03, S3-04 (on hold), S4-01, S4-02, S4-03, S4-05, S5-01, S5-02, S5-03, S6-01, S6-02, S6-03, S6-04, S9-02.
+> Changed on 2026-10-14 (S0-09 security review, accepted by Ahmed): extra steps in S0-03, S0-07, S0-08 and S7-02.
 > Changed on 2026-10-14 (decisions by Ahmed on the S1/S2 sprint plans): new tasks S1-10, S3-08 and S3-09 added below. `Nexus_Phase1_Sprint_Plan.xlsx` needs the same three rows added by hand.
 > Changed on 2026-10-12 (DATOMS provisional test key, docs/07 section 3): the S2 sprint dependency and S2-02 (Steps, External blocker, Acceptance check) now show S2-02 as unblocked.
 
@@ -60,6 +61,7 @@
 - **Steps (how to do it):** 1. Create a pipeline that runs on every pull request: install, lint, test.
   2. On merge to main: build Docker images for api and worker, push to Azure Container Registry, deploy to Container Apps (dev).
   3. Test by merging a small change and seeing it live.
+  4. Add `pnpm audit --prod` to the PR pipeline. Check whether `@vaadin/vaadin-usage-statistics` (pulled in by `@arcgis/core`) sends usage data at run time, and disable it if it does (security review of S0-09, item I6, 2026-10-14). This step needs no Azure access and is done ahead of the rest of S0-03.
 - **Output when done:** Merge to main = deployed to dev
 - **Now done by:** You (backend)
 - **Requirement:** Foundation
@@ -119,6 +121,7 @@
 - **Steps (how to do it):** 1. Create Azure Static Web App for dev.
   2. Add a pipeline: on merge to main, build and deploy apps/web.
   3. Check the dev URL works.
+  4. The deploy must build with `pnpm --filter @nexus/web build`, so the build-time guards run (no MSW, no sample data, no dev key in `dist/`; security review of S0-09, item L2, 2026-10-14).
 - **Output when done:** Web app auto-deploys to dev
 - **Now done by:** You (backend)
 - **Requirement:** Foundation
@@ -134,6 +137,7 @@
   2. Use the 'Nexus Web' client ID from S0-04.
   3. Sign-in button redirects to Microsoft; after sign-in show the user's name.
   4. Test with a user outside the Nexus groups: they must be refused.
+  5. On sign-out: `queryClient.clear()` (drops the previous user's cached data) and `esriConfig.apiKey = undefined` through the map adapter (security review of S0-09, item I3, 2026-10-14).
 - **Output when done:** Users sign in with their Innovo Microsoft account
 - **Now done by:** Colleague (frontend)
 - **Requirement:** Innovo: permissions
@@ -859,6 +863,7 @@
   2. Rotate keys in Key Vault.
   3. Firewall: only Container Apps can reach the database.
   4. Web app security headers and CSP (docs/08 §6) in staticwebapp.config.json: a CSP that allows only the MSAL (Entra) and ArcGIS domains plus the API and Web PubSub hosts; HSTS, X-Content-Type-Options, Referrer-Policy, frame-ancestors none. (Added by the S0 plan, 2026-10-09.)
+  5. ArcGIS (security review of S0-09, PR #19, accepted by Ahmed 2026-10-14): the ArcGIS SDK puts the key in tile, style and elevation URLs (`token=`). Exclude `*.arcgis.com` and `*.arcgisonline.com` from App Insights automatic dependency tracking and strip `token=` in a telemetry initializer. CSP for the map (assets self-hosted, decision L6): `script-src 'self' 'wasm-unsafe-eval'`; `worker-src 'self' blob:`; `img-src 'self' data: blob: https://*.arcgis.com`; `connect-src` with `https://*.arcgis.com` (basemapstyles-api, ibasemaps-api, elevation3d, basemaps3d, static); `font-src 'self'`; check Calcite styles under `style-src`; no `unsafe-eval` (verify with a report-only CSP first). `Referrer-Policy: strict-origin-when-cross-origin`, never `no-referrer` (the ArcGIS key is referrer-restricted). Details in docs/09.
 - **Output when done:** Data not reachable from the internet; the web app sends a CSP and security headers
 - **Now done by:** You (backend)
 - **Requirement:** Innovo: security
