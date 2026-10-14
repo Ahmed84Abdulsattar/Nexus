@@ -103,7 +103,7 @@ Versions: use the current stable major at project start and pin exact versions i
 | `VITE_API_BASE_URL` | web | `http://localhost:3000/v1` |
 | `LOG_LEVEL` | api, worker | `info` |
 
-**Database logins.** The three URLs are three different database users, so a bug in one process cannot use another's rights (`db/roles.sql`, `06` §9). The passwordless local users `nexus_api_local` and `nexus_worker_local` are members of `nexus_api` / `nexus_worker` (the roles are NOLOGIN) and are created only when `APP_ENV=local` by `db/seeds/dev-login-roles.sql`. The URLs may hold a password in other environments, so they are never logged or printed; error messages name only the variable. Typical local `.env` lines:
+**Database logins.** The three URLs are three different database users, so a bug in one process cannot use another's rights (`db/roles.sql`, `06` §9). The passwordless local users `nexus_api_local` and `nexus_worker_local` are members of `nexus_api` / `nexus_worker` (the roles are NOLOGIN) and are created only when `APP_ENV=local` by `db/seeds/dev-login-roles.sql`. The URLs may hold a password in other environments, so they are never logged or printed; error messages name only the variable. **Outside `APP_ENV=local` all three must use TLS**: the URL needs `sslmode=verify-full` (preferred; Azure Database for PostgreSQL Flexible Server serves a certificate that chains to a public root in the system store) or `sslmode=require`, otherwise the process refuses to start. The API also refuses port 6432 (PgBouncer): it needs a direct connection for `LISTEN`. Typical local `.env` lines:
 ```
 DATABASE_ADMIN_URL=postgres://nexus@localhost:5432/nexus
 DATABASE_URL=postgres://nexus_api_local@localhost:5432/nexus
