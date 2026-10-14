@@ -25,6 +25,25 @@ test.describe('lazy loading (no key needed)', () => {
   });
 });
 
+test.describe('portfolio without a key (MSW mock)', () => {
+  test.skip(hasKey, 'A key is set, so the map renders; see the real-key specs below.');
+
+  for (const [name, viewport] of Object.entries(viewports)) {
+    test(`shows "Map key not configured" and still lists the 10 projects at ${name}`, async ({
+      page,
+    }) => {
+      await page.setViewportSize(viewport);
+      await page.goto('/');
+      await expect(page.getByText('Map key not configured')).toBeVisible();
+      await expect(page.getByRole('listitem')).toHaveCount(10);
+      const overflow = await page.evaluate(
+        () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+      );
+      expect(overflow).toBeLessThanOrEqual(0);
+    });
+  }
+});
+
 // BLOCKED until an ArcGIS key exists (Q4, Q23): these need real basemap, elevation and 3D tiles.
 test.describe('portfolio map with a real key', () => {
   test.skip(
