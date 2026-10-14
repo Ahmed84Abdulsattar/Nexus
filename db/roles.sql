@@ -1,6 +1,9 @@
 -- =====================================================================
 -- Nexus database roles and grants (least privilege)
--- Run once per environment by an admin / the migrator, AFTER the schema exists.
+-- Applied by `pnpm db:migrate` after every migration run, as the role nexus_migrator (which owns every
+-- table and function, so it can grant on them). Everything here is idempotent. Because it is re-applied
+-- after each run, a table added by a later migration gets its grants without extra work; a migration
+-- that needs a table-specific grant adds the GRANT to this file.
 -- In Azure, prefer Entra (managed identity) principals mapped to these roles.
 -- Kept separate from schema.sql so `pnpm db:check` compares structure only.
 -- =====================================================================
@@ -20,7 +23,10 @@ GRANT EXECUTE ON ALL FUNCTIONS IN SCHEMA core, access, telemetry TO nexus_api, n
 GRANT USAGE ON ALL SEQUENCES IN SCHEMA core, access, telemetry, events, integration, audit TO nexus_api, nexus_worker;
 
 -- API writes: access admin, read state, audit, admin-held fields, settings, linking
-GRANT INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA access TO nexus_api;
+-- Users sign in (insert/update, never delete: deactivate with is_active). Roles, permissions and
+-- role_permission are reference data changed only by migrations, so the API cannot grant itself rights.
+GRANT INSERT, UPDATE ON access.app_user TO nexus_api;
+GRANT INSERT, UPDATE, DELETE ON access.group_role, access.user_role, access.project_access TO nexus_api;
 GRANT INSERT, UPDATE, DELETE ON events.event_read, events.read_marker TO nexus_api;           -- R-41 read state (docs/06 section 3, item 11)
 GRANT INSERT ON audit.log TO nexus_api;
 GRANT INSERT, UPDATE ON core.project, core.district, core.building, core.level, core.zone TO nexus_api;  -- R-63 admin projects
@@ -37,9 +43,15 @@ GRANT INSERT, UPDATE ON ALL TABLES IN SCHEMA events TO nexus_worker;
 REVOKE INSERT, UPDATE ON events.event_read, events.read_marker FROM nexus_worker;               -- per-user read state is API-only
 GRANT INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA integration TO nexus_worker;
 -- Partition maintenance (create/drop partitions) runs as nexus_worker through
--- core.create_range_partitions / core.drop_partitions_before. Those functions must be
--- owned by nexus_migrator and declared SECURITY DEFINER in the migration, with
--- search_path pinned; grant EXECUTE on them to nexus_worker only.
+-- core.create_range_partitions / core.drop_partitions_before. Those functions are owned by
+-- nexus_migrator, SECURITY DEFINER with a pinned search_path (see db/schema.sql), and only
+-- nexus_worker may execute them. New functions are executable by PUBLIC unless revoked.
+REVOKE EXECUTE ON FUNCTION core.create_range_partitions(text, text, date, int),
+                           core.drop_partitions_before(text, timestamptz)
+  FROM PUBLIC, nexus_api;
+GRANT EXECUTE ON FUNCTION core.create_range_partitions(text, text, date, int),
+                          core.drop_partitions_before(text, timestamptz)
+  TO nexus_worker;
 
 -- Future tables get the same defaults
 ALTER DEFAULT PRIVILEGES FOR ROLE nexus_migrator IN SCHEMA core, access, telemetry, events, integration, audit

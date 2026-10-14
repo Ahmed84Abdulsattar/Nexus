@@ -44,16 +44,24 @@ BEGIN
   RETURN NEW;
 END $$;
 
+-- Partition maintenance. SECURITY DEFINER: creating or dropping a partition needs ownership of the
+-- parent table, which the app roles (nexus_worker) do not have. The functions run as their owner
+-- (nexus_migrator, the owner of every table) and therefore:
+--   * pin search_path, so nothing can be shadowed;
+--   * accept only partitioned tables in the telemetry, events, integration and audit schemas;
+--   * are executable by nexus_worker only (db/roles.sql revokes them from PUBLIC and nexus_api).
+-- Partition bounds are UTC midnights, whatever the caller's TimeZone setting.
+--
 -- Create range partitions for a partitioned table.
 --   p_parent  'telemetry.packet'
 --   p_step    'day' | 'month'
 --   p_from    first period start (date)
---   p_count   number of periods
+--   p_count   number of periods (1 to 400)
 -- Partition name: <table>_pYYYYMMDD (day) or <table>_pYYYYMM (month)
 CREATE OR REPLACE FUNCTION core.create_range_partitions(
   p_parent text, p_step text, p_from date, p_count int
 ) RETURNS int
-LANGUAGE plpgsql AS $$
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, pg_temp AS $$
 DECLARE
   v_schema text := split_part(p_parent, '.', 1);
   v_table  text := split_part(p_parent, '.', 2);
@@ -65,6 +73,14 @@ BEGIN
   IF p_step NOT IN ('day', 'month') THEN
     RAISE EXCEPTION 'p_step must be day or month';
   END IF;
+  IF p_count IS NULL OR p_count < 1 OR p_count > 400 THEN
+    RAISE EXCEPTION 'p_count must be between 1 and 400';
+  END IF;
+  IF v_schema NOT IN ('telemetry', 'events', 'integration', 'audit') OR NOT EXISTS (
+       SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+       WHERE n.nspname = v_schema AND c.relname = v_table AND c.relkind = 'p') THEN
+    RAISE EXCEPTION '% is not a partitioned table that Nexus maintains', p_parent;
+  END IF;
   v_start := CASE p_step WHEN 'day' THEN p_from ELSE date_trunc('month', p_from)::date END;
   FOR i IN 1..p_count LOOP
     v_end  := CASE p_step WHEN 'day' THEN v_start + 1 ELSE (v_start + interval '1 month')::date END;
@@ -73,7 +89,7 @@ BEGIN
       EXECUTE format(
         'CREATE TABLE %I.%I PARTITION OF %I.%I FOR VALUES FROM (%L) TO (%L)',
         v_schema, v_name, v_schema, v_table,
-        v_start::timestamptz, v_end::timestamptz);
+        v_start::timestamp AT TIME ZONE 'UTC', v_end::timestamp AT TIME ZONE 'UTC');
       v_made := v_made + 1;
     END IF;
     v_start := v_end;
@@ -83,18 +99,29 @@ END $$;
 
 -- Drop partitions whose upper bound is <= p_before. Returns names dropped.
 -- Archive to Blob (Parquet) BEFORE calling this if archiving is enabled.
+-- p_before may not be in the future, so a wrong argument cannot drop the live partitions.
 CREATE OR REPLACE FUNCTION core.drop_partitions_before(p_parent text, p_before timestamptz)
 RETURNS SETOF text
-LANGUAGE plpgsql AS $$
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, pg_temp AS $$
 DECLARE
+  v_schema text := split_part(p_parent, '.', 1);
+  v_table  text := split_part(p_parent, '.', 2);
   r record;
   v_upper timestamptz;
 BEGIN
+  IF p_before IS NULL OR p_before > now() THEN
+    RAISE EXCEPTION 'p_before must not be in the future';
+  END IF;
+  IF v_schema NOT IN ('telemetry', 'events', 'integration', 'audit') OR NOT EXISTS (
+       SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+       WHERE n.nspname = v_schema AND c.relname = v_table AND c.relkind = 'p') THEN
+    RAISE EXCEPTION '% is not a partitioned table that Nexus maintains', p_parent;
+  END IF;
   FOR r IN
     SELECT c.oid::regclass::text AS part, pg_get_expr(c.relpartbound, c.oid) AS bound
     FROM pg_inherits i
     JOIN pg_class c ON c.oid = i.inhrelid
-    WHERE i.inhparent = p_parent::regclass
+    WHERE i.inhparent = format('%I.%I', v_schema, v_table)::regclass
   LOOP
     v_upper := substring(r.bound FROM 'TO \(''([^'']+)''\)')::timestamptz;
     IF v_upper IS NOT NULL AND v_upper <= p_before THEN
@@ -190,7 +217,8 @@ CREATE TABLE core.building (
   retired_at    timestamptz,
   created_at    timestamptz NOT NULL DEFAULT now(),
   UNIQUE (project_id, name),
-  UNIQUE (source_system, external_id)
+  UNIQUE (source_system, external_id),
+  UNIQUE (id, project_id)         -- target of core.asset's (building_id, project_id) foreign key
 );
 CREATE TABLE core.level (
   id            uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -203,7 +231,8 @@ CREATE TABLE core.level (
   external_id   text,
   retired_at    timestamptz,
   UNIQUE (building_id, name),
-  UNIQUE (source_system, external_id)
+  UNIQUE (source_system, external_id),
+  UNIQUE (id, building_id)        -- target of core.asset's (level_id, building_id) foreign key
 );
 CREATE TABLE core.zone (
   id            uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -217,7 +246,8 @@ CREATE TABLE core.zone (
   external_id   text,
   retired_at    timestamptz,
   UNIQUE (project_id, name),
-  UNIQUE (source_system, external_id)
+  UNIQUE (source_system, external_id),
+  UNIQUE (id, project_id)         -- target of core.asset's (zone_id, project_id) foreign key
 );
 
 -- ---- Asset types. Maps source type names to an icon/category. ----
@@ -238,6 +268,11 @@ CREATE TABLE core.asset_type (
 );
 
 -- ---- Assets: every sensored item on site ----
+-- Spatial links (BIM-ready): project_id, then optional building_id, level_id, zone_id. The two CHECKs
+-- and three composite foreign keys keep them consistent: a building or zone belongs to the asset's
+-- own project, a level to the asset's own building, and nothing is linked without a project.
+-- project_id stays NULL only for a source asset not yet linked to a project (integration.link_todo);
+-- such an asset is not shown anywhere project-scoped.
 CREATE TABLE core.asset (
   id               uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   project_id       uuid REFERENCES core.project(id),     -- null until linked (see integration.link_todo)
@@ -268,7 +303,14 @@ CREATE TABLE core.asset (
   retired_at       timestamptz,
   created_at       timestamptz NOT NULL DEFAULT now(),
   updated_at       timestamptz NOT NULL DEFAULT now(),
-  UNIQUE (source_system, external_id)
+  UNIQUE (source_system, external_id),
+  CONSTRAINT asset_spatial_needs_project_chk
+    CHECK (project_id IS NOT NULL OR (building_id IS NULL AND level_id IS NULL AND zone_id IS NULL)),
+  CONSTRAINT asset_level_needs_building_chk
+    CHECK (level_id IS NULL OR building_id IS NOT NULL),
+  CONSTRAINT asset_building_project_fk FOREIGN KEY (building_id, project_id) REFERENCES core.building (id, project_id),
+  CONSTRAINT asset_level_building_fk   FOREIGN KEY (level_id, building_id)   REFERENCES core.level (id, building_id),
+  CONSTRAINT asset_zone_project_fk     FOREIGN KEY (zone_id, project_id)     REFERENCES core.zone (id, project_id)
 );
 CREATE INDEX asset_project_idx ON core.asset (project_id) WHERE retired_at IS NULL;
 CREATE INDEX asset_type_idx    ON core.asset (asset_type_id);
@@ -360,6 +402,57 @@ RETURNS SETOF uuid LANGUAGE sql STABLE AS $$
   UNION
   SELECT project_id FROM access.project_access WHERE entra_group_id = ANY (p_group_ids)
 $$;
+
+-- Access changes reach every API instance at once (docs/08 section 2, S1-01 step 6).
+-- Every change that can alter a user's roles, permissions, project scope or active flag sends a
+-- NOTIFY on channel 'nexus_access' when its transaction commits. Each API instance LISTENs and drops
+-- the affected cache entries. Payload (small JSON):
+--   {"scope":"user","userId":"<app_user.id>"}   one user is affected
+--   {"scope":"all"}                             many users may be affected (a group, role or permission changed)
+-- Triggers (not application code) so that a change made by any writer, including a manual SQL fix,
+-- is announced. Identical notifications inside one transaction are delivered once.
+CREATE OR REPLACE FUNCTION access.notify_access_change() RETURNS trigger
+LANGUAGE plpgsql AS $$
+DECLARE
+  v_row     jsonb;
+  v_payload jsonb;
+BEGIN
+  FOR v_row IN
+    SELECT r FROM unnest(ARRAY[
+      CASE WHEN TG_OP IN ('UPDATE', 'DELETE') THEN to_jsonb(OLD) END,
+      CASE WHEN TG_OP IN ('INSERT', 'UPDATE') THEN to_jsonb(NEW) END
+    ]) AS r WHERE r IS NOT NULL
+  LOOP
+    v_payload := CASE
+      WHEN TG_TABLE_NAME = 'user_role'      THEN jsonb_build_object('scope', 'user', 'userId', v_row->>'user_id')
+      WHEN TG_TABLE_NAME = 'app_user'       THEN jsonb_build_object('scope', 'user', 'userId', v_row->>'id')
+      WHEN TG_TABLE_NAME = 'project_access' AND v_row->>'user_id' IS NOT NULL
+                                            THEN jsonb_build_object('scope', 'user', 'userId', v_row->>'user_id')
+      ELSE jsonb_build_object('scope', 'all')   -- group_role, role, role_permission, permission, group project access
+    END;
+    PERFORM pg_notify('nexus_access', v_payload::text);
+  END LOOP;
+  RETURN NULL;
+END $$;
+
+CREATE TRIGGER user_role_notify        AFTER INSERT OR UPDATE OR DELETE ON access.user_role
+  FOR EACH ROW EXECUTE FUNCTION access.notify_access_change();
+CREATE TRIGGER group_role_notify       AFTER INSERT OR UPDATE OR DELETE ON access.group_role
+  FOR EACH ROW EXECUTE FUNCTION access.notify_access_change();
+CREATE TRIGGER project_access_notify   AFTER INSERT OR UPDATE OR DELETE ON access.project_access
+  FOR EACH ROW EXECUTE FUNCTION access.notify_access_change();
+CREATE TRIGGER role_notify             AFTER INSERT OR UPDATE OR DELETE ON access.role
+  FOR EACH ROW EXECUTE FUNCTION access.notify_access_change();
+CREATE TRIGGER role_permission_notify  AFTER INSERT OR UPDATE OR DELETE ON access.role_permission
+  FOR EACH ROW EXECUTE FUNCTION access.notify_access_change();
+CREATE TRIGGER permission_notify       AFTER INSERT OR UPDATE OR DELETE ON access.permission
+  FOR EACH ROW EXECUTE FUNCTION access.notify_access_change();
+-- app_user: only a change of the active flag (sign-in updates last_seen_at and must not notify), or a delete.
+CREATE TRIGGER app_user_active_notify  AFTER UPDATE OF is_active ON access.app_user
+  FOR EACH ROW WHEN (OLD.is_active IS DISTINCT FROM NEW.is_active)
+  EXECUTE FUNCTION access.notify_access_change();
+CREATE TRIGGER app_user_delete_notify  AFTER DELETE ON access.app_user
+  FOR EACH ROW EXECUTE FUNCTION access.notify_access_change();
 
 -- =====================================================================
 -- TELEMETRY

@@ -1,0 +1,5 @@
+{
+  "extends": "../packages/config/tsconfig/library.json",
+  "compilerOptions": { "noEmit": true },
+  "include": ["src", "scripts", "test", "seeds", "bench", "vitest.config.ts"]
+}
