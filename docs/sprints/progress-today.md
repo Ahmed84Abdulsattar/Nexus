@@ -13,8 +13,9 @@ Rules followed: never merge; one backlog task per branch; stacked PRs when a tas
 | S0-06 Design tokens and base components | `S0-06-design-tokens` | `S0-05-web-shell` | [#12](https://github.com/Ahmed84Abdulsattar/Nexus/pull/12) | PR open (stacked on #10); Ready: qa findings fixed (axe in CI tests, Playwright spec + 4 screenshots, SidePanel focus, typed Tag tokens). Follow-up: wire Playwright into ci.yml | Confirm the provisional colour values (e.g. In bid = lime `#4d7c0f` because a light yellow fails AA); dark mode follows the OS by default; add Playwright later? |
 | S1-05 App header and user menu | `S1-05-app-header` | `S0-06-design-tokens` | [#13](https://github.com/Ahmed84Abdulsattar/Nexus/pull/13) | Ready: qa PASS (10 tests added); S0-06 fixes merged in, search landmark named so axe passes. User menu shows "Not signed in" until S0-08 (Entra) | Is there a header mockup image? (brief/structure don't describe it; built from the backlog list with a text wordmark). Is the "UAE" label static branding? |
 | S0-09 Map wrapper and ArcGIS adapter | `S0-09-map-wrapper` | `S0-06-design-tokens` | — | In progress (key read from `/v1/config` MSW mock; real map render blocked: no ArcGIS key, Q4/Q23) | — |
-| S1-06 Responsive layout | `S1-06-responsive-layout` | `S1-05-app-header` | — | In progress (applied to project/admin/dev pages; portfolio page adopts it after S0-09 merges) | — |
-| S5-04 Load-test harness | `S5-04-load-harness` | `main` | [#14](https://github.com/Ahmed84Abdulsattar/Nexus/pull/14) | PR open; qa PASS (7 generator tests added), low findings being fixed. k6 smoke run against `/health/live` passed (p95 21 ms); data endpoints listed but disabled until they exist | Thresholds: docs give latest-value p95 < 300 ms and one-year chart < 1 s; harness applies them to search and 30-day charts. No doc backs search < 300 ms: confirm or use the 2 s page budget. |
+| S1-06 Responsive layout | `S1-06-responsive-layout` | `S1-05-app-header` | [#15](https://github.com/Ahmed84Abdulsattar/Nexus/pull/15) | PR open (stacked on #13 → #12 → #10); Playwright 16/16 at 1440/1024/390; qa running. Portfolio page adopts it after S0-09 | Breakpoints: desktop ≥1280, tablet 768–1279, mobile <768 (so 1024 is tablet, list as a button) |
+| S3-01 Catalogue sync, phase 1 (connector + pure catalogue/retire logic) | `S3-01-catalogue-sync` | `S2-02-datoms-client` | — | In progress. Phase 2 (DB repository, worker job, leader lock) after S1-01; then it also needs `S1-01-database` merged in | — |
+| S5-04 Load-test harness | `S5-04-load-harness` | `main` | [#14](https://github.com/Ahmed84Abdulsattar/Nexus/pull/14) | Ready: qa PASS, all findings fixed (8 generator tests). k6 smoke run against `/health/live` passed (p95 21 ms); data endpoints listed but disabled until they exist | Thresholds: docs give latest-value p95 < 300 ms and one-year chart < 1 s; harness applies them to search and 30-day charts. No doc backs search < 300 ms: confirm or use the 2 s page budget. |
 | GETTING-STARTED pg-local command | `docs/getting-started-pg-local` | `main` | [#8](https://github.com/Ahmed84Abdulsattar/Nexus/pull/8) | PR open (docs only) | — |
 | This progress file | `docs/progress-today` | `main` | [#9](https://github.com/Ahmed84Abdulsattar/Nexus/pull/9) | Updated through the day | — |
 
@@ -29,7 +30,6 @@ Note 2026-10-14: all running agents were stopped on 2026-10-12 by the Claude ses
 | S1-07 Loading, error and empty states | frontend | after S0-06 | Shares `components/feedback/` |
 | S2-01 Projects API | backend-api | after S1-04 | Needs S1-09 (backlog) and the DB |
 | S2-06 Users and roles API | backend-api | after S2-01 | Needs the audit log |
-| S3-01 Catalogue sync (assets only; sites wait for Q21/Q22) | datoms-integration | `S2-02-datoms-client` + `S1-01-database` | Needs both |
 
 ## Blocked (skipped)
 
