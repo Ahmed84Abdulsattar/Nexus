@@ -79,8 +79,12 @@ Versions: use the current stable major at project start and pin exact versions i
 |---|---|---|
 | `NODE_ENV` | all | `development` / `production` |
 | `APP_ENV` | all | `local` / `dev` / `prod` (no `test` environment, ADR 0008) |
-| `DATABASE_URL` | api, worker, migrations | Local: `postgres://nexus_api_local@localhost:5432/nexus` for the api and `postgres://nexus_worker_local@localhost:5432/nexus` for the worker. These passwordless LOGIN users are members of `nexus_api` / `nexus_worker` and are created only when `APP_ENV=local` by `db/seeds/dev-login-roles.sql` (the roles in `db/roles.sql` are NOLOGIN). In Azure: host + Entra token through managed identity. |
+| `DATABASE_URL` | api | The API's own login (role `nexus_api`). Local: `postgres://nexus_api_local@localhost:5432/nexus`. Required, no fallback. The API needs a **direct** connection (port 5432, not PgBouncer 6432) because it also holds one `LISTEN` connection for access-cache invalidation. In Azure: host + Entra token through managed identity. |
+| `WORKER_DATABASE_URL` | worker | The worker's own login (role `nexus_worker`). Local: `postgres://nexus_worker_local@localhost:5432/nexus`. **Falls back to `DATABASE_URL` only when `APP_ENV=local`.** In dev and prod it is required: a fallback would run the worker with the API's grants. |
+| `DATABASE_ADMIN_URL` | `pnpm db:migrate`, `db:seed`, `db:check` (never a running app) | A login that can create roles, schemas and databases (locally the superuser: `postgres://nexus@localhost:5432/nexus`; in Azure the server admin, used only by the deployment pipeline). **Falls back to `DATABASE_URL` only when `APP_ENV=local`**; in dev and prod it is required, otherwise migrations would run as the API user. Migrations then run as the role `nexus_migrator`, which owns every table. |
 | `DATABASE_POOL_MAX` | api, worker | `10` |
+| `TEST_DATABASE_ADMIN_URL` | tests (`@nexus/db/testing`) | Administrator login of a throw-away server, e.g. `postgres://nexus@localhost:5432/postgres`. Each test file creates and drops its own database. When unset, the PostgreSQL integration tests are skipped with a warning. CI sets it for the `postgres:16` service. |
+| `PG_DUMP` | `pnpm db:check` | Optional full path to `pg_dump` (PostgreSQL 16 client). Otherwise found through `NEXUS_PG_BIN`, the portable install of `scripts/pg-local.ps1`, then `PATH`. |
 | `ENTRA_TENANT_ID` | api, web (`VITE_ENTRA_TENANT_ID`) | Innovo tenant GUID (public identifier, not a secret) |
 | `ENTRA_API_CLIENT_ID` / `ENTRA_API_AUDIENCE` | api | `nexus-api` app id / `api://nexus-api` |
 | `ENTRA_JWKS_URL` | api | Optional, and an override is accepted **only when `APP_ENV=local`**; elsewhere it must be unset or exactly the default. Default: `https://login.microsoftonline.com/<ENTRA_TENANT_ID>/discovery/v2.0/keys`. The API accepts both `ENTRA_API_AUDIENCE` and `ENTRA_API_CLIENT_ID` as the token `aud` (see Q29). |
@@ -98,6 +102,14 @@ Versions: use the current stable major at project start and pin exact versions i
 | `APPLICATIONINSIGHTS_CONNECTION_STRING` | all | |
 | `VITE_API_BASE_URL` | web | `http://localhost:3000/v1` |
 | `LOG_LEVEL` | api, worker | `info` |
+
+**Database logins.** The three URLs are three different database users, so a bug in one process cannot use another's rights (`db/roles.sql`, `06` §9). The passwordless local users `nexus_api_local` and `nexus_worker_local` are members of `nexus_api` / `nexus_worker` (the roles are NOLOGIN) and are created only when `APP_ENV=local` by `db/seeds/dev-login-roles.sql`. The URLs may hold a password in other environments, so they are never logged or printed; error messages name only the variable. Typical local `.env` lines:
+```
+DATABASE_ADMIN_URL=postgres://nexus@localhost:5432/nexus
+DATABASE_URL=postgres://nexus_api_local@localhost:5432/nexus
+WORKER_DATABASE_URL=postgres://nexus_worker_local@localhost:5432/nexus
+```
+Order on a new machine: `pnpm db:migrate`, then `pnpm db:seed` (it creates the two local login users), then `pnpm dev`.
 
 Local development: Postgres from docker-compose (or `scripts/pg-local.ps1` on Windows without Docker), `DATOMS_LIVE=false`, `LIVE_MODE=poll`, and either `AUTH_MODE=dev` or a real dev Entra app registration.
 

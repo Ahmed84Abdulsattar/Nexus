@@ -23,7 +23,8 @@ import {
   RequirePermission,
 } from '../../src/common/auth/decorators.js';
 import { JWT_KEY_RESOLVER } from '../../src/common/auth/entra-jwt.guard.js';
-import type { InMemoryAccessDirectory } from '../../src/common/auth/in-memory-access-directory.js';
+import { AccessChangeListener } from '../../src/common/auth/access-change-listener.js';
+import { InMemoryAccessDirectory } from '../../src/common/auth/in-memory-access-directory.js';
 import { mountDocs } from '../../src/openapi/setup.js';
 import { configureApp } from '../../src/common/http/configure-app.js';
 import { APP_CONFIG, type AppConfig, loadConfig } from '../../src/config/env.js';
@@ -41,6 +42,8 @@ export const TEST_ENV = {
   ENTRA_API_CLIENT_ID: API_CLIENT_ID,
   ENTRA_WEB_CLIENT_ID: WEB_CLIENT_ID,
   ENTRA_API_AUDIENCE: API_AUDIENCE,
+  // Nothing in the unit tests connects (the pool is lazy and the directory below is in memory).
+  DATABASE_URL: 'postgres://nexus_api_local@127.0.0.1:1/nexus_unit_tests',
 } as const;
 
 export interface TestKeys {
@@ -235,6 +238,11 @@ export async function createTestApp(
   })
     .overrideProvider(APP_CONFIG)
     .useValue(config)
+    // No database in unit tests: users, roles and scope come from memory, and no LISTEN connection is made.
+    .overrideProvider(ACCESS_DIRECTORY)
+    .useClass(InMemoryAccessDirectory)
+    .overrideProvider(AccessChangeListener)
+    .useValue({})
     .overrideProvider(JWT_KEY_RESOLVER)
     .useValue(
       options.resolver ??
