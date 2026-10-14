@@ -35,6 +35,7 @@ function setup() {
     },
   };
   const service = new AccessContextService(counting, () => now);
+  service.setChangeChannelUp(true); // the cache is off until a listener says it is up
   return {
     directory,
     service,
@@ -151,6 +152,7 @@ describe('AccessContextService', () => {
         },
       };
       const service = new AccessContextService(slow, () => 1);
+      service.setChangeChannelUp(true);
 
       const pending = service.resolve(who());
       await new Promise((r) => setTimeout(r, 10));
@@ -181,6 +183,7 @@ describe('AccessContextService', () => {
         },
       };
       const service = new AccessContextService(slow, () => 1);
+      service.setChangeChannelUp(true);
       const pending = service.resolve(who());
       await new Promise((r) => setTimeout(r, 10));
       service.invalidateUser(userId);

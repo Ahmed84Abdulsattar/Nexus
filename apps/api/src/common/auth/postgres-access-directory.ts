@@ -8,7 +8,7 @@ import { DB } from '../db/database.module.js';
 import {
   type AccessContext,
   type AccessDirectory,
-  SIGN_IN_IDLE_MINUTES,
+  DEFAULT_SIGN_IN_GAP_MINUTES,
   type SignedInIdentity,
 } from './access-context.js';
 
@@ -27,6 +27,7 @@ export class PostgresAccessDirectory implements AccessDirectory {
   async upsertUser(identity: SignedInIdentity): Promise<{ userId: string; isActive: boolean }> {
     // Users are matched by oid only (never by email). A name or email that the token lacks keeps
     // its stored value. `new_session` is computed from the PREVIOUS last_seen_at, in the same statement.
+    const gapMinutes = await this.signInGapMinutes();
     const { rows } = await sql<{ id: string; is_active: boolean; new_session: boolean }>`
       WITH previous AS (
         SELECT last_seen_at FROM access.app_user WHERE entra_oid = ${identity.oid}::uuid
@@ -39,7 +40,7 @@ export class PostgresAccessDirectory implements AccessDirectory {
         display_name = COALESCE(EXCLUDED.display_name, access.app_user.display_name),
         last_seen_at = now()
       RETURNING id, is_active,
-        coalesce((SELECT last_seen_at FROM previous) < now() - make_interval(mins => ${SIGN_IN_IDLE_MINUTES}), true)
+        coalesce((SELECT last_seen_at FROM previous) < now() - make_interval(mins => ${gapMinutes}), true)
           AS new_session`.execute(this.db);
     const row = rows[0];
     if (!row) throw new Error('access.app_user upsert returned no row');
@@ -97,11 +98,45 @@ export class PostgresAccessDirectory implements AccessDirectory {
     };
   }
 
+  /** How many sign-in audit writes failed since start (the log line has event=audit.write_failed). */
+  auditWriteFailures = 0;
+
+  private gapCache: { minutes: number; readAt: number } | undefined;
+
   /**
-   * The sign-in audit row (docs/08 section 2, step 6; Q29 c). Written on the first request after
-   * SIGN_IN_IDLE_MINUTES of silence, because a bearer-token API has no session of its own.
-   * A failed audit write is logged loudly but does not lock everybody out (a missing partition is an
-   * operations problem for the maintenance job, not a reason to refuse users).
+   * core.setting 'audit.sign_in_gap_minutes' (default 60, docs/08 section 2 step 6), cached for 60 s like
+   * a setting should be. A missing or unreadable value falls back to the default.
+   * TODO(Q38): switch to the Entra session id (sid) if S0-04 confirms tokens carry it.
+   */
+  private async signInGapMinutes(): Promise<number> {
+    const now = Date.now();
+    if (this.gapCache && now - this.gapCache.readAt < 60_000) return this.gapCache.minutes;
+    let minutes = DEFAULT_SIGN_IN_GAP_MINUTES;
+    try {
+      const row = await this.db
+        .selectFrom('core.setting')
+        .select('value')
+        .where('key', '=', 'audit.sign_in_gap_minutes')
+        .executeTakeFirst();
+      const n = Number(row?.value);
+      if (Number.isFinite(n) && n >= 1 && n <= 10_080) minutes = Math.round(n);
+      else if (row !== undefined)
+        this.logger.warn('audit.sign_in_gap_minutes is not a number from 1 to 10080; using 60');
+    } catch (error) {
+      this.logger.warn(
+        `could not read audit.sign_in_gap_minutes: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+    this.gapCache = { minutes, readAt: now };
+    return minutes;
+  }
+
+  /**
+   * The sign-in audit row (docs/08 section 2, step 6; Q29 c). Written when the access cache misses and
+   * the user's previous last_seen_at is older than the gap setting, because a bearer-token API has no
+   * session of its own. A failed audit write does not lock everybody out (a missing partition is an
+   * operations problem for the maintenance job), but it is counted and logged as a structured event
+   * that an alert can match: event=audit.write_failed.
    */
   private async auditSignIn(userId: string, identity: SignedInIdentity): Promise<void> {
     const req = identity.request;
@@ -120,8 +155,15 @@ export class PostgresAccessDirectory implements AccessDirectory {
         })
         .execute();
     } catch (error) {
+      this.auditWriteFailures += 1;
       this.logger.error(
-        `could not write the sign-in audit row: ${error instanceof Error ? error.message : String(error)}`,
+        JSON.stringify({
+          event: 'audit.write_failed',
+          action: 'auth.sign_in',
+          userId,
+          failures: this.auditWriteFailures,
+          error: error instanceof Error ? error.message : String(error),
+        }),
       );
     }
   }

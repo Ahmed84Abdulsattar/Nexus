@@ -1,3 +1,4 @@
+import { DatabaseConfigError, requireTlsUnlessLocal } from '@nexus/db';
 import { z } from 'zod';
 
 /**
@@ -41,6 +42,29 @@ const envSchema = z
     ),
   })
   .superRefine((env, ctx) => {
+    // The API holds a LISTEN connection for access-cache invalidation. Through a pooler in transaction
+    // mode (Azure's built-in PgBouncer, port 6432) LISTEN is silently deaf, so refuse to start.
+    try {
+      if (new URL(env.DATABASE_URL).port === '6432') {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['DATABASE_URL'],
+          message:
+            'port 6432 is the PgBouncer pooler; the API needs a direct connection (port 5432) for LISTEN',
+        });
+      }
+      // TLS outside local (never prints the URL).
+      requireTlsUnlessLocal(env.DATABASE_URL, 'DATABASE_URL', env.APP_ENV);
+    } catch (error) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['DATABASE_URL'],
+        message:
+          error instanceof DatabaseConfigError
+            ? error.message
+            : 'is not a valid URL (value not shown)',
+      });
+    }
     if (env.AUTH_MODE === 'dev' && env.APP_ENV !== 'local') {
       ctx.addIssue({
         code: 'custom',

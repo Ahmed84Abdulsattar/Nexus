@@ -7,7 +7,6 @@ import { AccessChangeListener } from '../src/common/auth/access-change-listener.
 import {
   AccessContextService,
   InactiveUserError,
-  SIGN_IN_IDLE_MINUTES,
   type AccessDirectory,
   type SignedInIdentity,
 } from '../src/common/auth/access-context.js';
@@ -168,7 +167,7 @@ describe.skipIf(testDatabaseAdminUrl === undefined)('access directory on Postgre
       expect(await auditRows(userId)).toHaveLength(1);
       await admin.query(
         `UPDATE access.app_user SET last_seen_at = now() - make_interval(mins => $2) WHERE id = $1`,
-        [userId, SIGN_IN_IDLE_MINUTES + 1],
+        [userId, 61],
       );
       await directory.upsertUser(who(oid));
       expect(await auditRows(userId)).toHaveLength(2);
