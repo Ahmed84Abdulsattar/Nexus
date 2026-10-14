@@ -16,3 +16,6 @@ PROMPTS.md
 # Generated (S1-03): apps/api/openapi.json by the API build, schema.d.ts by openapi-typescript.
 apps/api/openapi.json
 apps/web/src/api/schema.d.ts
+# k6 binary download and generated fleet (S5-04)
+tests/load/.k6dl
+tests/load/worker-5000-assets/out
