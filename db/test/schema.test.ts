@@ -197,7 +197,7 @@ describe.skipIf(testDatabaseAdminUrl === undefined)('database (PostgreSQL)', () 
         const bound = await admin.query(`SELECT pg_get_expr(c.relpartbound, c.oid) AS b FROM pg_class c WHERE c.relname = 'packet_p20310301'`);
         expect(bound.rows[0].b).toMatch(/FROM \('2031-03-01 00:00:00\+00'\) TO \('2031-03-02 00:00:00\+00'\)/);
         // Past partitions can be dropped; the call is idempotent.
-        const dropped = await worker.query(`SELECT * FROM core.drop_partitions_before('events.event', now() + interval '0 seconds')`);
+        const dropped = await worker.query(`SELECT * FROM core.drop_partitions_before('telemetry.rollup_5m', now() - interval '3 years')`);
         expect(dropped.rows).toEqual([]);
         const old = await worker.query(`SELECT core.create_range_partitions('events.event', 'month', DATE '2020-01-01', 1) AS n`);
         expect(old.rows[0].n).toBe(1);

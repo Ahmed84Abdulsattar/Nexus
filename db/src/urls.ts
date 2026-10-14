@@ -43,13 +43,15 @@ const nonEmpty = (v: string | undefined): string | undefined =>
 export function resolveDatabaseUrl(env: Env, role: DatabaseRole): ResolvedDatabaseUrl {
   const own = DATABASE_URL_VARIABLE[role];
   const direct = nonEmpty(env[own]);
-  if (direct !== undefined) return { url: assertPostgresUrl(direct, own), variable: own, fellBack: false };
+  if (direct !== undefined) {
+    return { url: requireTlsUnlessLocal(assertPostgresUrl(direct, own), own, env['APP_ENV']), variable: own, fellBack: false };
+  }
 
   if (role !== 'api' && env['APP_ENV'] === 'local') {
     const shared = nonEmpty(env['DATABASE_URL']);
     if (shared !== undefined) {
       return {
-        url: assertPostgresUrl(shared, 'DATABASE_URL'),
+        url: requireTlsUnlessLocal(assertPostgresUrl(shared, 'DATABASE_URL'), 'DATABASE_URL', env['APP_ENV']),
         variable: 'DATABASE_URL',
         fellBack: true,
       };
@@ -60,6 +62,25 @@ export function resolveDatabaseUrl(env: Env, role: DatabaseRole): ResolvedDataba
       ? ` There is no fallback to DATABASE_URL unless APP_ENV=local (APP_ENV is ${env['APP_ENV'] ?? 'unset'}).`
       : '';
   throw new DatabaseConfigError(`${own} is not set.${hint}`);
+}
+
+/**
+ * Outside APP_ENV=local (dev, prod, unset) the connection must use TLS: the URL needs sslmode=require,
+ * verify-ca or verify-full (or ssl=true). Azure Database for PostgreSQL Flexible Server requires TLS and
+ * accepts sslmode=verify-full with the system CA store (preferred: it also checks the server's
+ * certificate); sslmode=require encrypts without checking who answers. The value is never printed.
+ */
+export function requireTlsUnlessLocal(url: string, variable: string, appEnv: string | undefined): string {
+  if (appEnv === 'local') return url;
+  const params = new URL(url).searchParams;
+  const mode = params.get('sslmode');
+  const ok = mode === 'require' || mode === 'verify-ca' || mode === 'verify-full' || params.get('ssl') === 'true';
+  if (!ok) {
+    throw new DatabaseConfigError(
+      `${variable} must use TLS outside APP_ENV=local: add ?sslmode=verify-full (or sslmode=require) to the URL.`,
+    );
+  }
+  return url;
 }
 
 function assertPostgresUrl(value: string, variable: string): string {
