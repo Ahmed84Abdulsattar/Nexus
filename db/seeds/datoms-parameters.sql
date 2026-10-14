@@ -13,11 +13,11 @@
 --   * data_type is NOT set: the list gives no types (Q22). The column default applies until the live
 --     poll sees a value.
 --
--- source_type_name is the DATOMS asset category as the list names it. The sheet's DG tab is named
--- "DG Set (18)"; the "(18)" is very likely the number of DG sets connected (docs/07 section 3.2), not
--- part of the category, so the category is "DG Set". Open question Q35: S2-02 records the real category
--- strings from GET /assets. If they differ, correct the strings in THIS FILE ONLY; until then unmatched
--- rows mean raw keys are shown, never wrong names.
+-- source_type_name is the DATOMS asset category exactly as GET /assets returns it in category_name
+-- (confirmed 2026-10-12, Q35): "DG Set", "Fuel Tank", "AC Sub-Meter", "Solar Inverter". The sheet's DG
+-- tab is named "DG Set (18)"; the "(18)" is the DATOMS category_id of DG Set, not a count (there are
+-- 8 DG Set assets) and not part of the name. If DATOMS ever renames a category, correct the strings in
+-- THIS FILE ONLY; unmatched rows mean raw keys are shown, never wrong names.
 --
 -- Expected rows: DG Set 103, Fuel Tank 4, AC Sub-Meter 34, Solar Inverter 23 (total 164).
 -- =====================================================================
