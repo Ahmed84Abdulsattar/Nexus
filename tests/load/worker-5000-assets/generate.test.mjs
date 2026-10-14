@@ -1,4 +1,4 @@
-// S5-04 QA · Checks for the fleet generator. Run: node --test tests/load/worker-5000-assets/
+// S5-04 QA · Checks for the fleet generator. Run: node --test "tests/load/worker-5000-assets/*.test.mjs"
 // Uses tiny inline fixtures (same shape as the recorded ones), so it needs no DATOMS data.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -133,4 +133,15 @@ test('verify reports wrong counts and duplicate ids', () => {
   const r = generate({ ...base, sites: 10, assets: 100 });
   assert.ok(verify(r, { sites: 10, assets: 101 }).length > 0);
   assert.ok(verify(r, { sites: 11, assets: 100 }).length > 0);
+});
+
+test('coordinates are synthetic, inside the UAE box, and never the recorded value', () => {
+  const r = generate({ ...base, sites: 10, assets: 300 });
+  const rows = r.bulkPolls[0].flatMap((p) => p.data);
+  const lats = rows.map((x) => x.data.parameters.lat).filter((v) => v !== undefined && v !== null);
+  assert.ok(lats.length > 0);
+  for (const v of lats) {
+    assert.notEqual(v, 25.0774);
+    assert.ok(v >= 22.6 && v <= 26.1);
+  }
 });

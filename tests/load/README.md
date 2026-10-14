@@ -38,7 +38,7 @@ Environment (nothing is hard-coded; no secret goes in the repo or in shell histo
 Smoke run (what was recorded below):
 
 ```
-K6_PEAK_VUS=50 K6_RAMP=10s K6_HOLD=30s K6_THINK_MIN=0.5 K6_THINK_MAX=1 k6 run tests/load/api-1000-users.js
+K6_PEAK_VUS=50 K6_RAMP=10s K6_HOLD=30s K6_RAMPDOWN=5s K6_THINK_MIN=0.5 K6_THINK_MAX=1 k6 run tests/load/api-1000-users.js
 ```
 
 ### What it does
@@ -62,6 +62,8 @@ The run fails if a threshold is crossed. Each request is tagged with a `kind`:
 
 Also `http_req_failed` under 1% and checks over 99%.
 
+A threshold on a kind with no requests would pass silently, so for every enabled kind the script also requires `http_reqs{kind:X}` count above 0. If a call is skipped because its project id, asset id, `K6_HISTORY_PARAMETER` or `K6_ENERGY_METRIC` is missing, `setup()` prints a `WARNING` line and, if that was the whole kind, the run fails.
+
 ### Proof of independence (docs/12)
 
 During the full run, the worker's DATOMS calls per minute must not change. Read the budget use in `GET /admin/integrations/health` (or the `sync_run` table) before and during the run, and record both.
@@ -73,11 +75,13 @@ node tests/load/worker-5000-assets/generate.mjs --sites 100 --assets 5000 --poll
 node tests/load/worker-5000-assets/generate.mjs --sites 500 --assets 20000 --verify
 ```
 
+**Generator tests** (no fixtures or network needed): `node --test "tests/load/worker-5000-assets/*.test.mjs"` (the quoted glob form works on Node 22 and 24; passing the bare directory fails on Node 24)
+
 Options: `--fixtures <dir>` (default `packages/datoms-client/fixtures`, which arrives on main with S2-02; the script needs `assets-list-page1.json` and `bulk-latest-id-mode.json`), `--out <dir>` (default `tests/load/worker-5000-assets/out`, git-ignored), `--seed`, `--offline-share` (default 0.05, assets with a packet 7 days old), `--polls` (number of 60 s polls to generate), `--now`.
 
 Output: `sites.json`, `categories.json`, `assets-list/page-NNN.json` (1,000 rows a page), `bulk-latest/poll-NNN-page-NNN.json` (500 rows a page), and `k6-ids.json`.
 
-Only shapes are taken from the fixtures (category ids and names, parameter keys, numeric ranges, jittered by 10%). Ids and names are synthetic (`site-001`, `asset-00001`); serials, coordinates and real asset names are not copied.
+Only shapes are taken from the fixtures (category ids and names, parameter keys, numeric ranges, jittered by 10%). Ids and names are synthetic (`site-001`, `asset-00001`); serials and real asset names are not copied. Coordinate parameters (`lat`, `long`) are replaced by a fixed synthetic location per site inside the UAE box (or stay null where DATOMS sent null); nothing is derived from the recorded coordinate.
 
 `k6-ids.json` holds the synthetic site ids. They only work as project ids if the database was seeded with those ids; otherwise leave `K6_IDS_FILE` unset and let the script read ids from the API.
 

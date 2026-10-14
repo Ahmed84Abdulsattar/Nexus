@@ -77,10 +77,29 @@ function pickWeighted(templates, rng) {
   return templates[templates.length - 1];
 }
 
-/** Jitters numeric parameters by +/-10% (nulls stay null, as DATOMS sends them). */
-function jitter(params, rng) {
+const LAT_KEY = /^(lat|latitude)$/i;
+const LONG_KEY = /^(long|lng|lon|longitude)$/i;
+
+/** A fixed synthetic location per site, inside the UAE box (lat 22.6-26.1, long 51.6-56.4). */
+export function siteLocation(siteIndex) {
+  const step = siteIndex % 100;
+  return {
+    lat: Number((24 + step * 0.02).toFixed(4)),
+    long: Number((54 + step * 0.02).toFixed(4)),
+  };
+}
+
+/**
+ * Jitters numeric parameters by +/-10% (nulls stay null, as DATOMS sends them).
+ * Coordinate parameters are never derived from the recorded value: they get the site's fixed synthetic location.
+ */
+function jitter(params, rng, loc) {
   const out = {};
   for (const [k, v] of Object.entries(params)) {
+    if (LAT_KEY.test(k) || LONG_KEY.test(k)) {
+      out[k] = v === null ? null : LAT_KEY.test(k) ? loc.lat : loc.long;
+      continue;
+    }
     out[k] = typeof v === 'number' && v !== 0 ? Number((v * (0.9 + rng() * 0.2)).toFixed(4)) : v;
   }
   return out;
@@ -108,6 +127,7 @@ export function generate({ sites, assets, assetList, bulk, seed, offlineShare, p
       id,
       tpl,
       siteId: site.id,
+      loc: siteLocation(i % sites),
       offline: rng() < offlineShare,
       listRow: {
         id,
@@ -148,7 +168,7 @@ export function generate({ sites, assets, assetList, bulk, seed, offlineShare, p
       return {
         asset_id: f.id,
         success: true,
-        data: { time, parameters: jitter(f.tpl.params, rng) },
+        data: { time, parameters: jitter(f.tpl.params, rng, f.loc) },
       };
     });
     const pages = [];

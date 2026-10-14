@@ -9,9 +9,13 @@
 //   K6_IDS_FILE       JSON { "projectIds": [...], "assetIds": [...] } (used when the list endpoints are disabled)
 //   K6_ENABLE         comma list of endpoint names to enable on top of the defaults, or "all"
 //   K6_PEAK_VUS       peak virtual users (default 1000)
-//   K6_RAMP / K6_HOLD ramp-up and hold durations (default 5m / 10m)
+//   K6_RAMP / K6_HOLD / K6_RAMPDOWN  ramp-up, hold and ramp-down durations (default 5m / 10m / 1m)
+//   K6_SETUP_PROJECTS how many projects setup() reads assets from (default 10)
 //   K6_THINK_MIN / K6_THINK_MAX  think time seconds between steps (default 3 / 8)
 //   K6_ENERGY_METRIC  metric key for the energy trend call (only used when that endpoint is enabled)
+//   K6_HISTORY_PARAMETER  parameter key for the asset history call (only used when that endpoint is enabled)
+// A call whose ids or keys are missing is skipped, setup() warns about it, and the per-kind
+// `count>0` threshold makes the run fail if a whole kind of request was never sent.
 import http from 'k6/http';
 import { check, group, sleep } from 'k6';
 import { SharedArray } from 'k6/data';
@@ -22,9 +26,13 @@ const PEAK_VUS = Number(__ENV.K6_PEAK_VUS || 1000);
 const THINK_MIN = Number(__ENV.K6_THINK_MIN || 3);
 const THINK_MAX = Number(__ENV.K6_THINK_MAX || 8);
 const ENERGY_METRIC = __ENV.K6_ENERGY_METRIC || '';
+const HISTORY_PARAMETER = __ENV.K6_HISTORY_PARAMETER || '';
+const SETUP_PROJECTS = Number(__ENV.K6_SETUP_PROJECTS || 10);
 
 // Targets (kind -> p95 in ms). Sources:
-//   latest: docs/02 N-04, API p95 < 300 ms for latest-value screens (also used for search, docs/12 trigger table)
+//   latest: docs/02 N-04, API p95 < 300 ms for latest-value screens
+//   search: PENDING CONFIRMATION. No doc backs "search < 300 ms"; the value is borrowed from the
+//           latest-value target. The user decides (see tests/load/README.md).
 //   page:   backlog S8-01, "pages load in under 2 seconds" at target load
 //   chart:  docs/02 N-04 and backlog S4 acceptance, chart queries under 1 s
 const P95_MS = { latest: 300, search: 300, page: 2000, chart: 1000 };
@@ -87,6 +95,23 @@ const fileIds = new SharedArray('ids', () => {
   return [JSON.parse(open(__ENV.K6_IDS_FILE))];
 });
 
+// A threshold on an empty sub-metric passes. For every enabled kind also require at least one request.
+const thresholds = {
+  http_req_failed: ['rate<0.01'],
+  checks: ['rate>0.99'],
+  'http_req_duration{kind:latest}': [`p(95)<${P95_MS.latest}`],
+  'http_req_duration{kind:search}': [`p(95)<${P95_MS.search}`],
+  'http_req_duration{kind:page}': [`p(95)<${P95_MS.page}`],
+  'http_req_duration{kind:chart}': [`p(95)<${P95_MS.chart}`],
+};
+for (const kind of new Set(
+  Object.keys(ENDPOINTS)
+    .filter(isEnabled)
+    .map((n) => ENDPOINTS[n].kind),
+)) {
+  thresholds[`http_reqs{kind:${kind}}`] = ['count>0'];
+}
+
 export const options = {
   scenarios: {
     journey: {
@@ -95,19 +120,12 @@ export const options = {
       stages: [
         { duration: __ENV.K6_RAMP || '5m', target: PEAK_VUS },
         { duration: __ENV.K6_HOLD || '10m', target: PEAK_VUS },
-        { duration: '1m', target: 0 },
+        { duration: __ENV.K6_RAMPDOWN || '1m', target: 0 },
       ],
       gracefulRampDown: '30s',
     },
   },
-  thresholds: {
-    http_req_failed: ['rate<0.01'],
-    checks: ['rate>0.99'],
-    'http_req_duration{kind:latest}': [`p(95)<${P95_MS.latest}`],
-    'http_req_duration{kind:search}': [`p(95)<${P95_MS.search}`],
-    'http_req_duration{kind:page}': [`p(95)<${P95_MS.page}`],
-    'http_req_duration{kind:chart}': [`p(95)<${P95_MS.chart}`],
-  },
+  thresholds,
   summaryTrendStats: ['avg', 'med', 'p(90)', 'p(95)', 'p(99)', 'max'],
 };
 
@@ -121,29 +139,54 @@ function get(path, tags) {
   return http.get(`${BASE_URL}${path}`, { headers, tags });
 }
 
-// Runs once. When the project list endpoint is enabled it supplies the ids; otherwise the ids file does.
+function listItems(res) {
+  if (res.status !== 200) return [];
+  const body = res.json();
+  return Array.isArray(body) ? body : body.items || body.data || [];
+}
+
+// Runs once. Ids come from the ids file, or from the API when the list endpoints are enabled.
+// assetsByProject keeps each asset with the project it belongs to, so a journey never mixes them.
+// The ids file may be { projectIds, assetIds } (flat) or { projectIds, assetsByProject: { id: [ids] } }.
 export function setup() {
+  const file = fileIds.length ? fileIds[0] : {};
   const ids = {
-    projectIds: fileIds.length ? fileIds[0].projectIds || [] : [],
-    assetIds: fileIds.length ? fileIds[0].assetIds || [] : [],
+    projectIds: file.projectIds || [],
+    assetIds: file.assetIds || [],
+    assetsByProject: file.assetsByProject || {},
   };
   if (isEnabled('projects')) {
     const res = get(ENDPOINTS.projects.path, { kind: 'setup', name: 'setup projects' });
-    if (res.status === 200) {
-      const body = res.json();
-      const items = Array.isArray(body) ? body : body.items || body.data || [];
-      ids.projectIds = items.map((p) => p.id).filter(Boolean);
+    ids.projectIds = listItems(res)
+      .map((p) => p.id)
+      .filter(Boolean);
+  }
+  if (isEnabled('assets') && ids.projectIds.length && !Object.keys(ids.assetsByProject).length) {
+    for (const projectId of ids.projectIds.slice(0, SETUP_PROJECTS)) {
+      const res = get(ENDPOINTS.assets.path.replace('{projectId}', projectId), {
+        kind: 'setup',
+        name: 'setup assets',
+      });
+      const found = listItems(res)
+        .map((a) => a.id)
+        .filter(Boolean);
+      if (found.length) ids.assetsByProject[projectId] = found;
     }
   }
-  if (isEnabled('assets') && ids.projectIds.length && !ids.assetIds.length) {
-    const res = get(ENDPOINTS.assets.path.replace('{projectId}', ids.projectIds[0]), {
-      kind: 'setup',
-      name: 'setup assets',
-    });
-    if (res.status === 200) {
-      const body = res.json();
-      const items = Array.isArray(body) ? body : body.items || body.data || [];
-      ids.assetIds = items.map((a) => a.id).filter(Boolean);
+  const haveAssets = ids.assetIds.length > 0 || Object.keys(ids.assetsByProject).length > 0;
+  const missing = {
+    projectId: ids.projectIds.length === 0,
+    assetId: !haveAssets,
+    parameter: HISTORY_PARAMETER === '',
+    metric: ENERGY_METRIC === '',
+  };
+  for (const name of Object.keys(ENDPOINTS).filter(isEnabled)) {
+    const path = ENDPOINTS[name].path;
+    const gaps = Object.keys(missing).filter((k) => missing[k] && path.includes(`{${k}}`));
+    if (gaps.length) {
+      console.warn(
+        `WARNING: endpoint "${name}" is enabled but has no ${gaps.join(', ')}; its calls will be skipped.`,
+      );
     }
   }
   return ids;
@@ -153,18 +196,19 @@ function resolve(path, ctx) {
   return path
     .replace('{projectId}', ctx.projectId || '')
     .replace('{assetId}', ctx.assetId || '')
-    .replace('{parameter}', ctx.parameter || '')
-    .replace('{metric}', ENERGY_METRIC)
+    .replace('{parameter}', encodeURIComponent(HISTORY_PARAMETER))
+    .replace('{metric}', encodeURIComponent(ENERGY_METRIC))
     .replace('{from30d}', encodeURIComponent(ctx.from30d))
     .replace('{to}', encodeURIComponent(ctx.to));
 }
 
 export default function (ids) {
   const now = new Date();
+  const projectId = pick(ids.projectIds);
+  // An asset of the chosen project when the project is known; the flat list otherwise.
   const ctx = {
-    projectId: pick(ids.projectIds),
-    assetId: pick(ids.assetIds),
-    parameter: __ENV.K6_HISTORY_PARAMETER || '',
+    projectId,
+    assetId: pick((projectId && ids.assetsByProject[projectId]) || ids.assetIds),
     to: now.toISOString(),
     from30d: new Date(now.getTime() - 30 * 86400000).toISOString(),
   };
@@ -174,7 +218,14 @@ export default function (ids) {
       if (!isEnabled(name)) return false;
       const needsProject = ENDPOINTS[name].path.includes('{projectId}');
       const needsAsset = ENDPOINTS[name].path.includes('{assetId}');
-      return !((needsProject && !ctx.projectId) || (needsAsset && !ctx.assetId));
+      const needsParameter = ENDPOINTS[name].path.includes('{parameter}');
+      const needsMetric = ENDPOINTS[name].path.includes('{metric}');
+      return !(
+        (needsProject && !ctx.projectId) ||
+        (needsAsset && !ctx.assetId) ||
+        (needsParameter && !HISTORY_PARAMETER) ||
+        (needsMetric && !ENERGY_METRIC)
+      );
     });
     if (calls.length) {
       group(step.name, () => {
