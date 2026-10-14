@@ -57,6 +57,9 @@ catalog:
   '@axe-core/playwright': ^4.13.0
   '@playwright/test': ^1.64.0
   axe-core: ^4.14.0
+  '@arcgis/core': 5.1.27
+  '@tanstack/react-query': ^5.104.2
+  msw: ^3.0.3
 
 # Dependencies allowed to run install scripts (everything else is blocked).
 allowBuilds:

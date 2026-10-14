@@ -9,8 +9,18 @@ applyTheme(initialTheme(), false);
 const root = document.getElementById('root');
 if (!root) throw new Error('Missing #root element');
 
-createRoot(root).render(
-  <StrictMode>
-    <App />
-  </StrictMode>,
-);
+async function start(rootElement: HTMLElement) {
+  // Dev only: MSW answers /v1/config and /v1/projects until the API serves them (S1-02, S1-04).
+  // `import.meta.env.DEV` is false in a build, so this branch, MSW and the sample data are dropped.
+  if (import.meta.env.DEV) {
+    const { startMockWorker } = await import('./test/browser');
+    await startMockWorker();
+  }
+  createRoot(rootElement).render(
+    <StrictMode>
+      <App />
+    </StrictMode>,
+  );
+}
+
+void start(root);

@@ -1,6 +1,7 @@
 import '@testing-library/jest-dom/vitest';
 import { cleanup, configure } from '@testing-library/react';
-import { afterEach } from 'vitest';
+import { afterAll, afterEach, beforeAll } from 'vitest';
+import { server } from '../src/test/server';
 
 // Lazy route chunks are transformed on first use, which can take longer than the 1 s default.
 configure({ asyncUtilTimeout: 5000 });
@@ -14,4 +15,10 @@ globalThis.Request = class extends NodeRequest {
   }
 };
 
-afterEach(cleanup);
+// MSW answers /v1/config and /v1/projects (src/test/handlers.ts). Other requests are not touched.
+beforeAll(() => server.listen({ onUnhandledFrame: 'bypass' }));
+afterEach(() => {
+  cleanup();
+  server.resetHandlers();
+});
+afterAll(() => server.close());

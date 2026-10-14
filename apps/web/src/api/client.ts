@@ -53,7 +53,7 @@ export function shouldSendToken(requestUrl: string, apiOrigin: string): boolean 
   return url.origin === apiOrigin && !/^\/health(\/|$)/.test(url.pathname);
 }
 
-function authMiddleware(apiOrigin: string): Middleware {
+export function authMiddleware(apiOrigin: string): Middleware {
   return {
     async onRequest({ request }) {
       if (!shouldSendToken(request.url, apiOrigin)) return request;
