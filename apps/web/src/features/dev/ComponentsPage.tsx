@@ -85,7 +85,7 @@ export function ComponentsPage() {
 
       <Card aria-labelledby="tb">
         <CardTitle id="tb">Table</CardTitle>
-        <Table>
+        <Table label="Demo equipment">
           <caption className="sr-only">Demo equipment</caption>
           <THead>
             <Tr>

@@ -1,5 +1,5 @@
 import * as Dialog from '@radix-ui/react-dialog';
-import { type ReactNode } from 'react';
+import { type ReactNode, useLayoutEffect, useRef } from 'react';
 
 export type SidePanelProps = {
   open: boolean;
@@ -11,11 +11,25 @@ export type SidePanelProps = {
 
 /** Right-hand panel from `md` up, bottom sheet on phones (docs/11). Focus is trapped; Esc closes. */
 export function SidePanel({ open, onOpenChange, title, description, children }: SidePanelProps) {
+  // The panel is controlled and has no Trigger, so Radix cannot know the opener. Remember the
+  // focused element when the panel opens (layout effects run before Radix moves focus inside).
+  const opener = useRef<HTMLElement | null>(null);
+  useLayoutEffect(() => {
+    if (open) opener.current = document.activeElement as HTMLElement | null;
+  }, [open]);
+
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 bg-fg/40" />
         <Dialog.Content
+          onCloseAutoFocus={(event) => {
+            const el = opener.current;
+            if (el?.isConnected) {
+              event.preventDefault();
+              el.focus();
+            }
+          }}
           className={[
             'fixed z-50 overflow-y-auto border-border bg-surface-raised p-4 text-fg',
             'inset-x-0 bottom-0 max-h-[85vh] rounded-t-lg border-t',
