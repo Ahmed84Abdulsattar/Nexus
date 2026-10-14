@@ -1,6 +1,8 @@
 # 10 · API design (REST, `/v1`)
 
 - **Base:** `https://<host>/v1`. JSON, camelCase. Only `/health/*`, `/docs` and `/openapi.json` are outside `/v1` (`configureApp()` in `apps/api/src/common/http/configure-app.ts` sets the prefix; main.ts, the OpenAPI generator and the tests all use it, so `openapi.json` paths carry `/v1`). OpenAPI 3.1: Swagger UI at `/docs` and the spec at `/openapi.json`, both mounted only when `APP_ENV` is `local` or `dev` (an allow-list). The spec is also committed as `apps/api/openapi.json` (written by `pnpm build`), and the web client types are generated from it (see "OpenAPI and the typed client" below).
+- **Browser access:** CORS answers only for the origins in `CORS_ALLOWED_ORIGINS`; every response carries helmet security headers (`08` §6). `Retry-After`, `X-Correlation-Id` and `X-Data-Lag-Seconds` are exposed to the browser.
+- **Browser access:** CORS answers only for the origins in `CORS_ALLOWED_ORIGINS`, and every response carries helmet security headers (`08` §6). `Retry-After`, `X-Correlation-Id` and `X-Data-Lag-Seconds` are readable by the browser.
 - **Auth:** `Authorization: Bearer <Entra access token>` on everything except `/health/*`.
 - **Web client:** `VITE_API_BASE_URL` ends in `/v1`; `/health/*` is called on the API origin.
 - Every endpoint below lists its **permission**. *Scoped* means the project scope filter applies.
@@ -16,7 +18,8 @@
   - 404: not found or out of project scope.
   - 422: validation (a body, query or param that fails its zod DTO). The field failures are in `errors` (at most 20; `detail` says how many were left out).
   - `detail` is fixed text for 404 (`Not found.`, so a missing id and an out-of-scope id look the same), 5xx (`Unexpected error.`) and other statuses; only 401/403/409/429 carry a specific message. The cause of a 5xx is in the server log, found by `correlationId`.
-  - 429: rate-limited.
+  - 413: the request body is larger than  (default 1 MiB).
+  - 429: rate-limited (per user, or per client address). Always carries  (seconds). The limits are in `08` §6; the counters are per API instance.
 - **Freshness:** every live value carries `ts` (the source time), `receivedAt` and `stale: boolean`. `stale` uses the DATOMS rule when known; otherwise it uses the interim `display.stale_after_seconds`, but never less than twice the asset type's poll interval (Q8, ADR 0006). Responses that hold live data include `X-Data-Lag-Seconds`. A field the DATOMS bulk response doesn't carry is returned as absent (`null`), and the UI shows "no data yet" (ADR 0010).
 - **Equipment only:** every equipment list, count and marker endpoint returns `kind = 'physical'` assets only (ADR 0009).
 - **Versioning:** a breaking change goes to `/v2`. Additive fields are allowed in v1. The OpenAPI diff is checked in CI.

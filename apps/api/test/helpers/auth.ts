@@ -1,6 +1,6 @@
 import 'reflect-metadata';
 import { Body, Controller, Get, Module, Param, Post, Query, SetMetadata } from '@nestjs/common';
-import { FastifyAdapter, type NestFastifyApplication } from '@nestjs/platform-fastify';
+import { type NestFastifyApplication } from '@nestjs/platform-fastify';
 import { Test } from '@nestjs/testing';
 import { cursorPageQuerySchema } from '@nexus/shared';
 import { createZodDto } from 'nestjs-zod';
@@ -26,6 +26,7 @@ import { JWT_KEY_RESOLVER } from '../../src/common/auth/entra-jwt.guard.js';
 import { AccessChangeListener } from '../../src/common/auth/access-change-listener.js';
 import { InMemoryAccessDirectory } from '../../src/common/auth/in-memory-access-directory.js';
 import { mountDocs } from '../../src/openapi/setup.js';
+import { applySecurity, createHttpAdapter } from '../../src/common/http/security.js';
 import { configureApp } from '../../src/common/http/configure-app.js';
 import { APP_CONFIG, type AppConfig, loadConfig } from '../../src/config/env.js';
 
@@ -251,8 +252,9 @@ export async function createTestApp(
         }),
     )
     .compile();
-  const app = moduleRef.createNestApplication<NestFastifyApplication>(new FastifyAdapter());
+  const app = moduleRef.createNestApplication<NestFastifyApplication>(createHttpAdapter(config));
   configureApp(app);
+  await applySecurity(app, config);
   if (options.docs) mountDocs(app, config.appEnv);
   await app.init();
   await app.getHttpAdapter().getInstance().ready();
