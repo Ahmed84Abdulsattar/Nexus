@@ -26,6 +26,19 @@ export interface ErrorView {
 
 const MAX_TEXT = 300;
 
+/**
+ * True for a failed fetch (offline, DNS, blocked, CORS). Browsers reject fetch() with a TypeError
+ * and these messages; any other TypeError (for example thrown while rendering) is a bug, not the network.
+ */
+export function isNetworkError(error: unknown): boolean {
+  return (
+    error instanceof TypeError &&
+    /failed to fetch|fetch failed|networkerror|load failed|network request failed/i.test(
+      error.message,
+    )
+  );
+}
+
 /** Keeps API-provided text short and free of control characters. */
 function clean(value: unknown): string | undefined {
   if (typeof value !== 'string') return undefined;
@@ -101,8 +114,7 @@ export function describeError(error: unknown): ErrorView {
     if (error.retryAfterSeconds !== undefined) view.retryAfterSeconds = error.retryAfterSeconds;
     return view;
   }
-  if (error instanceof TypeError) {
-    // fetch() rejects with TypeError when the network is down or the request was blocked.
+  if (isNetworkError(error)) {
     return {
       kind: 'network',
       title: 'Cannot reach the service',
@@ -116,7 +128,7 @@ export function describeError(error: unknown): ErrorView {
 export function shouldRetry(failureCount: number, error: unknown): boolean {
   if (failureCount >= 2) return false;
   if (error instanceof ApiError) return error.status >= 500;
-  return error instanceof TypeError;
+  return isNetworkError(error);
 }
 
 /** Exponential back-off: 1 s, 2 s, 4 s … capped at 10 s. */

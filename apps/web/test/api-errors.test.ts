@@ -64,7 +64,7 @@ it('truncates long API text and strips control characters', () => {
 
 it('retries 5xx and network errors but never 4xx', () => {
   expect(shouldRetry(0, new ApiError(503, undefined))).toBe(true);
-  expect(shouldRetry(0, new TypeError('x'))).toBe(true);
+  expect(shouldRetry(0, new TypeError('Failed to fetch'))).toBe(true);
   expect(shouldRetry(2, new ApiError(503, undefined))).toBe(false);
   for (const status of [400, 401, 403, 404, 422, 429]) {
     expect(shouldRetry(0, new ApiError(status, undefined))).toBe(false);
@@ -75,4 +75,28 @@ it('retries 5xx and network errors but never 4xx', () => {
 it('backs off exponentially with a cap', () => {
   expect([0, 1, 2].map(retryDelay)).toEqual([1000, 2000, 4000]);
   expect(retryDelay(10)).toBe(10_000);
+});
+
+it('does not call a render-time TypeError a network error', () => {
+  const error = new TypeError("Cannot read properties of undefined (reading 'x')");
+  expect(describeError(error).kind).toBe('unknown');
+  expect(shouldRetry(0, error)).toBe(false);
+});
+
+it('clamps a past HTTP-date Retry-After to 0 and ignores unparseable values', async () => {
+  const respond = (value: string) =>
+    createApiClient({
+      baseUrl: 'http://api.test/v1',
+      fetch: (() =>
+        Promise.resolve(
+          new Response('{}', {
+            status: 429,
+            headers: { 'content-type': 'application/json', 'Retry-After': value },
+          }),
+        )) as typeof fetch,
+    })
+      .GET('/health/live')
+      .catch((e: unknown) => (e as ApiError).retryAfterSeconds);
+  expect(await respond(new Date(Date.now() - 60_000).toUTCString())).toBe(0);
+  expect(await respond('garbage')).toBeUndefined();
 });

@@ -44,7 +44,7 @@ it('QA: retry policy has no storm: 4xx/429 never, 5xx/network at most twice, 1s 
     expect(shouldRetry(0, new ApiError(s, undefined))).toBe(false);
   }
   expect(shouldRetry(0, new ApiError(503, undefined))).toBe(true);
-  expect(shouldRetry(1, new TypeError('x'))).toBe(true);
+  expect(shouldRetry(1, new TypeError('Failed to fetch'))).toBe(true);
   expect(shouldRetry(2, new ApiError(503, undefined))).toBe(false);
   expect(shouldRetry(0, new Error('render bug'))).toBe(false);
   expect([retryDelay(0), retryDelay(1)]).toEqual([1000, 2000]);
@@ -83,23 +83,23 @@ it('QA: Retry-After in seconds is parsed', async () => {
   expect(await retryAfterFor('7')).toBe(7);
 });
 
-// BUG (S1-07-QA-1): the HTTP-date form of Retry-After is ignored. Remove `.fails` once fixed.
-it.fails('QA: Retry-After as an HTTP-date is converted to seconds', async () => {
+// BUG (S1-07-QA-1): the HTTP-date form of Retry-After is ignored.
+it('QA: Retry-After as an HTTP-date is converted to seconds', async () => {
   const date = new Date(Date.now() + 30_000).toUTCString();
   const secs = await retryAfterFor(date);
   expect(secs).toBeGreaterThan(20);
   expect(secs).toBeLessThanOrEqual(30);
 });
 
-// BUG (S1-07-QA-2): NaN renders as the text "NaN" instead of a dash. Remove `.fails` once fixed.
-it.fails('QA: Value treats NaN as missing', () => {
+// BUG (S1-07-QA-2): NaN renders as the text "NaN" instead of a dash.
+it('QA: Value treats NaN as missing', () => {
   const { container } = render(<Value value={Number.NaN} />);
   expect(container.textContent).not.toContain('NaN');
   expect(container.textContent).toContain('—');
 });
 
-// BUG (S1-07-QA-3): whitespace-only string renders blank, not a dash. Remove `.fails` once fixed.
-it.fails('QA: Value treats a whitespace-only string as missing', () => {
+// BUG (S1-07-QA-3): whitespace-only string renders blank, not a dash.
+it('QA: Value treats a whitespace-only string as missing', () => {
   const { container } = render(<Value value="   " />);
   expect(container.textContent).toContain('—');
 });

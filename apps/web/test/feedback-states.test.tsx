@@ -121,7 +121,7 @@ it('Value renders "—" and never 0 for missing data, and keeps a real 0', () =>
   );
   expect(container).toHaveTextContent('—');
   expect(container).toHaveTextContent('No data yet');
-  expect(container).toHaveTextContent('updated 12:30'); // Asia/Dubai is UTC+4
+  expect(container).toHaveTextContent('updated 01 Jan, 12:30'); // Asia/Dubai is UTC+4; not today, so the date shows
   expect(container).not.toHaveTextContent('0 kW');
   rerender(<Value value={0} unit="kW" />);
   expect(container).toHaveTextContent('0 kW');
@@ -136,6 +136,11 @@ it('ComingSoon and EmptyState render', () => {
   );
   expect(screen.getByText('Coming later.')).toBeInTheDocument();
   expect(screen.getByText('No data yet')).toBeInTheDocument();
+});
+
+it('Value shows the date when the update is not today (Asia/Dubai)', () => {
+  const { container } = render(<Value value={5} updatedAt="2020-03-04T08:30:00Z" />);
+  expect(container).toHaveTextContent('updated 04 Mar, 12:30');
 });
 
 it('owned pages use the states: project, admin and not-found', async () => {

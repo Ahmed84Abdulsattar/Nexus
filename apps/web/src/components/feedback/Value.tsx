@@ -1,3 +1,13 @@
+const dubai = 'Asia/Dubai';
+const dayKey = new Intl.DateTimeFormat('en-CA', { timeZone: dubai });
+const dateTime = new Intl.DateTimeFormat('en-GB', {
+  day: '2-digit',
+  month: 'short',
+  hour: '2-digit',
+  minute: '2-digit',
+  hour12: false,
+  timeZone: dubai,
+});
 const time = new Intl.DateTimeFormat('en-GB', {
   hour: '2-digit',
   minute: '2-digit',
@@ -20,7 +30,12 @@ export function Value({
   updatedAt?: string | null;
   stale?: boolean;
 }) {
-  const missing = value === null || value === undefined || value === '';
+  // Missing: null, undefined, blank text or a non-finite number. A real 0 is not missing.
+  const missing =
+    value === null ||
+    value === undefined ||
+    (typeof value === 'string' && value.trim() === '') ||
+    (typeof value === 'number' && !Number.isFinite(value));
   const when = updatedAt ? new Date(updatedAt) : undefined;
   const validTime = when !== undefined && !Number.isNaN(when.getTime());
   return (
@@ -39,7 +54,10 @@ export function Value({
       {stale ? <span className="text-xs text-fg-muted">Stale</span> : null}
       {validTime ? (
         <time dateTime={when.toISOString()} className="text-xs text-fg-muted">
-          updated {time.format(when)}
+          updated{' '}
+          {dayKey.format(when) === dayKey.format(new Date())
+            ? time.format(when)
+            : dateTime.format(when)}
         </time>
       ) : null}
     </span>

@@ -6,6 +6,9 @@ import { EmptyState } from '../../components/feedback';
  * Placeholder until the project endpoints exist. Its panels show the "no data yet" state rather
  * than any number. When the project query lands it renders through `QueryState`, so a missing or
  * out-of-scope project (404) shows the not-found message and a failure shows a retry.
+ *
+ * TODO(S2-01): the 404 view shows the API's problem title/detail, so the API must send an identical
+ * problem body for an out-of-scope project and a missing one (hard rule 6), or it leaks existence.
  */
 export function ProjectPage() {
   const { projectId } = useParams();

@@ -55,9 +55,14 @@ export function shouldSendToken(requestUrl: string, apiOrigin: string): boolean 
   return url.origin === apiOrigin && !/^\/health(\/|$)/.test(url.pathname);
 }
 
+/** `Retry-After` is delay-seconds or an HTTP date (RFC 9110). Returns whole seconds, or undefined. */
 function parseRetryAfter(value: string | null): number | undefined {
-  if (value === null || !/^\d+$/.test(value.trim())) return undefined;
-  return Number(value.trim());
+  const text = value?.trim();
+  if (!text) return undefined;
+  if (/^\d+$/.test(text)) return Number(text);
+  const at = Date.parse(text);
+  if (Number.isNaN(at)) return undefined;
+  return Math.max(0, Math.ceil((at - Date.now()) / 1000));
 }
 
 function authMiddleware(apiOrigin: string): Middleware {
