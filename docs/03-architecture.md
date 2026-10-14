@@ -152,10 +152,11 @@ packages/connectors/
 ```ts
 interface SourceConnector {
   readonly sourceSystem: string;                  // 'datoms'
-  listSites(): AsyncIterable<SourceSite>;
-  listAssets(): AsyncIterable<SourceAsset>;
+  // the complete catalogue walk; `complete` is true only when seen == the source's total (safe retire)
+  listAssets(): Promise<{ assets: SourceAsset[]; total?: number; complete: boolean }>;
   // batches; a reading carries values plus status, location, kind and alerts when the source has them
-  pollLatest(scope?: { externalIds?: string[] }): AsyncIterable<SourceReading[]>;
+  readLatest(scope: { mode: 'fleet' } | { mode: 'ids'; externalIds: string[] }): AsyncIterable<SourceReadingBatch>;
+  listSites?(): Promise<SourceSite[]>;                             // only sources with a site list; DATOMS sites come in the bulk rows
   listEvents?(since: Date): AsyncIterable<SourceEvent>;          // other sources only; DATOMS alerts come in pollLatest (ADR 0010)
   fetchHistory?(assetId: string, from: Date, to: Date): AsyncIterable<SourceReading>;  // DATOMS: on hold (ADR 0010)
 }

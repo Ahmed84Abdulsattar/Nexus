@@ -80,7 +80,9 @@ export function bulkIdRequest(ids: readonly string[]): unknown {
 export const CODE_PAGE_RESPONSE_TOO_LARGE = 'PAGE_RESPONSE_TOO_LARGE';
 
 // ---------------------------------------------------------------------------------------------
-// Mapped (Nexus-side) shapes. They match the connector types (SourceAsset, SourceReading).
+// Mapped (Nexus-side) shapes. They are structurally assignable to the connector types
+// (SourceAsset, SourceReading in packages/connectors/core); the DATOMS connector checks this at
+// compile time, so a drift between the two fails the build.
 // ---------------------------------------------------------------------------------------------
 
 export interface Pagination {
@@ -105,6 +107,10 @@ export interface MappedAsset {
   lifecycleStatus: string | undefined;
   /** `asset_info`, unchanged (make, model, kva, capacity, ... and nulls as sent). */
   nameplate: Record<string, unknown> | undefined;
+  // Absent until DATOMS gives the field list (Q21, Q22). Never defaulted. The asset list rows
+  // carry no site, so the asset-to-site link is not mapped (docs/07 section 3.2).
+  siteExternalId?: never;
+  kind?: never;
 }
 
 export function mapAsset(raw: RawAsset): MappedAsset {
