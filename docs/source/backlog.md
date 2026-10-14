@@ -122,6 +122,7 @@
   2. Add a pipeline: on merge to main, build and deploy apps/web.
   3. Check the dev URL works.
   4. The deploy must build with `pnpm --filter @nexus/web build`, so the build-time guards run (no MSW, no sample data, no dev key in `dist/`; security review of S0-09, item L2, 2026-10-14).
+  5. The static host must serve HTTP/2 or later, with a long immutable cache for the hashed files under `assets/` and `assets/arcgis/*` (about 1,000 ArcGIS chunks; QA of S0-09, 2026-10-14).
 - **Output when done:** Web app auto-deploys to dev
 - **Now done by:** You (backend)
 - **Requirement:** Foundation
@@ -318,6 +319,7 @@
   2. Apply the project-scope filter from S1-02.
   3. Return the fields DATOMS provides for each site (name, location, type, status).
   4. Add seed data for 5 sample sites so the frontend can work before DATOMS is connected.
+  5. Do not read any project source column (`source_system`, `external_id`, `source_payload`, `*_seen_at` on `core.project`): ADR 0012 drops them in S3-09. Source ids are not part of the normal project response.
 - **Output when done:** Projects list endpoint the map uses
 - **Now done by:** You (backend)
 - **Requirement:** Sheet: Top level
@@ -351,6 +353,7 @@
   3. Call GET /projects and draw one pin per project.
   4. Colour pins: Active green, Central Store blue, Finished grey, In bid yellow (structure sheet).
   5. Click a pin = zoom to that project.
+  6. Acceptance is split (decision S2 D3): part A (no key, test data, stubbed tiles) is the merge gate. Part B runs when the ArcGIS key arrives (Q23): the real-key spec checks there are no failed `arcgis.com` / `basemaps3d` responses, the marker or cluster count equals the 10 sample projects, and a screenshot comparison passes (QA of S0-09, 2026-10-14).
 - **Output when done:** Top-level portfolio map
 - **Now done by:** Colleague (frontend)
 - **Requirement:** Sheet: Top level
@@ -414,7 +417,7 @@
 - **Depends on:** S2-02
 - **External blocker:** DATOMS sample + field list (Q21, Q22) + read-only key; id stability (Q11)
 - **Estimate (days):** 2
-- **Acceptance check:** New DATOMS site appears in Nexus within 1 hour
+- **Acceptance check:** A new DATOMS asset appears in Nexus within 1 hour of being added to DATOMS, typed from its catalogue category (unmapped categories go to `generic` plus a to-do); assets are retired only by the safe-retire rule. New DATOMS **sites** appear only once DATOMS sends site data (Q21, Q22); until then admins create projects (S3-09). (Reworded 2026-10-14, ADR 0012.)
 
 ### S3-02 · Auto-link new sites and devices on exact match; others to admin to-do list
 - **Sprint:** S3
@@ -426,7 +429,7 @@
 - **Output when done:** New sites appear automatically, no guessing
 - **Now done by:** You (backend)
 - **Requirement:** Innovo: sites added automatically
-- **Depends on:** S3-01
+- **Depends on:** S3-01, S3-09 (ADR 0012 link table). Exact-name matching follows the `linking.name_match` setting (off / suggest / auto, default suggest; ADR 0012).
 - **Estimate (days):** 2
 - **Acceptance check:** No guessed links; unmatched items listed
 
@@ -527,7 +530,7 @@
 - **Output when done:** Admins can build the portfolio until DATOMS sends site data (Q21, Q22, Q43)
 - **Now done by:** You (backend)
 - **Requirement:** R-63
-- **Depends on:** ADR 0012, S2-06, S3-01
+- **Depends on:** ADR 0012 (accepted 2026-10-14), S2-06, S3-01
 - **Estimate (days):** 2
 - **Acceptance check:** An admin creates a project and links an asset to it; a non-admin gets 403; the change is in the audit log
 - **Added:** 2026-10-14 (architect S2 plan, decisions D2 and D10)
