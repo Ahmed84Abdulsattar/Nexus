@@ -150,26 +150,20 @@ describe('keyboard and focus', () => {
     );
   }
 
-  // KNOWN BUG (QA S0-06): SidePanel has no Dialog.Trigger/onCloseAutoFocus, so Radix prevents focus
-  // restore and focus falls to <body> on close. it.fails flips to red when the component is fixed;
-  // then change it.fails back to it.
-  it.fails(
-    'SidePanel: focus moves in and stays trapped; Esc closes and focus returns to the trigger',
-    async () => {
-      const user = userEvent.setup();
-      render(<Harness />);
-      await user.click(screen.getByRole('button', { name: 'Open' }));
-      const dialog = screen.getByRole('dialog', { name: 'Panel' });
+  it('SidePanel: focus moves in and stays trapped; Esc closes and focus returns to the trigger', async () => {
+    const user = userEvent.setup();
+    render(<Harness />);
+    await user.click(screen.getByRole('button', { name: 'Open' }));
+    const dialog = screen.getByRole('dialog', { name: 'Panel' });
+    expect(dialog).toContainElement(document.activeElement as HTMLElement);
+    for (let i = 0; i < 5; i++) {
+      await user.tab();
       expect(dialog).toContainElement(document.activeElement as HTMLElement);
-      for (let i = 0; i < 5; i++) {
-        await user.tab();
-        expect(dialog).toContainElement(document.activeElement as HTMLElement);
-      }
-      await user.keyboard('{Escape}');
-      expect(screen.queryByRole('dialog')).toBeNull();
-      await waitFor(() => expect(screen.getByRole('button', { name: 'Open' })).toHaveFocus());
-    },
-  );
+    }
+    await user.keyboard('{Escape}');
+    expect(screen.queryByRole('dialog')).toBeNull();
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Open' })).toHaveFocus());
+  });
 
   it('SidePanel: the close button has an accessible name and closes the panel', async () => {
     const user = userEvent.setup();

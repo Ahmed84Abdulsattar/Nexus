@@ -49,7 +49,7 @@ describe('Tag', () => {
   });
 
   it('rejects a raw colour instead of a token name', () => {
-    expect(() => render(<Tag label="x" token="#ff0000" />)).toThrow(/not a token name/);
+    expect(() => render(<Tag label="x" token={'red' as never} />)).toThrow(/not a token name/);
   });
 });
 

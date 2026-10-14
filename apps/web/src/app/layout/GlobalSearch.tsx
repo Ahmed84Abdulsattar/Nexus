@@ -18,9 +18,13 @@ const icon = (
  * Placeholder. It does nothing yet, so it is disabled rather than pretending to search.
  * Wide screens get the box; phones get an icon button (S1-06 does the full responsive layout).
  */
-export function GlobalSearch() {
+export function GlobalSearch({ label = 'Global search' }: { label?: string }) {
   return (
-    <div role="search" className="flex min-w-0 flex-1 justify-end md:justify-center">
+    <div
+      role="search"
+      aria-label={label}
+      className="flex min-w-0 flex-1 justify-end md:justify-center"
+    >
       <label className="hidden w-full max-w-md items-center gap-2 rounded-md border border-border bg-surface px-3 text-fg-muted md:flex">
         {icon}
         <span className="sr-only">Search</span>

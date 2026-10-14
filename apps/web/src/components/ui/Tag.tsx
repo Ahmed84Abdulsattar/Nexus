@@ -1,9 +1,8 @@
+import { STATE_STATUS_TOKENS, type StateStatusToken } from '../../styles/tokens';
 import { cn } from './cn';
 
-/** A design-token name without the leading dashes, for example "status-running" or "state-active". */
-export type TokenName = string;
-
-const TOKEN_NAME = /^[a-z][a-z0-9-]*$/;
+/** A state or status token name (docs/11), without the leading dashes. */
+export type TokenName = StateStatusToken;
 
 export type TagProps = {
   /** The text. Always from props or API data; never from a list in this component. */
@@ -17,7 +16,7 @@ export type TagProps = {
 
 /** Pill with a coloured dot and always a text label (never colour alone). */
 export function Tag({ label, token, hollow, className }: TagProps) {
-  if (token !== undefined && !TOKEN_NAME.test(token)) {
+  if (token !== undefined && !STATE_STATUS_TOKENS.includes(token)) {
     throw new Error(`Tag: "${token}" is not a token name`);
   }
   const color = token ? `var(--${token})` : 'var(--border-strong)';

@@ -2,8 +2,17 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { SWATCHES } from '../src/features/dev/swatches';
+import { STATE_STATUS_TOKENS } from '../src/styles/tokens';
 
-const css = readFileSync(resolve(process.cwd(), 'src/styles/tokens.css'), 'utf8');
+const css = readFileSync(resolve(process.cwd(), 'src/styles/tokens.css'), 'utf8').replace(
+  /\/\*[\s\S]*?\*\//g,
+  '',
+);
+
+it('tokens.ts lists exactly the state and status tokens declared in tokens.css', () => {
+  const declared = [...css.matchAll(/--((?:state|status)-[a-z-]+)\s*:/g)].map((m) => m[1]!);
+  expect([...new Set(declared)].sort()).toEqual([...STATE_STATUS_TOKENS].sort());
+});
 
 /** Token values of one block (`:root` = light, `[data-theme='dark']` = dark). */
 function block(selector: string): Record<string, string> {

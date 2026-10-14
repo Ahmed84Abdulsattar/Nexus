@@ -62,7 +62,10 @@ export function ComponentsPage() {
 
       <Card aria-labelledby="hd">
         <CardTitle id="hd">Header (sample user)</CardTitle>
-        <Header session={{ user: { name: 'Sample User' }, signOut: () => undefined }} />
+        <Header
+          session={{ user: { name: 'Sample User' }, signOut: () => undefined }}
+          searchLabel="Global search (sample)"
+        />
       </Card>
 
       <Card aria-labelledby="bt">
@@ -91,7 +94,7 @@ export function ComponentsPage() {
 
       <Card aria-labelledby="tb">
         <CardTitle id="tb">Table</CardTitle>
-        <Table>
+        <Table label="Demo equipment">
           <caption className="sr-only">Demo equipment</caption>
           <THead>
             <Tr>
