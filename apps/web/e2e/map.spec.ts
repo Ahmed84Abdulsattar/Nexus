@@ -19,7 +19,7 @@ test.describe('lazy loading (no key needed)', () => {
     const urls: string[] = [];
     page.on('request', (r) => urls.push(r.url()));
     await page.goto('/admin/users');
-    await expect(page.getByRole('heading', { name: 'Admin' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Admin', exact: true })).toBeVisible();
     await page.waitForLoadState('networkidle');
     expect(urls.filter((u) => /arcgis/i.test(u))).toEqual([]);
   });
