@@ -88,7 +88,13 @@ GRANT UPDATE ON integration.link_todo TO nexus_api;
 GRANT INSERT, UPDATE ON core.project, core.asset, core.asset_type TO nexus_worker;
 GRANT INSERT, UPDATE ON ALL TABLES IN SCHEMA telemetry TO nexus_worker;
 REVOKE INSERT, UPDATE ON telemetry.status_map FROM nexus_worker;       -- display mapping is managed by admins (API)
-GRANT INSERT, UPDATE ON events.event TO nexus_worker;                  -- NOT the read-state tables (events.event_read and its partitions)
+-- events.event: INSERT, and UPDATE only on the columns a later alert update changes. Not id, occurred_at
+-- (the partition key: moving a row into an old partition would defeat the retention floor in
+-- core.drop_partitions_before), source_system, external_id or received_at.
+GRANT INSERT ON events.event TO nexus_worker;
+GRANT UPDATE (project_id, asset_id, building_id, level_id, zone_id, category, severity, title, message,
+              source_state, cleared_at, payload) ON events.event TO nexus_worker;
+-- (no access to the read-state tables events.event_read and its partitions, below)
 GRANT INSERT, UPDATE ON ALL TABLES IN SCHEMA integration TO nexus_worker;
 GRANT DELETE ON integration.sync_run TO nexus_worker;                  -- maintenance prunes old run history
 -- Per-user read state is API-only. The partitions of events.event_read are separate tables: the worker

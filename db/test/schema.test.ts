@@ -45,7 +45,7 @@ describe.skipIf(testDatabaseAdminUrl === undefined)('database (PostgreSQL)', () 
       const fresh = await createTestDatabase();
       try {
         expect((await migrate({ url: fresh.adminUrl, direction: 'up' })).applied).toEqual([]);
-        expect((await migrate({ url: fresh.adminUrl, direction: 'down', count: Infinity })).applied).toEqual([
+        expect((await migrate({ url: fresh.adminUrl, direction: 'down', count: Infinity, confirmDatabase: fresh.name })).applied).toEqual([
           '0001_init',
         ]);
         const c = new pg.Client({ connectionString: fresh.adminUrl });
@@ -199,8 +199,8 @@ describe.skipIf(testDatabaseAdminUrl === undefined)('database (PostgreSQL)', () 
         // Past partitions can be dropped; the call is idempotent.
         const dropped = await worker.query(`SELECT * FROM core.drop_partitions_before('telemetry.rollup_5m', now() - interval '3 years')`);
         expect(dropped.rows).toEqual([]);
-        const old = await worker.query(`SELECT core.create_range_partitions('events.event', 'month', DATE '2020-01-01', 1) AS n`);
-        expect(old.rows[0].n).toBe(1);
+        // The worker cannot create an old partition of a protected table (N1); the owner can, for this test.
+        await admin.query(`CREATE TABLE events.event_p202001 PARTITION OF events.event FOR VALUES FROM ('2020-01-01') TO ('2020-02-01')`);
         const gone = await worker.query(`SELECT * FROM core.drop_partitions_before('events.event', timestamptz '2021-01-01')`);
         expect(gone.rowCount).toBe(1);
       } finally {

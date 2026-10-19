@@ -42,7 +42,7 @@ END $$;
 CREATE OR REPLACE FUNCTION core.create_range_partitions(
   p_parent text, p_step text, p_from date, p_count int
 ) RETURNS int
-LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, pg_temp AS $$
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, pg_temp SET TimeZone = 'UTC' SET DateStyle = 'ISO' AS $$
 DECLARE
   v_schema text := split_part(p_parent, '.', 1);
   v_table  text := split_part(p_parent, '.', 2);
@@ -63,6 +63,12 @@ BEGIN
     RAISE EXCEPTION '% is not a partitioned table that Nexus maintains', p_parent;
   END IF;
   v_start := CASE p_step WHEN 'day' THEN p_from ELSE date_trunc('month', p_from)::date END;
+  -- A protected table gets no partition for a date older than the retention floor: otherwise rows could be
+  -- moved into an old partition (UPDATE of the partition key) and the partition dropped.
+  IF (v_schema = 'audit' OR (v_schema = 'events' AND v_table IN ('event', 'event_read')))
+     AND v_start < (now() - interval '730 days')::date THEN
+    RAISE EXCEPTION '% keeps at least 730 days; no partition older than that can be created', p_parent;
+  END IF;
   FOR i IN 1..p_count LOOP
     v_end  := CASE p_step WHEN 'day' THEN v_start + 1 ELSE (v_start + interval '1 month')::date END;
     v_name := v_table || '_p' || to_char(v_start, CASE p_step WHEN 'day' THEN 'YYYYMMDD' ELSE 'YYYYMM' END);
@@ -83,12 +89,13 @@ END $$;
 -- Guards (the worker is trusted to run maintenance, not to destroy history):
 --   * p_before may not be in the future, so a wrong argument cannot drop the live partitions;
 --   * audit.log, events.event and events.event_read keep at least 730 days, whatever the argument
+--     (create_range_partitions also refuses to create a partition older than that for them);
 --     (the settings retention.audit_days / retention.event_days default to 730; shortening them
 --     needs a migration that changes this floor);
 --   * every dropped partition is written to audit.log, inside this function.
 CREATE OR REPLACE FUNCTION core.drop_partitions_before(p_parent text, p_before timestamptz)
 RETURNS SETOF text
-LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, pg_temp AS $$
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, pg_temp SET TimeZone = 'UTC' SET DateStyle = 'ISO' AS $$
 DECLARE
   v_schema text := split_part(p_parent, '.', 1);
   v_table  text := split_part(p_parent, '.', 2);

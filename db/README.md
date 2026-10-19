@@ -15,7 +15,7 @@ PostgreSQL 16, native partitions and Nexus rollup tables, one extension (`pg_trg
 ## Commands (from the repo root)
 | Command | Does |
 |---|---|
-| `pnpm db:migrate` | Applies pending migrations as the role `nexus_migrator`, then `roles.sql`. `pnpm db:migrate down` reverts one (`down 3`, `down all`), `redo` = down + up. `down` and `redo` drop tables, so outside `APP_ENV=local` they need `--confirm-database=<name>`. |
+| `pnpm db:migrate` | Applies pending migrations as the role `nexus_migrator`, then `roles.sql`. `pnpm db:migrate down` reverts one (`down 3`, `down all`), `redo` = down + up. `down` and `redo` drop tables, so unless `APP_ENV=local` and the database host is local they need `--confirm-database=<name>`. |
 | `pnpm db:seed` | Runs the seeds that belong to `APP_ENV`. Safe to repeat. |
 | `pnpm db:check` | Applies all migrations to one empty database, loads `schema.sql` into another, and fails if `pg_dump --schema-only`, the reference data or `src/types.ts` differ. Needs `pg_dump` (see below). |
 | `pnpm db:seed:scale` | Loads 100 sites / 5,000 assets / 7 days of packets into a **benchmark database** and prints sizes and screen timings (`bench/`). |

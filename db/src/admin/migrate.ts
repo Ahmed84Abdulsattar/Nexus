@@ -1,5 +1,6 @@
 import { runner } from 'node-pg-migrate';
 import pg from 'pg';
+import { assertMayRevert } from './guards.js';
 import { MIGRATIONS_DIR, readSql, ROLES_FILE } from './paths.js';
 
 /** Serialises role bootstrap between processes that share a cluster (parallel test files, two deploys). */
@@ -19,6 +20,10 @@ export interface MigrateOptions {
   direction: MigrateDirection;
   /** How many migrations to run. Default: all pending (up), one (down). Infinity = all. */
   count?: number;
+  /** Needed for a revert outside APP_ENV=local or on a remote host: the exact database name (guards.ts). */
+  confirmDatabase?: string;
+  /** Defaults to process.env.APP_ENV. */
+  appEnv?: string | undefined;
   log?: (message: string) => void;
 }
 
@@ -36,6 +41,13 @@ export interface MigrateResult {
  */
 export async function migrate(options: MigrateOptions): Promise<MigrateResult> {
   const log = options.log ?? ((): void => undefined);
+  if (options.direction === 'down') {
+    assertMayRevert({
+      appEnv: 'appEnv' in options ? options.appEnv : process.env['APP_ENV'],
+      url: options.url,
+      confirmDatabase: options.confirmDatabase,
+    });
+  }
   const client = new pg.Client({ connectionString: options.url, application_name: 'nexus-migrate' });
   await client.connect();
   try {

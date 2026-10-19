@@ -11,7 +11,8 @@ import type { AccessContext } from './access-context.js';
 export interface ProjectScopeOptions {
   /**
    * Also return rows with no project (assets not yet linked, docs/06 decision 8). Only the admin
-   * linking screen (`admin.projects.manage`, R-63) passes this; everything else never sees them.
+   * linking screen passes this, and the caller must hold `admin.projects.manage` (docs/08 section 3, R-63);
+   * otherwise an error is thrown, so a misuse cannot go unnoticed.
    */
   includeUnlinked?: boolean;
 }
@@ -33,6 +34,9 @@ export function projectScope<DB, TB extends keyof DB>(
   column: StringReference<DB, TB>,
   options: ProjectScopeOptions = {},
 ): (eb: ExpressionBuilder<DB, TB>) => Expression<SqlBool> {
+  if (options.includeUnlinked && !access.permissions.has('admin.projects.manage')) {
+    throw new Error('includeUnlinked requires the admin.projects.manage permission');
+  }
   return (eb) => {
     if (access.allProjects) {
       return options.includeUnlinked
