@@ -7,6 +7,7 @@ import {
   type OnApplicationBootstrap,
   type OnApplicationShutdown,
 } from '@nestjs/common';
+import { assertDirectConnection } from '@nexus/db';
 import pg from 'pg';
 import { z } from 'zod';
 import { APP_CONFIG, type AppConfig } from '../../config/env.js';
@@ -77,11 +78,7 @@ export class AccessChangeListener implements OnApplicationBootstrap, OnApplicati
   }
 
   onApplicationBootstrap(): void {
-    if (new URL(this.config.database.url).port === '6432') {
-      throw new Error(
-        'DATABASE_URL points at port 6432 (the PgBouncer pooler): LISTEN does not work there. Use the direct port 5432.',
-      );
-    }
+    assertDirectConnection(this.config.database.url); // refuses the pooler port, also via ?port=
     // Not awaited: the API starts serving while the first connection is made. Until it is proven the
     // cache is simply not used.
     this.access.setChangeChannelUp(false);
@@ -163,19 +160,21 @@ export class AccessChangeListener implements OnApplicationBootstrap, OnApplicati
     const timeoutMs = this.options?.probeTimeoutMs ?? 5_000;
     const nonce = randomUUID();
     return new Promise<void>((resolve, reject) => {
-      const timer = setTimeout(() => {
-        this.pendingProbe = undefined;
-        reject(new Error(`probe not echoed within ${timeoutMs} ms`));
-      }, timeoutMs);
-      timer.unref();
-      this.pendingProbe = {
+      const mine: { nonce: string; done: () => void } = {
         nonce,
         done: () => {
           clearTimeout(timer);
-          this.pendingProbe = undefined;
+          // Only clear the slot if it is still this probe's.
+          if (this.pendingProbe === mine) this.pendingProbe = undefined;
           resolve();
         },
       };
+      const timer = setTimeout(() => {
+        if (this.pendingProbe === mine) this.pendingProbe = undefined;
+        reject(new Error(`probe not echoed within ${timeoutMs} ms`));
+      }, timeoutMs);
+      timer.unref();
+      this.pendingProbe = mine;
       client.query('SELECT pg_notify($1, $2)', [PROBE_CHANNEL, nonce]).catch((e: Error) => {
         clearTimeout(timer);
         reject(e);

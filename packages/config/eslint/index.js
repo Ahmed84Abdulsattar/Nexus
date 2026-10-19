@@ -4,6 +4,7 @@ import importX from 'eslint-plugin-import-x';
 import globals from 'globals';
 import tseslint from 'typescript-eslint';
 import { boundaries } from './boundaries.js';
+import { react } from './react.js';
 
 /** Root ESLint flat config for the whole monorepo. */
 export default tseslint.config(
@@ -47,6 +48,7 @@ export default tseslint.config(
     files: ['apps/api/**/*.ts', 'apps/worker/**/*.ts'],
     rules: { '@typescript-eslint/consistent-type-imports': 'off' },
   },
+  ...react,
   ...boundaries,
   prettier,
 );

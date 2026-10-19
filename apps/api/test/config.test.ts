@@ -70,6 +70,22 @@ describe('loadConfig', () => {
       ).toThrow(/6432/);
     });
 
+    it('refuses a ?port= parameter that would override the port (N3) and a TLS-looking flag next to sslmode=disable (N2)', () => {
+      expect(() =>
+        loadConfig({
+          ...TEST_ENV,
+          DATABASE_URL: 'postgres://nexus_api@db.example:5432/nexus?port=6432',
+        }),
+      ).toThrow(/query parameter/);
+      expect(() =>
+        loadConfig({
+          ...TEST_ENV,
+          APP_ENV: 'prod',
+          DATABASE_URL: 'postgres://nexus_api@db.example:5432/nexus?ssl=true&sslmode=disable',
+        }),
+      ).toThrow(/must use TLS/);
+    });
+
     it('never puts the URL in an error', () => {
       try {
         loadConfig({ ...TEST_ENV, APP_ENV: 'prod', DATABASE_URL: 'postgres://u:hunter2@h:5432/d' });

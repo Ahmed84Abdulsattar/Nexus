@@ -3,6 +3,7 @@
 export {
   DATABASE_URL_VARIABLE,
   DatabaseConfigError,
+  assertDirectConnection,
   describeDatabaseUrl,
   requireTlsUnlessLocal,
   resolveDatabaseUrl,

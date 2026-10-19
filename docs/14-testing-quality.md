@@ -21,7 +21,7 @@
 | API contract | CI regenerates `apps/api/openapi.json` and `apps/web/src/api/schema.d.ts` (`pnpm openapi:generate`) and fails on `git diff --exit-code`; web `typecheck` fails when a call site no longer matches | Frontend and backend agree (S1-03) |
 | Component | Vitest + Testing Library + MSW | Info boxes, tables, side panel, states (loading, empty, error, stale) |
 | End-to-end | Playwright (desktop + phone viewports) | Sign in (test tenant or mocked MSAL), portfolio → project → asset, equipment table, energy page, notifications, admin access change |
-| Load | k6 + fixture replay | See `12-scalability.md` |
+| Load | k6 + fixture replay | See `12-scalability.md`; scripts and how to run: `tests/load/README.md`. Record each run in the results table in `12-scalability.md` section 3. |
 | Security | `pnpm audit`, Renovate, OWASP ZAP baseline in CI on dev, penetration test before go-live | |
 
 ## Database integration tests (S1-01)

@@ -17,6 +17,7 @@ import type { AppConfig } from '../src/config/env.js';
 const TENANT = '11111111-2222-4333-8444-555555555555';
 const GROUP_PM = 'bbbbbbbb-0000-4000-8000-00000000000a';
 const GROUP_LEAD = 'bbbbbbbb-0000-4000-8000-00000000000b';
+const GROUP_ADMIN = 'bbbbbbbb-0000-4000-8000-00000000000c';
 
 let oidCounter = 0;
 const newOid = (): string => `aaaaaaaa-0000-4000-8000-${String(++oidCounter).padStart(12, '0')}`;
@@ -69,8 +70,8 @@ describe.skipIf(testDatabaseAdminUrl === undefined)('access directory on Postgre
       projects.push(r.rows[0]!.id);
     }
     await admin.query(
-      `INSERT INTO access.group_role VALUES ($1,'project_manager'), ($2,'leadership')`,
-      [GROUP_PM, GROUP_LEAD],
+      `INSERT INTO access.group_role VALUES ($1,'project_manager'), ($2,'leadership'), ($3,'admin')`,
+      [GROUP_PM, GROUP_LEAD, GROUP_ADMIN],
     );
     await admin.query(
       `INSERT INTO access.project_access (project_id, entra_group_id) VALUES ($1,$2), ($3,$2)`,
@@ -446,9 +447,18 @@ describe.skipIf(testDatabaseAdminUrl === undefined)('access directory on Postgre
       ]);
     });
 
-    it('shows unlinked assets only when the admin linking screen asks for them', async () => {
-      const { userId } = await directory.upsertUser(who(newOid(), [GROUP_LEAD]));
-      const ctx = await directory.loadAccess(userId, [GROUP_LEAD]);
+    it('shows unlinked assets only to an admin who asks for them; others get an error (N7)', async () => {
+      const { userId } = await directory.upsertUser(who(newOid(), [GROUP_ADMIN]));
+      const ctx = await directory.loadAccess(userId, [GROUP_ADMIN]);
+      const lead = await directory.loadAccess(
+        (await directory.upsertUser(who(newOid(), [GROUP_LEAD]))).userId,
+        [GROUP_LEAD],
+      );
+      expect(() =>
+        withProjectScope(db.selectFrom('core.asset as a').select('a.name'), lead, 'a.project_id', {
+          includeUnlinked: true,
+        }),
+      ).toThrow(/admin.projects.manage/);
       const rows = await withProjectScope(
         db
           .selectFrom('core.asset as a')
@@ -460,11 +470,8 @@ describe.skipIf(testDatabaseAdminUrl === undefined)('access directory on Postgre
         { includeUnlinked: true },
       ).execute();
       expect(rows.map((r) => r.name)).toEqual(['a1', 'unlinked']);
-      // a scoped user never gets them, even with the flag
-      const scoped = await directory.loadAccess(
-        (await directory.upsertUser(who(newOid(), [GROUP_PM]))).userId,
-        [GROUP_PM],
-      );
+      // the flag does not widen a scoped user's project list (even one holding the permission)
+      const scoped = { ...ctx, allProjects: false, projectIds: new Set([projects[0]!]) };
       const none = await withProjectScope(
         db.selectFrom('core.asset as a').select('a.name').where('a.name', '=', 'unlinked'),
         scoped,
