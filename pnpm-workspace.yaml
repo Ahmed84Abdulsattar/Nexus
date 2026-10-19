@@ -50,6 +50,13 @@ catalog:
   vite: ^7.3.7
   vitest: ^3.2.7
   zod: ^4.6.5
+  '@radix-ui/react-dialog': ^1.2.0
+  '@radix-ui/react-slot': ^1.4.0
+  '@radix-ui/react-tabs': ^1.1.22
+  '@testing-library/user-event': ^14.6.7
+  '@axe-core/playwright': ^4.13.0
+  '@playwright/test': ^1.64.0
+  axe-core: ^4.14.0
 
 # Dependencies allowed to run install scripts (everything else is blocked).
 allowBuilds:

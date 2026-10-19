@@ -1,6 +1,7 @@
 import { createBrowserRouter, createMemoryRouter, type RouteObject } from 'react-router';
 import { NotFound, PageLoading, RouteError } from '../components/feedback';
 import { adminRoutes } from '../features/admin';
+import { devRoutes } from '../features/dev';
 import { portfolioRoutes } from '../features/portfolio';
 import { projectRoutes } from '../features/project';
 
@@ -13,6 +14,7 @@ export const routes: RouteObject[] = [
       ...portfolioRoutes,
       ...projectRoutes,
       ...adminRoutes,
+      ...(import.meta.env.DEV ? devRoutes : []),
       { path: '*', element: <NotFound /> },
     ],
   },
