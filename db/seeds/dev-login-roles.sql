@@ -3,8 +3,9 @@
 -- ---------------------------------------------------------------------
 -- APP_ENV=local ONLY. `pnpm db:seed` runs this file only when APP_ENV=local, and the file also refuses
 -- to run anywhere else: the runner sets `SET nexus.app_env = '<APP_ENV>'` first, and anything other
--- than 'local' (or unset) raises before a role is touched. In dev and prod the apps sign in with Entra
+-- than exactly 'local' (an unset value is refused too) raises before a role is touched. In dev and prod the apps sign in with Entra
 -- (managed identity) principals mapped to these roles (docs/06 section 9); there are no such users there.
+-- The runner also refuses a remote database host (localhost, loopback and unix sockets only).
 --
 -- Creates (or re-asserts):
 --   nexus_api_local     LOGIN, member of nexus_api     -> the api's DATABASE_URL locally (docs/04)

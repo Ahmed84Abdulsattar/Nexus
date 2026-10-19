@@ -14,6 +14,8 @@
 | `integration` | `sync_run`, `api_call`, `link_todo`, `cursor` | integrations |
 | `audit` | `log` | audit |
 
+Settings added in S1-01: `audit.sign_in_gap_minutes` (default 60, see `08` §2 step 6).
+
 ## 2. Entity relationships
 ```mermaid
 erDiagram
@@ -53,11 +55,14 @@ erDiagram
 5. **Status as reported.** `asset_status_current.source_value` stores the DATOMS label exactly. `telemetry.status_map` translates labels to the four display colours (running, idle, maintenance, off). This is a lookup table of DATOMS's own labels; Nexus never works out a status from values. An unmapped label shows as `unknown` and creates a `link_todo` row of type `status_value` for an admin.
 6. **Daily partitions** for `packet` and `api_call`; **monthly** for `rollup_5m`, `rollup_1h`, status and location histories, events, `event_read` and audit. `rollup_1d` is not partitioned (small, kept forever). Dropping a partition is instant retention, with no slow `DELETE`.
 7. **Rollups instead of continuous aggregates (ADR 0007).** The `refresh_rollup_5m()` and `refresh_rollup_combine()` functions are safe to run again for any time window. In phase 1 they are the **only** rollup path. The worker runs `refresh_rollup_5m` **once per closed 5-minute bucket**, `rollup.close_grace_intervals` (2) poll intervals after the bucket ends, and again only for closed buckets that receive late packets. It never runs over a sliding window or every minute. Daily buckets are **local days in Asia/Dubai**. Each rollup row stores `packets`, the number of samples Nexus stored, which the API reports as data coverage.
-8. **BIM-ready spatial model.** `building → level → zone`, with nullable `building_id / level_id / zone_id` on `core.asset` and `events.event`, and `bim_ref` jsonb for IFC GUIDs, APS URNs or ArcGIS I3S layer ids. `building`, `level` and `zone` each have nullable `source_system` + `external_id` (unique together) and `retired_at`, so a BIM model or another platform can feed them later with the same identity and never-delete rules as assets.
+8. **BIM-ready spatial model.** `building → level → zone`, with nullable `building_id / level_id / zone_id` on `core.asset` and `events.event`, and `bim_ref` jsonb for IFC GUIDs, APS URNs or ArcGIS I3S layer ids. `building`, `level` and `zone` each have nullable `source_system` + `external_id` (unique together) and `retired_at`, so a BIM model or another platform can feed them later with the same identity and never-delete rules as assets. **The database keeps the links consistent (S1-01):** composite foreign keys make an asset's building and zone belong to the asset's own project and its level to its own building; a CHECK refuses any building, level or zone on an asset that has no project, and another refuses a level without its building. `project_id` stays nullable only for a source asset not yet linked to a project (`integration.link_todo`); such an asset is never visible to a project-scoped user.
 9. **Access is data.** Entra groups map to roles in `group_role`. Project scope sits in `project_access` (per user or per group). Roles with `all_projects = true` (admin, leadership) skip the project filter.
 10. **Asset kind (ADR 0009).** `core.asset.kind` is `physical` for physical sensored items of any category (including DGs, solar and mains) or `site_metric` for site-level values as the source reports them, such as energy site totals. **Every equipment list, count, map layer and view filters `kind = 'physical'`.** `v_asset_live` and `v_project_asset_counts` already do. Site-level values are read through `v_site_metric_live`.
 11. **Read state that doesn't grow with users × events.** "Mark all read" moves one row in `events.read_marker` (per user, either global or per project). `events.event_read` holds only events read one by one after the marker. It is partitioned by `occurred_at` like `events.event` and dropped with it. Unread = events in scope with `occurred_at` later than the user's latest applicable marker and no `event_read` row.
 12. **Parameter dictionary per source type (ADR 0011).** `telemetry.parameter` is unique on `(source_system, source_type_name, key)`, not on the key alone, because the same DATOMS key has different names (and unit spellings) in different categories: 31 keys are shared across DG Set, Fuel Tank, AC Sub-Meter and Solar Inverter (`docs/source/datoms-parameters.md`). `source_type_name` is the category exactly as the source names it, the same string as `core.asset.source_type_name`; `NULL` means the type is not known yet (the constraint is `NULLS NOT DISTINCT`). It is a raw source string, not an FK to `core.asset_type`, so a Nexus type remap never changes a source name. Look up an asset's names with `source_type_name IS NOT DISTINCT FROM asset.source_type_name`; with no row, show the raw key and no unit, and never borrow another type's name. The DATOMS list of 12 Oct 2026 is loaded by `db/seeds/datoms-parameters.sql`, which also appends the four category names to `core.asset_type.source_names` (DG Set → `diesel_generator`, Fuel Tank → `fuel_tank`, AC Sub-Meter → `mains`, Solar Inverter → `solar`).
+
+13. **Access changes reach every API instance (S1-01).** Triggers on `access.user_role`, `group_role`, `project_access`, `role`, `role_permission`, `permission` and on `app_user.is_active` send `NOTIFY nexus_access` (`{"scope":"user","userId":...}` or `{"scope":"all"}`) when the change commits, whoever made it (API, migration, manual SQL). Each API instance holds one `LISTEN` connection (a direct Postgres connection, not PgBouncer) and clears its access cache. A cache hit also checks `is_active`, a load that started before a change is never cached, and while the LISTEN connection is down the cache is off. See `08` §2.
+14. **Partition maintenance is a privileged function, not a worker privilege.** `core.create_range_partitions` and `core.drop_partitions_before` are SECURITY DEFINER, owned by `nexus_migrator` (the owner of every table), with a pinned `search_path`. They accept only partitioned tables in the `telemetry`, `events`, `integration` and `audit` schemas, create partitions with UTC bounds whatever the caller's time zone, refuse a drop date in the future, and only `nexus_worker` may execute them.
 
 ## 4. Write paths (worker)
 | Job | Writes | Rule |
@@ -150,6 +155,48 @@ Test machine: PostgreSQL 16.13 with 2 vCPU and 8 GB RAM (shared_buffers 2 GB), a
 - **Re-benchmark with real fixtures in S2/S3.** This benchmark used random values and short keys (`p001`…`p103`). Re-run it with the recorded DATOMS sample (Q21) once it arrives, including the closed-bucket refresh time and the row sizes in section 6a. Decide then whether a more compact rollup `stats` format is needed (an ADR if it changes).
 - Re-run this benchmark (the `db/seeds/scale-100-sites.ts` seed plus these queries) after any schema change on telemetry tables, and paste the table into the PR.
 
+## 6c. Re-run on the real schema with the DATOMS parameter keys (S1-01, 14 Oct 2026)
+Command: `pnpm db:seed:scale` (`db/seeds/scale-100-sites.ts`, queries in `db/bench/screens.ts`, see `db/bench/README.md`). Machine: PostgreSQL 16.15 on Windows, shared_buffers **128 MB** (the 7 Oct run used 2 GB), a developer laptop with other programs running, so **absolute times are pessimistic and the "first run" column is not a cold-cache measurement**. Data: 100 projects, 5,000 assets (4,800 physical, 200 `site_metric`, about 60% in a zone), **3,026,400 packets** (300 assets x 7 days; 70 DG Set with 103 keys, 33 Fuel Tank with 4, 132 AC Sub-Meter with 34, 65 Solar Inverter with 23: the real DATOMS keys, random values), rollups 5-minute 7 days, hourly 90 days, daily 3 years (the older ones copied from a real row), 1,000,000 events over 180 days.
+
+| Screen / job | Rows | First run (ms) | Warm median (ms) | N-04 target (ms) |
+|---|---|---|---|---|
+| Portfolio map (100 projects + equipment counts) | 100 | 4.0 | 3.5 | 300 |
+| Portfolio for a scoped user (20 projects) | 20 | 5.4 | 0.5 | 300 |
+| Project page markers (`v_asset_live`, 48 assets) | 48 | 202.0 | 3.6 | 300 |
+| Info box 2 counts | 15 | 2.2 | 2.2 | 300 |
+| Energy box: site totals (`v_site_metric_live`) | 2 | 0.6 | 0.4 | 300 |
+| Energy box: sum over the DG Sets of a project | 1 | 0.6 | 0.7 | 300 |
+| Asset search "contains" over 5,000 assets (trigram) | 50 | 1.1 | 0.5 | 300 |
+| Device card (103 values with names and units) | 103 | 1.1 | 0.8 | 300 |
+| Trend 6 h, raw packets | 321 | 71.0 | 2.8 | 1,000 |
+| Trend 7 days, 5-minute rollups | 2,008 | 91.6 | 30.9 | 1,000 |
+| Trend 90 days, hourly rollups | 2,153 | 367.1 | 45.7 | 1,000 |
+| Trend 3 years, daily rollups | 1,097 | 661.3 | 28.8 | 1,000 |
+| Explorer: 10 assets x 30 days hourly | 10 | 645.1 | 189.7 | 1,000 |
+| Notifications: latest 50 for a project (90 days) | 50 | 2.4 | 1.2 | 300 |
+| Notifications: unread count, 20 projects, 30 days | 1 | 116.3 | 36.6 | 300 |
+| One poll write (300 packets + 300 latest upserts) | | 16.3 | | 300 |
+
+Every query is under its target, first run included.
+
+| Job (one run, 300 assets with packets) | Time | Scaled linearly to 5,000 assets |
+|---|---|---|
+| `refresh_rollup_5m`, one closed 5-minute bucket (median of 5) | 402 ms | ~6.7 s per 5 minutes |
+| `refresh_rollup_combine`, one hourly close | 935 ms | ~15.6 s per hour |
+| `refresh_rollup_combine`, one Dubai day close | 1.8 s | ~30 s per day |
+
+The 30 s trigger of `12` §2 is not reached (5,000 assets would use about 6.7 s of every 300 s). Bulk backfill is slower per packet than the closed-bucket unit: 8 day windows of 5-minute rollups took 200 to 290 s each at this load, which is why `seed:scale` is a one-off and why backfills must run by day windows, never inside the live loop.
+
+| Table | Rows | Heap | Indexes | Total | Bytes per row (total) |
+|---|---|---|---|---|---|
+| `telemetry.packet` (7 days) | 3,026,400 | 2.92 GB | 218 MB | 3.14 GB | 1,114 |
+| `telemetry.rollup_5m` (7 days) | 605,700 | 485 MB | 40 MB | 1.12 GB | 1,987 |
+| `telemetry.rollup_1h` (90 days) | 646,200 | 616 MB | 42 MB | 1.51 GB | 2,506 |
+| `telemetry.rollup_1d` (3 years) | 329,400 | 315 MB | 22 MB | 788 MB | 2,509 |
+| `events.event` | 1,000,000 | 156 MB | 284 MB | 441 MB | 462 |
+
+(`total` includes TOAST, which holds the compressed jsonb.) `packet_ts_idx` is 20 MB over 3 M rows (about 7 bytes per row). Packet rows are smaller than in the 7 Oct run (1.1 KB against 1.37 KB) and rollup rows about half (2.0 to 2.5 KB against 4.05 KB), because the real category mix averages about 43 numeric keys per asset, not 103. The 6a table below still assumes 103 keys for every asset; treat it as the upper bound until the S2/S3 re-run with recorded fixtures. No change to the table design or to `packet_ts_idx` is proposed (no `EXPLAIN ANALYZE` evidence for BRIN yet).
+
 ## 6a. Sizing estimates (from the benchmark's measured row sizes)
 Measured on 7 Oct 2026: about **1.37 KB per raw packet row** (591 MB for 432,000 rows) and about **4.05 KB per rollup row** (5-minute: 2.8 GB for 691,200 rows; hourly: 5.3 GB for 1,296,000 rows). Rollup rows are larger because each of the ~103 parameters stores min, max, avg, last and n. Per asset per day: raw ≈ 1.97 MB, 5-minute ≈ 1.17 MB, hourly ≈ 98 KB.
 
@@ -171,13 +218,14 @@ Add indexes (~10–20%), and remember that zone-redundant HA keeps a second copy
 - Rollup primary keys `(asset_id, bucket)`.
 - `event(project_id, occurred_at DESC)` and `event(asset_id, occurred_at DESC)`.
 - `project_access` by user and by group.
+- `building(id, project_id)`, `level(id, building_id)` and `zone(id, project_id)` are unique so that `core.asset` can reference them in the composite foreign keys of decision 8 (small tables, no extra write cost on hot rows).
 - Add new indexes only with a measured slow query (`EXPLAIN ANALYZE` in the PR).
 
 ## 8. Migration rules
 1. One migration per PR. Use a sequential number. Never edit a migration once it is merged.
 2. Every `up` has a working `down`.
 3. No locking changes on hot tables during the day: build indexes `CONCURRENTLY` and add columns as nullable first.
-4. Update `db/schema.sql` in the same PR, and run `pnpm db:check`. It applies all migrations to one empty DB and `schema.sql` to another, then diffs `pg_dump --schema-only` of both, excluding partition child tables (`*_pYYYYMM*`). Reference data (the INSERTs) is compared separately with a sorted `COPY` of those tables. This keeps the check stable whatever the date.
+4. Update `db/schema.sql` in the same PR and run `pnpm db:check`. It applies all migrations (with the real runner, including `db/roles.sql`) to one empty DB and loads `schema.sql` into another, then diffs `pg_dump --schema-only` of both (no owners or grants, partition children `*_p20..` and the migrations table left out). Reference data is compared separately: every row of every ordinary table, without timestamps and generated uuids. It also fails if `db/src/types.ts` (generated by `kysely-codegen`) is stale. This keeps the check stable whatever the date. `pnpm db:migrate` runs migrations as `nexus_migrator`, then applies `db/roles.sql`; `down` reverts one migration (`down all`, `redo`). See `db/README.md`.
 5. Seed data that differs between environments goes in `db/seeds/`, not in migrations. So does **source data delivered outside the API**: `db/seeds/datoms-parameters.sql` (the DATOMS parameter list and category → asset type names, ADR 0011) runs in every environment, is idempotent, and is the only file to change when DATOMS updates the list or Q35 corrects a category name.
 
 ## 9. Database security
@@ -186,6 +234,9 @@ Add indexes (~10–20%), and remember that zone-redundant HA keeps a second copy
   - `nexus_worker`: read on everything. Writes on synced `core.project/asset/asset_type`, `telemetry.*`, `events.event`, `integration.*`. No writes on per-user read state. Partition maintenance goes through SECURITY DEFINER functions.
   - `nexus_migrator`: DDL, and owns the functions.
   Every role has the least access it needs.
+- **One server per environment.** The database-level PUBLIC rights (CONNECT, TEMPORARY) are revoked and only the three Nexus roles get CONNECT, but roles are cluster-wide: dev and prod must be different servers, never two databases on one server, and no other application shares a Nexus server.
+- Review hardening (PR #16): the worker has no access to `access.*`, `audit.log` or the per-user read-state tables (not even their partitions), has `INSERT, UPDATE` on `events.event` only, and `DELETE` only on `integration.sync_run`; the API's `UPDATE` on projects, districts and spatial rows is limited to the admin-held columns (source identity, `*_seen_at` and the project's `retired_at` stay with the connector); there are no default privileges, and functions are granted one by one (the API gets only `access.user_roles` and `user_project_ids`; a new SECURITY DEFINER function is executable by nobody until granted); `drop_partitions_before` keeps 730 days of `audit.log` and `events`, and writes an `audit.log` row for every partition it drops; `refresh_rollup_combine` takes `regclass` arguments limited to the two allowed pairs and is SECURITY INVOKER (like `refresh_rollup_5m`). `db:migrate down`/`redo` need `--confirm-database=<name>` unless `APP_ENV=local`, and `dev-login-roles.sql` runs only against localhost, loopback or a unix socket.
+- Migrations and seeds connect with `DATABASE_ADMIN_URL`, the API with `DATABASE_URL` and the worker with `WORKER_DATABASE_URL` (three different logins; `docs/04`). Only the local environment may fall back to `DATABASE_URL`. `nexus_migrator` owns every table and function; `nexus_api` cannot change `access.role`, `role_permission` or `permission` (reference data changed only by migrations), cannot delete users and can only insert into `audit.log`; the partition functions are executable by `nexus_worker` only.
 - These roles are NOLOGIN. Locally only (`APP_ENV=local`), `db/seeds/dev-login-roles.sql` adds passwordless LOGIN users `nexus_api_local` and `nexus_worker_local`, each a member of one role and nothing else, so local runs hit the same permission errors as Azure. The seed refuses to run unless the session has `nexus.app_env = 'local'`.
 - The API never connects as the owner. Entra (managed identity) is used for database auth in Azure where possible.
 - Prod: private endpoint only, TLS required, PITR backups for 35 days, and a restore test every quarter (S8-02).

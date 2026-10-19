@@ -7,17 +7,30 @@ Internal, read-only monitoring platform for construction sites across the UAE. S
 
 - Node.js 22 LTS (`.nvmrc`)
 - pnpm (version pinned in `package.json`, `corepack enable` or `npm i -g pnpm`)
-- Docker (only for the local PostgreSQL 16; not needed until S1-01)
+- A local PostgreSQL 16: Docker (`docker compose up -d`) or, on Windows without Docker, `scripts/pg-local.ps1`
+- For `pnpm db:check`: the PostgreSQL 16 client tools (`pg_dump`)
 
 ## Run locally
 
 ```
 pnpm install
+pnpm db:migrate # create the schema, then the passwordless local login users:
+pnpm db:seed
 pnpm dev        # web http://localhost:5173, api http://localhost:3000/health/live, worker (no jobs)
 ```
 
 Copy `.env.example` to `.env` for local values (never commit it). `DATOMS_LIVE` defaults to false (fixtures).
 `docker compose up -d` starts PostgreSQL 16 on `127.0.0.1:5432`.
+
+## Database
+
+Three logins, three variables (`docs/04-tech-stack.md`): `DATABASE_ADMIN_URL` for `pnpm db:migrate`,
+`db:seed` and `db:check`; `DATABASE_URL` for the API; `WORKER_DATABASE_URL` for the worker. With
+`APP_ENV=local` the first and last fall back to `DATABASE_URL`; elsewhere they are required.
+Migrations are in `db/migrations`, the target schema in `db/schema.sql`, and everything else (commands,
+how to write a migration, the 100-site benchmark) in [`db/README.md`](db/README.md).
+Integration tests that need PostgreSQL run when `TEST_DATABASE_ADMIN_URL` is set (CI does) and are
+skipped with a warning otherwise.
 
 ## Checks (definition of done)
 
