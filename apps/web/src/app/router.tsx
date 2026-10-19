@@ -4,18 +4,25 @@ import { adminRoutes } from '../features/admin';
 import { devRoutes } from '../features/dev';
 import { portfolioRoutes } from '../features/portfolio';
 import { projectRoutes } from '../features/project';
+import { AppShell } from './layout';
 
 /** Only the three backlog routes. Other routes arrive with their features (docs/05). */
 export const routes: RouteObject[] = [
   {
-    errorElement: <RouteError />,
+    element: <AppShell />,
     hydrateFallbackElement: <PageLoading />,
     children: [
-      ...portfolioRoutes,
-      ...projectRoutes,
-      ...adminRoutes,
-      ...(import.meta.env.DEV ? devRoutes : []),
-      { path: '*', element: <NotFound /> },
+      {
+        // Inside the shell, so the header stays visible when a page fails.
+        errorElement: <RouteError />,
+        children: [
+          ...portfolioRoutes,
+          ...projectRoutes,
+          ...adminRoutes,
+          ...(import.meta.env.DEV ? devRoutes : []),
+          { path: '*', element: <NotFound /> },
+        ],
+      },
     ],
   },
 ];
