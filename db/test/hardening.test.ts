@@ -1,6 +1,7 @@
 import pg from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { assertMayRevert, isLocalHost } from '../src/admin/guards.js';
+import { migrate } from '../src/admin/migrate.js';
 import { createTestDatabase, testDatabaseAdminUrl, type TestDatabase } from '../src/testing.js';
 
 /** Security review of PR #16: one test per finding. */
@@ -17,15 +18,34 @@ const sqlState = async (p: Promise<unknown>): Promise<string | undefined> =>
     (e: { code?: string }) => e.code,
   );
 
-describe('M5: db:migrate down and redo', () => {
-  const url = 'postgres://nexus@db.example:5432/nexus_prod?sslmode=require';
-  it('run freely only when APP_ENV=local', () => {
-    expect(() => assertMayRevert({ appEnv: 'local', url, args: [] })).not.toThrow();
+describe('M5 and N4: db:migrate down and redo', () => {
+  const remote = 'postgres://nexus@db.example:5432/nexus_prod?sslmode=require';
+  const local = 'postgres://nexus@localhost:5432/nexus';
+  it('run freely only when APP_ENV=local and the database is on this machine', () => {
+    expect(() => assertMayRevert({ appEnv: 'local', url: local })).not.toThrow();
+    // APP_ENV=local does not help against a remote server
+    expect(() => assertMayRevert({ appEnv: 'local', url: remote })).toThrow(/Refusing to revert/);
+    expect(() => assertMayRevert({ appEnv: 'local', url: remote, confirmDatabase: 'nexus_prod' })).not.toThrow();
   });
   it.each(['dev', 'prod', undefined])('need --confirm-database=<name> when APP_ENV is %s', (appEnv) => {
-    expect(() => assertMayRevert({ appEnv, url, args: [] })).toThrow(/Refusing to revert/);
-    expect(() => assertMayRevert({ appEnv, url, args: ['--confirm-database=other'] })).toThrow(/Refusing/);
-    expect(() => assertMayRevert({ appEnv, url, args: ['--confirm-database=nexus_prod'] })).not.toThrow();
+    expect(() => assertMayRevert({ appEnv, url: local })).toThrow(/Refusing to revert/);
+    expect(() => assertMayRevert({ appEnv, url: remote })).toThrow(/Refusing to revert/);
+    expect(() => assertMayRevert({ appEnv, url: remote, confirmDatabase: 'other' })).toThrow(/Refusing/);
+    expect(() => assertMayRevert({ appEnv, url: remote, confirmDatabase: 'nexus_prod' })).not.toThrow();
+  });
+  it('an empty host counts as local only when PGHOST is unset or local', () => {
+    const socket = 'postgres://nexus@/nexus';
+    expect(() => assertMayRevert({ appEnv: 'local', url: socket, env: {} })).not.toThrow();
+    expect(() => assertMayRevert({ appEnv: 'local', url: socket, env: { PGHOST: '/var/run/postgresql' } })).not.toThrow();
+    expect(() => assertMayRevert({ appEnv: 'local', url: socket, env: { PGHOST: 'prod-db.example.com' } })).toThrow(/Refusing/);
+  });
+  it('is enforced inside migrate() itself, before it connects', async () => {
+    await expect(
+      migrate({ url: 'postgres://nexus@db.example.invalid:5432/nexus_prod', direction: 'down', appEnv: 'prod' }),
+    ).rejects.toThrow(/Refusing to revert/);
+    await expect(
+      migrate({ url: 'postgres://nexus@db.example.invalid:5432/nexus_prod', direction: 'down', appEnv: 'local' }),
+    ).rejects.toThrow(/Refusing to revert/);
   });
 });
 
@@ -39,7 +59,13 @@ describe('L1: the local-only seed', () => {
     ['postgres://nexus@10.0.0.4:5432/n', false],
     ['postgres://nexus@localhost.evil.example/n', false],
   ])('%s is local: %s', (url, expected) => {
-    expect(isLocalHost(url)).toBe(expected);
+    expect(isLocalHost(url, {})).toBe(expected);
+  });
+
+  it('an empty host follows PGHOST (N4)', () => {
+    expect(isLocalHost('postgres://nexus@/n', { PGHOST: 'db.example.com' })).toBe(false);
+    expect(isLocalHost('postgres://nexus@/n', { PGHOST: 'localhost' })).toBe(true);
+    expect(isLocalHost('postgres://nexus@/n', {})).toBe(true);
   });
 
 });
@@ -123,7 +149,8 @@ describe.skipIf(testDatabaseAdminUrl === undefined)('database hardening (Postgre
     it('writes an audit row for every dropped partition, from inside the function', async () => {
       const worker = await connectAs(db.adminUrl, 'nexus_worker');
       try {
-        await worker.query(`SELECT core.create_range_partitions('audit.log', 'month', DATE '2020-01-01', 1)`);
+        // The owner makes the old audit partition (the worker cannot, N1).
+        await admin.query(`CREATE TABLE audit.log_p202001 PARTITION OF audit.log FOR VALUES FROM ('2020-01-01') TO ('2020-02-01')`);
         await worker.query(`SELECT core.create_range_partitions('telemetry.packet', 'day', DATE '2020-03-01', 2)`);
         const events = await worker.query(`SELECT * FROM core.drop_partitions_before('audit.log', timestamptz '2021-01-01')`);
         expect(events.rowCount).toBe(1);
@@ -265,6 +292,74 @@ describe.skipIf(testDatabaseAdminUrl === undefined)('database hardening (Postgre
     } finally {
       await worker.end();
     }
+  });
+
+  it('N1: the worker cannot move events between partitions, nor create an old protected partition', async () => {
+    const worker = await connectAs(db.adminUrl, 'nexus_worker');
+    try {
+      await worker.query(
+        `INSERT INTO events.event (occurred_at, source_system, external_id, title) VALUES (now(), 'datoms', 'n1', 't')`,
+      );
+      for (const col of ["occurred_at = now() - interval '800 days'", "id = gen_random_uuid()", "source_system = 'x'", "external_id = 'y'", 'received_at = now()']) {
+        expect(await sqlState(worker.query(`UPDATE events.event SET ${col} WHERE external_id = 'n1'`)), col).toBe('42501');
+      }
+      await worker.query(`UPDATE events.event SET title = 'changed', severity = 'high', cleared_at = now(), payload = '{}' WHERE external_id = 'n1'`);
+      for (const [parent, step] of [['events.event', 'month'], ['events.event_read', 'month'], ['audit.log', 'month']] as const) {
+        await expect(
+          worker.query(`SELECT core.create_range_partitions('${parent}', '${step}', DATE '2020-01-01', 1)`),
+        ).rejects.toThrow(/730 days/);
+        await expect(
+          worker.query(`SELECT core.create_range_partitions('${parent}', '${step}', (now() - interval '740 days')::date, 1)`),
+        ).rejects.toThrow(/730 days/);
+      }
+      // Unprotected tables and recent partitions are still fine.
+      await worker.query(`SELECT core.create_range_partitions('telemetry.packet', 'day', DATE '2020-06-01', 1)`);
+      await worker.query(`SELECT core.create_range_partitions('events.event', 'month', (now() - interval '700 days')::date, 1)`);
+    } finally {
+      await worker.end();
+    }
+  });
+
+  it('N7: the partition functions run with UTC and ISO dates whatever the caller sets', async () => {
+    const r = await admin.query<{ f: string; config: string[] }>(
+      `SELECT proname AS f, proconfig AS config FROM pg_proc WHERE proname IN ('create_range_partitions','drop_partitions_before')`,
+    );
+    expect(r.rowCount).toBe(2);
+    for (const row of r.rows) {
+      expect(row.config, row.f).toEqual(expect.arrayContaining(['TimeZone=UTC', 'DateStyle=ISO']));
+    }
+  });
+
+  it('N6: the worker has exactly the expected privileges on every table', async () => {
+    const r = await admin.query<{ rel: string; priv: string }>(`
+      SELECT n.nspname || '.' || c.relname AS rel, p.priv
+      FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+      CROSS JOIN (VALUES ('SELECT'), ('INSERT'), ('UPDATE'), ('DELETE'), ('TRUNCATE')) p(priv)
+      WHERE n.nspname IN ('core','access','telemetry','events','integration','audit')
+        AND c.relkind IN ('r','p') AND NOT c.relispartition
+        AND has_table_privilege('nexus_worker', c.oid, p.priv)
+      ORDER BY 1, 2`);
+    const got = new Map<string, string[]>();
+    for (const row of r.rows) got.set(row.rel, [...(got.get(row.rel) ?? []), row.priv]);
+    const rw = ['INSERT', 'SELECT', 'UPDATE'];
+    const telemetryTables = ['asset_location_current','asset_location_history','asset_parameter','asset_status_current','asset_status_history','latest_packet','packet','parameter','rollup_1d','rollup_1h','rollup_5m'];
+    const expected = new Map<string, string[]>([
+      ['core.asset', rw], ['core.asset_type', rw], ['core.project', rw],
+      ['core.building', ['SELECT']], ['core.district', ['SELECT']], ['core.feature_flag', ['SELECT']],
+      ['core.level', ['SELECT']], ['core.setting', ['SELECT']], ['core.source_system', ['SELECT']], ['core.zone', ['SELECT']],
+      ...telemetryTables.map((t): [string, string[]] => ['telemetry.' + t, rw]),
+      ['telemetry.status_map', ['SELECT']],
+      ['events.event', ['INSERT', 'SELECT']],        // UPDATE is column-level, checked below
+      ['integration.api_call', rw], ['integration.cursor', rw], ['integration.link_todo', rw],
+      ['integration.sync_run', ['DELETE', 'INSERT', 'SELECT', 'UPDATE']],
+    ]);
+    expect(Object.fromEntries([...got].sort())).toEqual(Object.fromEntries([...expected].sort()));
+    const cols = await admin.query<{ a: string }>(`
+      SELECT attname AS a FROM pg_attribute WHERE attrelid = 'events.event'::regclass AND attnum > 0 AND NOT attisdropped
+        AND has_column_privilege('nexus_worker', 'events.event', attname, 'UPDATE') ORDER BY 1`);
+    expect(cols.rows.map((x) => x.a)).toEqual(
+      ['asset_id','building_id','category','cleared_at','level_id','message','payload','project_id','severity','source_state','title','zone_id'],
+    );
   });
 
   it('L4: unlinked assets are not in the equipment views', async () => {

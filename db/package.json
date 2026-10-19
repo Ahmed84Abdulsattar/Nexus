@@ -36,7 +36,8 @@
   "dependencies": {
     "kysely": "catalog:",
     "node-pg-migrate": "catalog:",
-    "pg": "catalog:"
+    "pg": "catalog:",
+    "pg-connection-string": "catalog:"
   },
   "devDependencies": {
     "@nexus/config": "workspace:*",

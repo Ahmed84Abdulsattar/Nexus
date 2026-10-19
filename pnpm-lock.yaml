@@ -257,6 +257,9 @@ catalogs:
     pg:
       specifier: ^8.23.1
       version: 8.23.1
+    pg-connection-string:
+      specifier: ^2.14.1
+      version: 2.14.1
     prettier:
       specifier: ^3.9.9
       version: 3.9.9
@@ -511,6 +514,9 @@ importers:
       pg:
         specifier: 'catalog:'
         version: 8.23.1
+      pg-connection-string:
+        specifier: 'catalog:'
+        version: 2.14.1
     devDependencies:
       '@nexus/config':
         specifier: workspace:*
