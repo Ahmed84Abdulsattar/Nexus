@@ -1,1 +1,40 @@
 @import 'tailwindcss';
+@import './tokens.css';
+
+/* Wire the tokens into Tailwind utilities (bg-surface, text-fg, border-border, ...). */
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-raised: var(--surface-raised);
+  --color-fg: var(--fg);
+  --color-fg-muted: var(--fg-muted);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-primary: var(--primary);
+  --color-primary-fg: var(--primary-fg);
+  --color-focus-ring: var(--focus-ring);
+  --color-state-active: var(--state-active);
+  --color-state-central-store: var(--state-central-store);
+  --color-state-finished: var(--state-finished);
+  --color-state-in-bid: var(--state-in-bid);
+  --color-status-running: var(--status-running);
+  --color-status-idle: var(--status-idle);
+  --color-status-maintenance: var(--status-maintenance);
+  --color-status-off: var(--status-off);
+  --color-status-unknown: var(--status-unknown);
+  --radius-sm: var(--radius-sm);
+  --radius-md: var(--radius-md);
+  --radius-lg: var(--radius-lg);
+}
+
+@layer base {
+  body {
+    background: var(--bg);
+    color: var(--fg);
+    font-family: var(--font-sans);
+  }
+  :focus-visible {
+    outline: 2px solid var(--focus-ring);
+    outline-offset: 2px;
+  }
+}
