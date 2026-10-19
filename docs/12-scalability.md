@@ -51,6 +51,14 @@
 - **Live:** 1,000 Web PubSub clients receiving updates.
 - **Proof of independence:** while load-testing the API with 1,000 users, the worker's DATOMS calls per minute must not change.
 - Run these again at every major release and after any schema change on telemetry tables.
+- **How to run:** scripts, thresholds and the fleet generator are in `tests/load/README.md` (S5-04).
+
+### Load test results
+Add one row per run (k6 summary kept with the PR or release notes).
+
+| Date | Commit | Environment | Script and settings | Peak VUs | p95 latest / page / chart | Errors | Result |
+|---|---|---|---|---|---|---|---|
+| 2026-10-14 | S5-04 branch | local API | `api-1000-users.js`, `/health/live` only, smoke | 50 | 21 ms / n/a / n/a | 0% | pass (harness check only) |
 
 ## 4. Things that would break scalability (do not do them)
 - Calling DATOMS from the API or the browser.
