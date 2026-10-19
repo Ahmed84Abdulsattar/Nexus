@@ -66,6 +66,7 @@ catalog:
 allowBuilds:
   '@scarf/scarf': false # swagger-ui-dist telemetry; not needed
   '@swc/core': true
+  '@vaadin/vaadin-usage-statistics': false # pulled in by @arcgis/core; usage telemetry, not needed (S0-09 security review I6)
   esbuild: true
   unrs-resolver: true
 
