@@ -5,16 +5,17 @@ Rules followed: never merge; one backlog task per branch; stacked PRs when a tas
 
 ## Status on 2026-10-19
 
-**Merged by Ahmed:** #8, #9, #10 (S0-05), #11 (S2-02), #12 (S0-06), #13 (S1-05), #14 (S5-04), #15 (S1-06), #16 (S1-01), #17 (S1-07), #18 (sprint plans + decisions), #20 (S1-09), #21 (ADR 0012), #22 (S1-10), #23 (qa rule), #24 (datoms-client test fix).
+**Stopped by Ahmed on 2026-10-19.** Next session: restart #25's qa + security review and S3-08 first (critical path to S3-03 before the test key expires on 10 Nov), then the S1-10 review fixes.
+
+**Merged by Ahmed:** #8, #9, #10 (S0-05), #11 (S2-02), #12 (S0-06), #13 (S1-05), #14 (S5-04), #15 (S1-06), #16 (S1-01), #17 (S1-07), #18 (sprint plans + decisions), #19 (S0-09), #20 (S1-09), #21 (ADR 0012), #22 (S1-10), #23 (qa rule), #24 (datoms-client test fix).
 
 Conflicts after the merges were resolved on the branches (merge commits, no force-push): #16 (`88b62e7`), #18 (`79f8888`), #20 (`0435dc2`), #19 (`f973a0f`). #18's CI failure was a flaky datoms-client test from #11, fixed in #24.
 
 | Task | Branch | Base branch | PR | Status | Needs my decision |
 |---|---|---|---|---|---|
-| S0-09 Map wrapper and ArcGIS adapter | `S0-09-map-wrapper` | `main` | [#19](https://github.com/Ahmed84Abdulsattar/Nexus/pull/19) | All security + QA fixes done; vaadin install script disabled (CI fix); main merged (config schema now main's fuller shape). CI re-running. L6 (self-host ArcGIS assets) moved to its own follow-up PR before S7-02: 68 MB / 11,089 files, needs a real key to size | Confirm L6 as a separate follow-up |
-| S1-10 review fixes (OpenAPI nullable, docs/08) | `S1-10-review-fixes` | `main` | — | In progress (#22 merged before its review fixes) | UAE extent 51.0–57.0 E, 22.0–26.6 N: confirm |
-| S3-01 Catalogue sync (phases 1 + 2) | `S3-01-catalogue-sync` | `main` | [#25](https://github.com/Ahmed84Abdulsattar/Nexus/pull/25) | PR open; migration `0002`; derived miss counter; leader lock + scheduler; qa + security review running | — |
-| S3-08 Partition maintenance job (critical) | `S3-08-maintenance-job` | `S3-01-catalogue-sync` | — | In progress | — |
+| S1-10 review fixes (OpenAPI nullable, docs/08) | `S1-10-review-fixes` | `main` | — | Stopped before any push; restart (#22 merged before its review fixes) | UAE extent 51.0–57.0 E, 22.0–26.6 N: confirm |
+| S3-01 Catalogue sync (phases 1 + 2) | `S3-01-catalogue-sync` | `main` | [#25](https://github.com/Ahmed84Abdulsattar/Nexus/pull/25) | PR open; migration `0002`; derived miss counter; leader lock + scheduler; qa + security review stopped before reporting: restart them | — |
+| S3-08 Partition maintenance job (critical) | `S3-08-maintenance-job` | `S3-01-catalogue-sync` | — | Stopped before any push; restart first after #25's reviews | — |
 | ADR 0012 doc follow-ups (00, 02, 03, 06, 07, 08, 10, 13, 14) | — | `main` | — | Queued (architect) | — |
 | QA of merged S1-09 + S1-10 on main | — | — | — | Queued (they merged before QA ran) | — |
 | S3-03 Live poll | — | after S3-08 | — | Queued; must finish live testing before the DATOMS test key expires on **10 Nov 2026** (production key requested by 1 Nov) | — |
