@@ -16,6 +16,7 @@ import {
   InactiveUserError,
   type SignedInIdentity,
 } from './access-context.js';
+import { UserRateLimiter } from '../rate-limit/rate-limit.js';
 import { resolveAccessPolicy } from './access-policy.js';
 import type { AuthRequest } from './request.js';
 
@@ -39,6 +40,7 @@ export class EntraJwtGuard implements CanActivate {
   constructor(
     private readonly reflector: Reflector,
     private readonly access: AccessContextService,
+    private readonly userRateLimit: UserRateLimiter,
     @Inject(APP_CONFIG) private readonly config: AppConfig,
     @Inject(JWT_KEY_RESOLVER) private readonly keys: JWTVerifyGetKey,
   ) {}
@@ -59,6 +61,8 @@ export class EntraJwtGuard implements CanActivate {
     const request = context.switchToHttp().getRequest<AuthRequest>();
     const payload = await this.verifyToken(bearerToken(request));
     const identity = this.identityFrom(payload, request);
+    // Before any database work: keyed on the validated oid, and it counts deactivated users too.
+    this.userRateLimit.check(identity.oid);
 
     let access;
     try {

@@ -71,10 +71,19 @@ Permission keys live in `packages/shared/src/permissions.ts`, the single source 
 - Sign-out clears the MSAL cache and the live connection.
 
 ## 6. Security baseline
-Helmet, CORS, the per-user rate limit, the request size limit and turning Swagger UI off in prod are built in S1-09, before S2-01.
-- HTTPS only, HSTS, helmet headers, strict CORS (Nexus web origins only), and a CSP that allows ArcGIS domains.
+Built in S1-09 (`apps/api/src/common/http/security.ts`, `common/rate-limit/`). Every limit is read from config (`04` environment table).
+- **Secure headers:** `@fastify/helmet` on every response, errors and 404s included: `Content-Security-Policy: default-src 'none'; frame-ancestors 'none'`, HSTS (1 year), `nosniff`, `X-Frame-Options`, `Referrer-Policy: no-referrer`. Only `/docs` (not mounted in prod) gets a looser CSP: its own scripts, styles and images, no inline script.
+- **CORS:** only the exact origins in `CORS_ALLOWED_ORIGINS` (https, no wildcard, validated at startup; http is allowed only when `APP_ENV=local`). Any other origin gets no CORS headers. No credentials: the SPA sends a bearer token, not cookies. When nothing is configured outside local, no browser origin is allowed.
+- **Rate limit:** two fixed one-minute windows, in memory.
+  1. Per user, keyed on the `oid` of the **validated** token: `EntraJwtGuard` counts it right after the token checks and before any database work, so deactivated and abusive users cost no queries and a forged token cannot spend someone else's budget. `RATE_LIMIT_USER_PER_MINUTE`, default 600.
+  2. Per client address, in a Fastify `onRequest` hook before routing, body parsing and any guard, so unknown paths, oversized bodies and floods of bad tokens are covered too: `RATE_LIMIT_IP_PER_MINUTE`, default 3000 (high because an office shares one address). This is also the "by IP before sign-in" fallback.
+  - Over the limit: 429 problem+json with `Retry-After`.
+  - **The counters are per API instance, not shared across replicas:** with N replicas a client can reach N times the limit, and a restart resets them. This guards against runaway clients and is not a security boundary, so no Postgres write is made per request. A shared store is a later change if abuse needs it.
+- **Client address:** `TRUST_PROXY` must list the proxies in front of the API, otherwise the sign-in audit IP and the IP limit see the proxy's address. It is **required when `APP_ENV` is dev or prod** (startup fails without it; `false` is an explicit choice). Refused: `true`, hop counts (Fastify 5: a number trusts nobody), IPv4 wider than /8, IPv6 wider than /32, `::ffff:` notation. The address is counted as IPv4 when it is IPv4-mapped, and IPv6 clients by their /64. The Azure value (infrastructure subnet CIDR) is Q46.
+- **Body limit:** `BODY_LIMIT_BYTES` (default 1 MiB); larger bodies get 413 problem+json before any handler runs.
+- **Swagger UI and the spec:** `/docs` and `/openapi.json` exist only for `APP_ENV` local or dev (404 in prod).
+- HTTPS only. The ArcGIS domains belong in the CSP of the **web app** (Static Web Apps headers), not of the JSON API.
 - Inputs are validated with zod. SQL goes only through Kysely parameter binding.
 - Secrets in Key Vault: DATOMS token, ArcGIS API key (also restricted by HTTP referrer), DB credentials. Rotate them every 90 days (runbook).
-- Rate limit on the API per user (e.g. 600 requests/min) to stop runaway clients.
 - Dependency scanning (Renovate + `pnpm audit` in CI). A penetration test happens before go-live (S8-05).
 - Data is held only in Azure UAE North.

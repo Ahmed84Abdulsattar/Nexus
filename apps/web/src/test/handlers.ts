@@ -13,7 +13,17 @@ function devKey(): string {
 
 export function configBody(apiKey: string): ConfigResponse {
   return {
-    arcgis: { apiKey },
+    // Same shape and defaults as the API's GET /v1/config (apps/api/src/modules/config).
+    arcgis: {
+      apiKey,
+      basemaps: {
+        map2d: 'arcgis/light-gray',
+        satellite: 'arcgis/imagery',
+        scene3d: 'arcgis/imagery',
+      },
+      extent: { xmin: 51.0, ymin: 22.0, xmax: 57.0, ymax: 26.6 },
+      initialView: { latitude: 24.4, longitude: 54.4, zoom: 7 },
+    },
     enums: {
       projectStates: Object.entries(SAMPLE_STATE_LABELS).map(([key, label]) => ({ key, label })),
       displayStatuses: [],

@@ -20,3 +20,5 @@ Do:
 - Load tests (k6 + fixture replay) per docs/12 section 3, with its per-job targets (poll, closed-bucket rollup refresh, API p95). Prove that DATOMS calls per minute stay flat while API users go from 1 to 1,000, and that live messages stay well under 1 MB at 500 assets per project.
 - Telemetry must come only from the bulk endpoint: fail any product code path that calls `data/latest` (ADR 0010).
 - Run the docs/14 review checklist against the diff and report any item that fails.
+- Before giving a verdict, run the checks with turbo `--force` (no cache replay): `pnpm lint` (eslint has no `--force`), then `pnpm exec turbo run typecheck test build --force`. Say in the report that you did. A cached "FULL TURBO" run is not evidence. (Ahmed, 2026-10-14.)
+- For e2e runs, use a free port (the Playwright config reads it from an env var) so you never test another worktree's dev server.
