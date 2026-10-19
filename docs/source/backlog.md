@@ -303,13 +303,13 @@
 - **Steps (how to do it):** 1. `GET /v1/me` (`@AnySignedIn`): the signed-in user's name, roles, permissions and project scope from the access context (docs/08 §5, docs/10).
   2. `GET /v1/config` (`@AnySignedIn`): feature flags, enums and the ArcGIS settings, including the per-environment ArcGIS key from config / Key Vault (docs/09, docs/10).
   3. Add both to OpenAPI and regenerate the typed web client; the web app's interim `/v1/config` and `/v1/projects` calls (S0-09 `pendingClient.ts`) switch to the typed client.
+  (Added 2026-10-14 (architect S1 plan, decision D2).)
 - **Output when done:** The web app can read who the user is and its runtime config from the API
 - **Now done by:** You (backend)
 - **Requirement:** Innovo: permissions; Brief: interactive map
 - **Depends on:** S1-09
 - **Estimate (days):** 1
 - **Acceptance check:** Tests: `/v1/me` returns the caller's permissions and nothing else; `/v1/config` needs a valid sign-in and never returns a secret other than the referrer-restricted ArcGIS key; both appear in the generated client
-- **Added:** 2026-10-14 (architect S1 plan, decision D2)
 
 ### S2-01 · Projects API: list, filter (status, type, district), search, scoped to user
 - **Sprint:** S2
@@ -512,13 +512,13 @@
 - **Steps (how to do it):** 1. Worker job `maintenance` (docs/07 §5), daily at 02:00 Asia/Dubai and once at start-up, leader only.
   2. Create partitions ahead for every partitioned table (raw packets, API-call log, events, audit log) using the existing SQL functions; drop partitions past retention through `drop_partitions_before` (with its audit floor).
   3. Record each run in `integration.sync_run` and raise a health warning when tomorrow's (or next month's) partition is missing.
+  (Added 2026-10-14 (architect S1 plan, decision D4).)
 - **Output when done:** Inserts never fail for lack of a partition; retention runs on its own
 - **Now done by:** You (backend)
 - **Requirement:** Foundation; N-10 retention
 - **Depends on:** S1-01, S3-01 (worker scheduler and leader lock)
 - **Estimate (days):** 1
 - **Acceptance check:** Integration test: with the clock moved forward 40 days, every partitioned table still accepts inserts and expired partitions are gone; a missing partition raises the health warning. Merged before or with S3-03.
-- **Added:** 2026-10-14 (architect S1 plan, decision D4)
 
 ### S3-09 · Admin projects API (R-63): create and edit projects, assign DATOMS assets
 - **Sprint:** S3
@@ -527,13 +527,13 @@
 - **Steps (how to do it):** 1. Write ADR 0012 (project source identity, link table) first.
   2. `/v1/admin/projects`: create, edit and retire projects with the admin-held fields (name, location, district, state, type, client / consultant / PM); never delete (hard rule 8).
   3. Assign DATOMS assets to projects from the linking to-do; every change goes to the audit log.
+  (Added 2026-10-14 (architect S2 plan, decisions D2 and D10).)
 - **Output when done:** Admins can build the portfolio until DATOMS sends site data (Q21, Q22, Q43)
 - **Now done by:** You (backend)
 - **Requirement:** R-63
 - **Depends on:** ADR 0012 (accepted 2026-10-14), S2-06, S3-01
 - **Estimate (days):** 2
 - **Acceptance check:** An admin creates a project and links an asset to it; a non-admin gets 403; the change is in the audit log
-- **Added:** 2026-10-14 (architect S2 plan, decisions D2 and D10)
 
 ### S4-01 · Chart summaries (5-minute, 1-hour, 1-day) as Nexus rollup tables
 - **Sprint:** S4
