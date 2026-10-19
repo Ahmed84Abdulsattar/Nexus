@@ -1,3 +1,4 @@
+import { assertDirectConnection, DatabaseConfigError, requireTlsUnlessLocal } from '@nexus/db';
 import { z } from 'zod';
 
 /**
@@ -28,8 +29,35 @@ const envSchema = z
      * unset or exactly the tenant's own JWKS URL, so the key source cannot be redirected.
      */
     ENTRA_JWKS_URL: z.preprocess(blankToUndefined, z.url().optional()),
+    /**
+     * The API's own database login (nexus_api role, docs/06 section 9). Never falls back to another
+     * variable. The pool connects lazily, so the app starts without a reachable database.
+     */
+    DATABASE_URL: z
+      .string()
+      .refine((v) => /^postgres(ql)?:\/\/.+/.test(v), 'must be a postgres:// or postgresql:// URL'),
+    DATABASE_POOL_MAX: z.preprocess(
+      blankToUndefined,
+      z.coerce.number().int().min(1).max(100).default(10),
+    ),
   })
   .superRefine((env, ctx) => {
+    // The API holds a LISTEN connection for access-cache invalidation. Through a pooler in transaction
+    // mode (Azure's built-in PgBouncer, port 6432) LISTEN is silently deaf, so refuse to start.
+    try {
+      assertDirectConnection(env.DATABASE_URL, 'DATABASE_URL');
+      // TLS outside local (never prints the URL).
+      requireTlsUnlessLocal(env.DATABASE_URL, 'DATABASE_URL', env.APP_ENV);
+    } catch (error) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['DATABASE_URL'],
+        message:
+          error instanceof DatabaseConfigError
+            ? error.message
+            : 'is not a valid URL (value not shown)',
+      });
+    }
     if (env.AUTH_MODE === 'dev' && env.APP_ENV !== 'local') {
       ctx.addIssue({
         code: 'custom',
@@ -67,6 +95,11 @@ export interface AppConfig {
     jwksUrl: string;
     requiredScope: string;
   };
+  database: {
+    /** Contains credentials when the URL has them: never log it. */
+    url: string;
+    poolMax: number;
+  };
 }
 
 export class ConfigError extends Error {}
@@ -90,6 +123,7 @@ export function loadConfig(env: NodeJS.ProcessEnv): AppConfig {
       jwksUrl: e.ENTRA_JWKS_URL ?? derivedJwksUrl(tenant),
       requiredScope: REQUIRED_SCOPE,
     },
+    database: { url: e.DATABASE_URL, poolMax: e.DATABASE_POOL_MAX },
   };
 }
 

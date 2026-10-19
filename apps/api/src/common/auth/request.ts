@@ -12,6 +12,8 @@ export interface AuthPrincipal {
 /** The parts of the (Fastify) request the auth code touches. */
 export interface AuthRequest {
   id?: string;
+  /** Client address as Fastify sees it (the proxy's address until trustProxy is configured, S1-09). */
+  ip?: string;
   headers: Record<string, string | string[] | undefined>;
   params?: Record<string, string | undefined>;
   auth?: AuthPrincipal;

@@ -3,7 +3,7 @@ import { Injectable } from '@nestjs/common';
 import { PERMISSION_KEYS, type PermissionKey, type RoleCode } from '@nexus/shared';
 import type { AccessContext, AccessDirectory, SignedInIdentity } from './access-context.js';
 
-/** Mirrors the seed in db/schema.sql (docs/08 section 3). Postgres replaces this in S1-01. */
+/** Mirrors the seed in db/schema.sql (docs/08 section 3). Used by tests; the API binds PostgresAccessDirectory. */
 const ROLE_PERMISSIONS: Record<RoleCode, readonly PermissionKey[]> = {
   admin: PERMISSION_KEYS,
   leadership: [
@@ -36,8 +36,8 @@ interface UserRow {
 }
 
 /**
- * In-memory stand-in for the access schema. Nobody has any role until one is assigned, so with
- * this bound the API denies everything that needs a permission. Tests seed it through the
+ * In-memory stand-in for the access schema, for tests. Nobody has any role until one is assigned,
+ * so with this bound the API denies everything that needs a permission. Tests seed it through the
  * methods below.
  */
 @Injectable()
@@ -51,6 +51,12 @@ export class InMemoryAccessDirectory implements AccessDirectory {
   upsertUser(identity: SignedInIdentity): Promise<{ userId: string; isActive: boolean }> {
     const row = this.ensureUser(identity.oid);
     return Promise.resolve({ userId: row.id, isActive: row.isActive });
+  }
+
+  isUserActive(userId: string): Promise<boolean> {
+    for (const row of this.users.values())
+      if (row.id === userId) return Promise.resolve(row.isActive);
+    return Promise.resolve(false);
   }
 
   loadAccess(userId: string, groupIds: string[]): Promise<AccessContext> {

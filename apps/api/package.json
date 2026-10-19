@@ -13,14 +13,17 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@fastify/static": "catalog:",
     "@nestjs/common": "catalog:",
     "@nestjs/core": "catalog:",
-    "@fastify/static": "catalog:",
     "@nestjs/platform-fastify": "catalog:",
     "@nestjs/swagger": "catalog:",
+    "@nexus/db": "workspace:*",
     "@nexus/shared": "workspace:*",
     "jose": "catalog:",
+    "kysely": "catalog:",
     "nestjs-zod": "catalog:",
+    "pg": "catalog:",
     "reflect-metadata": "catalog:",
     "rxjs": "catalog:",
     "zod": "catalog:"
@@ -28,8 +31,9 @@
   "devDependencies": {
     "@nestjs/testing": "catalog:",
     "@nexus/config": "workspace:*",
-    "@types/node": "catalog:",
     "@swc-node/register": "catalog:",
+    "@types/node": "catalog:",
+    "@types/pg": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
   }

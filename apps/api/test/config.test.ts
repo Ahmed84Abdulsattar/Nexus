@@ -39,6 +39,63 @@ describe('loadConfig', () => {
     expect(loadConfig({ ...TEST_ENV, AUTH_MODE: 'dev', APP_ENV: 'local' }).auth.mode).toBe('dev');
   });
 
+  describe('DATABASE_URL', () => {
+    const plain = 'postgres://nexus_api@db.example:5432/nexus';
+
+    it('is required and must be a postgres URL', () => {
+      const env: Record<string, string> = { ...TEST_ENV };
+      delete env['DATABASE_URL'];
+      expect(() => loadConfig(env)).toThrow(/DATABASE_URL/);
+      expect(() => loadConfig({ ...TEST_ENV, DATABASE_URL: 'mysql://x' })).toThrow(/DATABASE_URL/);
+    });
+
+    it('needs no TLS locally but requires it in dev and prod (L9)', () => {
+      expect(loadConfig({ ...TEST_ENV, APP_ENV: 'local', DATABASE_URL: plain }).database.url).toBe(
+        plain,
+      );
+      for (const appEnv of ['dev', 'prod']) {
+        expect(() => loadConfig({ ...TEST_ENV, APP_ENV: appEnv, DATABASE_URL: plain })).toThrow(
+          /must use TLS/,
+        );
+        expect(
+          loadConfig({ ...TEST_ENV, APP_ENV: appEnv, DATABASE_URL: plain + '?sslmode=verify-full' })
+            .database.poolMax,
+        ).toBe(10);
+      }
+    });
+
+    it('refuses the PgBouncer port, where LISTEN is deaf (M4)', () => {
+      expect(() =>
+        loadConfig({ ...TEST_ENV, DATABASE_URL: 'postgres://nexus_api@db.example:6432/nexus' }),
+      ).toThrow(/6432/);
+    });
+
+    it('refuses a ?port= parameter that would override the port (N3) and a TLS-looking flag next to sslmode=disable (N2)', () => {
+      expect(() =>
+        loadConfig({
+          ...TEST_ENV,
+          DATABASE_URL: 'postgres://nexus_api@db.example:5432/nexus?port=6432',
+        }),
+      ).toThrow(/query parameter/);
+      expect(() =>
+        loadConfig({
+          ...TEST_ENV,
+          APP_ENV: 'prod',
+          DATABASE_URL: 'postgres://nexus_api@db.example:5432/nexus?ssl=true&sslmode=disable',
+        }),
+      ).toThrow(/must use TLS/);
+    });
+
+    it('never puts the URL in an error', () => {
+      try {
+        loadConfig({ ...TEST_ENV, APP_ENV: 'prod', DATABASE_URL: 'postgres://u:hunter2@h:5432/d' });
+        expect.unreachable();
+      } catch (error) {
+        expect((error as Error).message).not.toContain('hunter2');
+      }
+    });
+  });
+
   it('defaults AUTH_MODE to entra', () => {
     const env: Record<string, string> = { ...TEST_ENV };
     delete env['AUTH_MODE'];

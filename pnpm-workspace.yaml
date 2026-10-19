@@ -2,6 +2,7 @@ packages:
   - apps/*
   - packages/*
   - packages/connectors/*
+  - db
 
 # One place for shared dependency versions. Renovate proposes upgrades.
 catalog:
@@ -31,9 +32,15 @@ catalog:
   husky: ^9.1.7
   jsdom: ^30.1.2
   jose: ^6.2.12
+  kysely: ^0.29.6
+  kysely-codegen: ^0.20.0
   nestjs-zod: ^5.5.0
+  node-pg-migrate: ^9.0.0
   openapi-fetch: ^0.17.0
   openapi-typescript: ^7.13.0
+  pg: ^8.23.1
+  pg-connection-string: ^2.14.1
+  '@types/pg': ^8.23.1
   lint-staged: ^17.6.0
   prettier: ^3.9.9
   react: ^19.3.0

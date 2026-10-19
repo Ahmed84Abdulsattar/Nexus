@@ -1,0 +1,26 @@
+{
+  "meta": {
+    "endpoint": "/assets/43644/data/latest",
+    "method": "GET",
+    "date": "2026-10-12T11:46:03.816Z",
+    "status": 200,
+    "rateLimit": {
+      "limit": "8",
+      "remaining": "7",
+      "reset": "300"
+    }
+  },
+  "body": {
+    "success": true,
+    "status": "success",
+    "data": {
+      "time": "2026-10-12T11:45:36.000Z",
+      "parameters": {
+        "fuel": 87.06,
+        "fuel_litre": 17412,
+        "fuel_consumption": 4.0001,
+        "fuel_filled": null
+      }
+    }
+  }
+}
