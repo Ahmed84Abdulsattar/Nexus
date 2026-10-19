@@ -91,6 +91,11 @@ Versions: use the current stable major at project start and pin exact versions i
 | `VITE_ENTRA_API_SCOPE` | web | `api://nexus-api/access_as_user` (the scope MSAL requests; matches `ENTRA_API_AUDIENCE`) |
 | `ENTRA_WEB_CLIENT_ID` | web (`VITE_ENTRA_WEB_CLIENT_ID`) | `nexus-web` app id |
 | `AUTH_MODE` | api, web | `entra` (default). `dev` is allowed **only when `APP_ENV=local`**: it signs local test tokens for seeded users. The API refuses to start with `dev` anywhere else. |
+| `CORS_ALLOWED_ORIGINS` | api | Comma-separated browser origins that may call the API, e.g. `https://nexus-dev.innovo.example`. Exact origins only: no `*`, no path, no trailing slash; `https` required unless `APP_ENV=local`. Unset: `http://localhost:5173` when `APP_ENV=local`, otherwise none (browsers are refused). Any other origin gets no CORS headers. |
+| `RATE_LIMIT_USER_PER_MINUTE` | api | Requests per signed-in user (token `oid`) per minute. Default `600`. Over it: 429 problem+json with `Retry-After`. In memory, per API instance (`08` §6). |
+| `RATE_LIMIT_IP_PER_MINUTE` | api | Flood guard per client address per minute, also for requests with bad tokens. Default `3000` (many users share an office address). |
+| `BODY_LIMIT_BYTES` | api | Largest request body. Default `1048576` (1 MiB). Larger: 413 problem+json. |
+| `TRUST_PROXY` | api | How the client address is read from `X-Forwarded-For`: `false` or a comma-separated list of the proxies' IP addresses or CIDRs. **Required when `APP_ENV` is `dev` or `prod`** (the API refuses to start without it, because behind the Azure ingress every user would otherwise share one address and a flood of bad tokens would lock everyone out); in Azure set it to the Container Apps environment infrastructure subnet CIDR. Unset is `false` only when `APP_ENV=local`. Refused: a hop count (Fastify 5 treats a number as "trust nobody"), `true`, IPv4 wider than /8, IPv6 wider than /32, and `::ffff:` notation (any client could pick its own address). It sets the IP in the sign-in audit row and the IP rate limit. The exact CIDR is Q46. |
 | `KEY_VAULT_URI` | api, worker | `https://kv-nexus-dev.vault.azure.net/` (secrets below are read from here in Azure) |
 | `DATOMS_BASE_URL` / `DATOMS_ORG_ID` / `DATOMS_TOKEN` | worker, CLI | `DATOMS_ORG_ID` = `20283` (Innovo's org; public). Token comes from Key Vault in Azure. The provisional read-only **test key** (valid until 10 Nov 2026) is set **only** in a developer's local git-ignored `.env` as `DATOMS_TOKEN`: never in Key Vault, CI, code, docs, fixtures or logs (`07` §3.1). |
 | `DATOMS_LIVE` | worker, CLI | `false` = use fixtures (default locally) |
@@ -98,7 +103,7 @@ Versions: use the current stable major at project start and pin exact versions i
 | `WEB_PUBSUB_ENDPOINT` / `WEB_PUBSUB_HUB` | api, worker | `https://wps-nexus-dev.webpubsub.azure.com` / `nexus` |
 | `LIVE_MODE` | api, worker, web | `pubsub` (default) or `poll`. Locally, `poll` turns off push and the web app refetches every 60 s. |
 | `ARCGIS_API_KEY` | api (served via `/v1/config`) | Referrer-restricted; Key Vault in Azure. One key per environment. |
-| `VITE_DEV_ARCGIS_API_KEY` | web, **local only** | Interim (S0-09) until `GET /v1/config` runs locally (S1-02). Read only by the MSW `/v1/config` mock in Vite dev mode, from the developer's git-ignored `.env`. Never set in CI or Azure: the web build fails if it is set. Remove after S1-02. |
+| `VITE_DEV_ARCGIS_API_KEY` | web, **local only** | Only for running the web app **without the API** locally. The real path is `GET /v1/config` (S1-10), which serves `ARCGIS_API_KEY`. Read only by the MSW `/v1/config` mock in Vite dev mode, from the developer's git-ignored `.env`. Never set in CI or Azure: the web build fails if it is set. Remove once the web uses the typed `/v1/config` client (follow-up to S1-10). |
 | `APPLICATIONINSIGHTS_CONNECTION_STRING` | all | |
 | `VITE_API_BASE_URL` | web | `http://localhost:3000/v1` |
 | `LOG_LEVEL` | api, worker | `info` |

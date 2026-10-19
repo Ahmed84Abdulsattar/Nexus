@@ -161,6 +161,30 @@ describe.skipIf(testDatabaseAdminUrl === undefined)('access directory on Postgre
       });
     });
 
+    it('does not write for a deactivated user (no last_seen_at change, no audit row)', async () => {
+      const oid = newOid();
+      const { userId } = await directory.upsertUser(who(oid, [], { email: 'old@innovo.example' }));
+      await admin.query(
+        `UPDATE access.app_user SET is_active = false, last_seen_at = now() - interval '2 days' WHERE id = $1`,
+        [userId],
+      );
+      const before = (
+        await admin.query(`SELECT last_seen_at, email FROM access.app_user WHERE id = $1`, [userId])
+      ).rows[0];
+      const auditBefore = (await auditRows(userId)).length;
+      for (let i = 0; i < 3; i++) {
+        expect(await directory.upsertUser(who(oid, [], { email: 'new@innovo.example' }))).toEqual({
+          userId,
+          isActive: false,
+        });
+      }
+      const after = (
+        await admin.query(`SELECT last_seen_at, email FROM access.app_user WHERE id = $1`, [userId])
+      ).rows[0];
+      expect(after).toEqual(before);
+      expect((await auditRows(userId)).length).toBe(auditBefore);
+    });
+
     it('does not audit again for a user who is still active, but does after the idle window', async () => {
       const oid = newOid();
       const { userId } = await directory.upsertUser(who(oid));

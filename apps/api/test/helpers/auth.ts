@@ -1,6 +1,6 @@
 import 'reflect-metadata';
 import { Body, Controller, Get, Module, Param, Post, Query, SetMetadata } from '@nestjs/common';
-import { FastifyAdapter, type NestFastifyApplication } from '@nestjs/platform-fastify';
+import { type NestFastifyApplication } from '@nestjs/platform-fastify';
 import { Test } from '@nestjs/testing';
 import { cursorPageQuerySchema } from '@nexus/shared';
 import { createZodDto } from 'nestjs-zod';
@@ -25,7 +25,17 @@ import {
 import { JWT_KEY_RESOLVER } from '../../src/common/auth/entra-jwt.guard.js';
 import { AccessChangeListener } from '../../src/common/auth/access-change-listener.js';
 import { InMemoryAccessDirectory } from '../../src/common/auth/in-memory-access-directory.js';
+import {
+  ME_REPOSITORY,
+  type MeRepository,
+  type StoredProfile,
+} from '../../src/modules/access/me.repository.js';
+import {
+  CLIENT_CONFIG_REPOSITORY,
+  type ClientConfigRepository,
+} from '../../src/modules/config/config.repository.js';
 import { mountDocs } from '../../src/openapi/setup.js';
+import { applySecurity, createHttpAdapter } from '../../src/common/http/security.js';
 import { configureApp } from '../../src/common/http/configure-app.js';
 import { APP_CONFIG, type AppConfig, loadConfig } from '../../src/config/env.js';
 
@@ -38,6 +48,8 @@ export const ISSUER = `https://login.microsoftonline.com/${TENANT_ID}/v2.0`;
 export const TEST_ENV = {
   APP_ENV: 'local',
   AUTH_MODE: 'entra',
+  // Required outside local (Q46); tests state "no proxy" explicitly.
+  TRUST_PROXY: 'false',
   ENTRA_TENANT_ID: TENANT_ID,
   ENTRA_API_CLIENT_ID: API_CLIENT_ID,
   ENTRA_WEB_CLIENT_ID: WEB_CLIENT_ID,
@@ -45,6 +57,24 @@ export const TEST_ENV = {
   // Nothing in the unit tests connects (the pool is lazy and the directory below is in memory).
   DATABASE_URL: 'postgres://nexus_api_local@127.0.0.1:1/nexus_unit_tests?sslmode=require',
 } as const;
+
+/** Stored profiles by user id, for /v1/me in tests without a database. */
+export const storedProfiles = new Map<string, StoredProfile>();
+const fakeMeRepository: MeRepository = {
+  profile: (userId) => Promise.resolve(storedProfiles.get(userId) ?? { name: null, email: null }),
+};
+/** What the settings tables hold, for /v1/config in tests without a database. */
+export const storedConfig = {
+  featureFlags: { 'project.weather': false, 'explorer.csv_export': true } as Record<
+    string,
+    boolean
+  >,
+  displayStatusKeys: ['running', 'idle'] as string[],
+};
+const fakeConfigRepository: ClientConfigRepository = {
+  featureFlags: () => Promise.resolve({ ...storedConfig.featureFlags }),
+  displayStatusKeys: () => Promise.resolve([...storedConfig.displayStatusKeys]),
+};
 
 export interface TestKeys {
   kid: string;
@@ -243,6 +273,10 @@ export async function createTestApp(
     .useClass(InMemoryAccessDirectory)
     .overrideProvider(AccessChangeListener)
     .useValue({})
+    .overrideProvider(ME_REPOSITORY)
+    .useValue(fakeMeRepository)
+    .overrideProvider(CLIENT_CONFIG_REPOSITORY)
+    .useValue(fakeConfigRepository)
     .overrideProvider(JWT_KEY_RESOLVER)
     .useValue(
       options.resolver ??
@@ -251,8 +285,9 @@ export async function createTestApp(
         }),
     )
     .compile();
-  const app = moduleRef.createNestApplication<NestFastifyApplication>(new FastifyAdapter());
+  const app = moduleRef.createNestApplication<NestFastifyApplication>(createHttpAdapter(config));
   configureApp(app);
+  await applySecurity(app, config);
   if (options.docs) mountDocs(app, config.appEnv);
   await app.init();
   await app.getHttpAdapter().getInstance().ready();
