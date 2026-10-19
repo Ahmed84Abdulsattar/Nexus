@@ -4,17 +4,18 @@ import { NestFactory } from '@nestjs/core';
 import { WorkerModule } from './worker.module.js';
 
 async function bootstrap(): Promise<void> {
+  // The schedule starts in onApplicationBootstrap (SchedulerService). Timers keep the process
+  // alive; SIGTERM / SIGINT stop the schedule, wait for a running job and release the leader lock.
   const app = await NestFactory.createApplicationContext(WorkerModule);
   app.enableShutdownHooks();
 
-  // docs/04: DATOMS_LIVE=false (the default) means fixtures. S0 has no DATOMS code at all.
+  // docs/04: DATOMS_LIVE=false (the default) means fixtures.
   const live = process.env['DATOMS_LIVE'] === 'true';
-  new Logger('Worker').log(`worker started, DATOMS_LIVE=${live}, no jobs registered`);
-
-  // Keeps the process alive until scheduled jobs exist (S2/S3); remove then.
-  const keepAlive = setInterval(() => undefined, 60_000);
-  process.once('SIGTERM', () => clearInterval(keepAlive));
-  process.once('SIGINT', () => clearInterval(keepAlive));
+  new Logger('Worker').log(`worker started, DATOMS_LIVE=${live}, jobs: catalogue-sync`);
 }
 
-void bootstrap();
+bootstrap().catch((error: unknown) => {
+  // Config errors name the missing variable and never print a URL or a token.
+  new Logger('Worker').error(error instanceof Error ? error.message : 'worker failed to start');
+  process.exitCode = 1;
+});

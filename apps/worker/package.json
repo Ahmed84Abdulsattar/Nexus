@@ -2,7 +2,7 @@
   "name": "@nexus/worker",
   "version": "0.0.0",
   "private": true,
-  "description": "NestJS standalone worker. Placeholder: logs startup, runs no jobs, makes no DATOMS calls.",
+  "description": "NestJS standalone worker: leader lock, scheduler, catalogue sync. The only process that calls DATOMS (through the connector interface).",
   "type": "module",
   "scripts": {
     "dev": "node --env-file-if-exists=../../.env --watch --import @swc-node/register/esm-register src/main.ts",
@@ -14,8 +14,12 @@
   "dependencies": {
     "@nestjs/common": "catalog:",
     "@nestjs/core": "catalog:",
+    "@nexus/connectors-core": "workspace:*",
+    "@nexus/connectors-datoms": "workspace:*",
     "@nexus/db": "workspace:*",
+    "@nexus/shared": "workspace:*",
     "kysely": "catalog:",
+    "pg": "catalog:",
     "reflect-metadata": "catalog:",
     "rxjs": "catalog:",
     "zod": "catalog:"
@@ -25,6 +29,7 @@
     "@nexus/config": "workspace:*",
     "@swc-node/register": "catalog:",
     "@types/node": "catalog:",
+    "@types/pg": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
   }

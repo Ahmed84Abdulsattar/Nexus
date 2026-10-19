@@ -20,7 +20,9 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run"
   },
-  "dependencies": {},
+  "dependencies": {
+    "@nexus/shared": "workspace:*"
+  },
   "devDependencies": {
     "@nexus/config": "workspace:*",
     "@types/node": "catalog:",

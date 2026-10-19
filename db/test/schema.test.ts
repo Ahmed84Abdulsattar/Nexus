@@ -1,7 +1,9 @@
+import { readdirSync } from 'node:fs';
 import pg from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { checkSchema } from '../src/admin/check.js';
 import { migrate } from '../src/admin/migrate.js';
+import { MIGRATIONS_DIR } from '../src/admin/paths.js';
 import { seed } from '../src/admin/seed.js';
 import { createTestDatabase, testDatabaseAdminUrl, type TestDatabase } from '../src/testing.js';
 
@@ -42,18 +44,24 @@ describe.skipIf(testDatabaseAdminUrl === undefined)('database (PostgreSQL)', () 
 
   describe('migrations', () => {
     it('run up, down, up on an empty database and are then up to date', async () => {
+      // Every migration file, in order: the test needs no edit when a migration is added.
+      const all = readdirSync(MIGRATIONS_DIR)
+        .filter((f) => f.endsWith('.sql'))
+        .map((f) => f.replace(/\.sql$/, ''))
+        .sort();
       const fresh = await createTestDatabase();
       try {
         expect((await migrate({ url: fresh.adminUrl, direction: 'up' })).applied).toEqual([]);
-        expect((await migrate({ url: fresh.adminUrl, direction: 'down', count: Infinity, confirmDatabase: fresh.name })).applied).toEqual([
-          '0001_init',
-        ]);
+        expect(
+          (await migrate({ url: fresh.adminUrl, direction: 'down', count: Infinity, confirmDatabase: fresh.name }))
+            .applied,
+        ).toEqual(all);
         const c = new pg.Client({ connectionString: fresh.adminUrl });
         await c.connect();
         const schemas = await c.query(`SELECT 1 FROM pg_namespace WHERE nspname IN ('core','telemetry','access')`);
         await c.end();
         expect(schemas.rowCount).toBe(0);
-        expect((await migrate({ url: fresh.adminUrl, direction: 'up' })).applied).toEqual(['0001_init']);
+        expect((await migrate({ url: fresh.adminUrl, direction: 'up' })).applied).toEqual(all);
       } finally {
         await fresh.drop();
       }

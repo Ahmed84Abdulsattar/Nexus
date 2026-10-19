@@ -80,7 +80,9 @@ export function bulkIdRequest(ids: readonly string[]): unknown {
 export const CODE_PAGE_RESPONSE_TOO_LARGE = 'PAGE_RESPONSE_TOO_LARGE';
 
 // ---------------------------------------------------------------------------------------------
-// Mapped (Nexus-side) shapes. They match the connector types (SourceAsset, SourceReading).
+// Mapped (Nexus-side) shapes. They are structurally assignable to the connector types
+// (SourceAsset, SourceReading in packages/connectors/core); the DATOMS connector checks this at
+// compile time, so a drift between the two fails the build.
 // ---------------------------------------------------------------------------------------------
 
 export interface Pagination {
@@ -105,6 +107,10 @@ export interface MappedAsset {
   lifecycleStatus: string | undefined;
   /** `asset_info`, unchanged (make, model, kva, capacity, ... and nulls as sent). */
   nameplate: Record<string, unknown> | undefined;
+  // Absent until DATOMS gives the field list (Q21, Q22). Never defaulted. The asset list rows
+  // carry no site, so the asset-to-site link is not mapped (docs/07 section 3.2).
+  siteExternalId?: never;
+  kind?: never;
 }
 
 export function mapAsset(raw: RawAsset): MappedAsset {
@@ -139,7 +145,7 @@ export function mapAssetListPage(body: RawAssetList): AssetListPage {
  * with a `null` value are DROPPED from `values`; all other values (including `0`, `false` and
  * `""`) pass through unchanged. `seenKeys` lists EVERY key in the row, null or not, in the
  * order sent, so the worker can still record each key in `telemetry.parameter` per source type
- * (the UI then lists a never-reported key as "—").
+ * (the UI then shows a never-reported key as "no data yet").
  *
  * The worker must REPLACE `latest_packet.values` with `values` on every new packet, never merge
  * it with the stored object: a value that went null must not keep showing its old value.
@@ -201,4 +207,31 @@ export function bulkRowCount(body: RawBulkResponse | undefined): number {
 
 export function mapBulkPage(body: RawBulkResponse): MappedBulkPage {
   return { ...mapBulkRows(body.data ?? []), pagination: mapPagination(body.pagination) };
+}
+
+// ---------------------------------------------------------------------------------------------
+// Fixture-mode helpers (src/fixtures.ts). They live here because they touch raw field names.
+// ---------------------------------------------------------------------------------------------
+
+export type ParsedBulkRequest = { mode: 'ids'; ids: string[] } | { mode: 'fleet'; page: number };
+
+/** Reads a bulk request body the way `bulkIdRequest` / `bulkFleetRequest` build it. */
+export function parseBulkRequest(body: unknown): ParsedBulkRequest {
+  const b = (body ?? {}) as { asset_ids?: unknown; page?: unknown };
+  if (Array.isArray(b.asset_ids)) return { mode: 'ids', ids: b.asset_ids.map(String) };
+  return { mode: 'fleet', page: typeof b.page === 'number' ? b.page : 1 };
+}
+
+export function bulkRowId(row: RawBulkRow): string {
+  return String(row.asset_id);
+}
+
+/** What id mode answers for an id that is not in the fleet: `success: false`, no data. */
+export function noDataRow(id: string): RawBulkRow {
+  return { asset_id: id, success: false };
+}
+
+/** The same response with no rows (a page past the end). */
+export function withoutRows<T extends { data: unknown[] }>(body: T): T {
+  return { ...body, data: [] };
 }

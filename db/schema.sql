@@ -323,6 +323,9 @@ CREATE TABLE core.asset (
   retired_at       timestamptz,
   created_at       timestamptz NOT NULL DEFAULT now(),
   updated_at       timestamptz NOT NULL DEFAULT now(),
+  -- DATOMS lifecycle_status exactly as reported. Display only: never used for status, counts, poll scope or
+  -- retirement. Added by the catalogue_sync_details migration, so it is the last column (pg_dump lists columns in creation order).
+  source_lifecycle_status text,
   UNIQUE (source_system, external_id),
   CONSTRAINT asset_spatial_needs_project_chk
     CHECK (project_id IS NOT NULL OR (building_id IS NULL AND level_id IS NULL AND zone_id IS NULL)),
@@ -795,7 +798,8 @@ CREATE TABLE integration.sync_run (
   api_calls      int NOT NULL DEFAULT 0,
   credits_used   bigint NOT NULL DEFAULT 0,
   lag_seconds    int,                          -- now() - newest packet time
-  error          jsonb
+  error          jsonb,                        -- failures only
+  details        jsonb                         -- typed summary per job (packages/shared SyncRunDetails); added by the catalogue_sync_details migration
 );
 CREATE INDEX sync_run_job_time_idx ON integration.sync_run (source_system, job, started_at DESC);
 

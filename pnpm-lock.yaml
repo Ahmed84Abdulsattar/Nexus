@@ -579,12 +579,24 @@ importers:
       '@nestjs/core':
         specifier: 'catalog:'
         version: 11.2.7(@nestjs/common@11.2.7(reflect-metadata@0.2.2)(rxjs@7.8.2)(supports-color@7.2.0))(reflect-metadata@0.2.2)(rxjs@7.8.2)
+      '@nexus/connectors-core':
+        specifier: workspace:*
+        version: link:../../packages/connectors/core
+      '@nexus/connectors-datoms':
+        specifier: workspace:*
+        version: link:../../packages/connectors/datoms
       '@nexus/db':
         specifier: workspace:*
         version: link:../../db
+      '@nexus/shared':
+        specifier: workspace:*
+        version: link:../../packages/shared
       kysely:
         specifier: 'catalog:'
         version: 0.29.7
+      pg:
+        specifier: 'catalog:'
+        version: 8.23.1
       reflect-metadata:
         specifier: 'catalog:'
         version: 0.2.2
@@ -607,6 +619,9 @@ importers:
       '@types/node':
         specifier: 'catalog:'
         version: 22.20.5
+      '@types/pg':
+        specifier: 'catalog:'
+        version: 8.23.1
       typescript:
         specifier: 'catalog:'
         version: 5.9.3
@@ -695,6 +710,10 @@ importers:
         version: 3.2.7(@types/debug@4.1.13)(@types/node@22.20.5)(jiti@2.7.0)(jsdom@30.1.2(@noble/hashes@1.8.0))(lightningcss@1.32.0)(supports-color@7.2.0)(tsx@4.23.15)(yaml@2.9.1)
 
   packages/connectors/core:
+    dependencies:
+      '@nexus/shared':
+        specifier: workspace:*
+        version: link:../../shared
     devDependencies:
       '@nexus/config':
         specifier: workspace:*
