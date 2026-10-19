@@ -1,0 +1,56 @@
+{
+  "meta": {
+    "endpoint": "/assets/33899/data/latest",
+    "method": "GET",
+    "date": "2026-10-12T11:46:04.137Z",
+    "status": 200,
+    "rateLimit": {
+      "limit": "8",
+      "remaining": "7",
+      "reset": "300"
+    }
+  },
+  "body": {
+    "success": true,
+    "status": "success",
+    "data": {
+      "time": "2026-10-12T11:45:53.000Z",
+      "parameters": {
+        "mrun_hr": 4429.4902,
+        "mt_energy": 34455.8008,
+        "mt_power": 19.7148,
+        "mvol": 234.12,
+        "mcurr": 32.625,
+        "tot_curr": 97.89,
+        "mvol_r": 233.49,
+        "mvol_y": 233.58,
+        "mvol_b": 235.31,
+        "mvol_ry": 402.26,
+        "mvol_yb": 404.79,
+        "mvol_br": 401.86,
+        "mvolt_p": 402.97,
+        "mcur_ir": 31.335,
+        "mcur_iy": 35.805,
+        "mcur_ib": 30.75,
+        "mpow_r": 6.1651,
+        "mpow_y": 7.5549,
+        "mpow_b": 5.9948,
+        "mr_power": 11.579,
+        "mrpow_r": 3.9398,
+        "mrpow_y": 3.5872,
+        "mrpow_b": 4.052,
+        "ma_power": 22.9155,
+        "mapow_r": 7.3164,
+        "mapow_y": 8.3633,
+        "mapow_b": 7.2358,
+        "mt_pf": 0.8622,
+        "mpf_r": 0.8426,
+        "mpf_y": 0.9033,
+        "mpf_b": 0.8284,
+        "mfreq": 50,
+        "ma_energy": 37909.3984,
+        "mr_energy": 14874.7012
+      }
+    }
+  }
+}

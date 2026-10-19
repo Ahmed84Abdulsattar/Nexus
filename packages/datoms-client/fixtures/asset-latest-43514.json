@@ -1,0 +1,45 @@
+{
+  "meta": {
+    "endpoint": "/assets/43514/data/latest",
+    "method": "GET",
+    "date": "2026-10-12T11:46:03.995Z",
+    "status": 200,
+    "rateLimit": {
+      "limit": "8",
+      "remaining": "7",
+      "reset": "300"
+    }
+  },
+  "body": {
+    "success": true,
+    "status": "success",
+    "data": {
+      "time": "2026-10-12T11:45:58.000Z",
+      "parameters": {
+        "mpow_r": 4.8734,
+        "mpow_y": 9.7064,
+        "mpow_b": 4.7352,
+        "ma_energy": 18351.5,
+        "mcurr": 41.345,
+        "mt_pf": 0.9999,
+        "mvol_ry": 404.62,
+        "mvol_r": 232.58,
+        "mvol_yb": 406.13,
+        "mvol_y": 234.72,
+        "mvol_br": 404.33,
+        "mvol_b": 234.23,
+        "mcur_ir": 41.265,
+        "mcur_iy": 41.385,
+        "mcur_ib": 41.385,
+        "mr_energy": 31192.8984,
+        "ma_power": 28.9975,
+        "mr_power": -0.2237,
+        "freq": 50.021,
+        "mvol": 233.84,
+        "calculated_sol_enrg": 0.1016,
+        "sol_enrg": 20772.3008,
+        "inv_power": 19.3351
+      }
+    }
+  }
+}

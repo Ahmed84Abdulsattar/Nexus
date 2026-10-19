@@ -1,0 +1,458 @@
+{
+  "meta": {
+    "endpoint": "/assets?page=1&limit=1000",
+    "method": "GET",
+    "date": "2026-10-12T11:45:47.305Z",
+    "status": 200,
+    "rateLimit": {
+      "limit": "60",
+      "remaining": "59",
+      "reset": "60"
+    }
+  },
+  "body": {
+    "success": true,
+    "status": "success",
+    "data": [
+      {
+        "id": "43644",
+        "name": "Fuel Tank Ghaf wood",
+        "created_at": "2026-08-19T06:49:22Z",
+        "lifecycle_status": "active",
+        "category_id": 71,
+        "category_name": "Fuel Tank",
+        "asset_info": {
+          "make": null,
+          "model": null,
+          "sl_no": null,
+          "capacity": 20000
+        }
+      },
+      {
+        "id": "43514",
+        "name": "Ghaf woods Solar Farm",
+        "created_at": "2026-08-17T08:56:52Z",
+        "lifecycle_status": "active",
+        "category_id": 93,
+        "category_name": "Solar Inverter",
+        "asset_info": {
+          "make": null,
+          "model": null,
+          "sl_no": "ABCD",
+          "phase": null,
+          "capacity": null,
+          "capacity_unit": null,
+          "rated_current": null,
+          "load_power_factor": null,
+          "system_capacity_kwp": 400
+        }
+      },
+      {
+        "id": "43512",
+        "name": "Source -2 DG-3062 (Channel 2)",
+        "created_at": "2026-08-17T08:36:46Z",
+        "lifecycle_status": "active",
+        "category_id": 18,
+        "category_name": "DG Set",
+        "asset_info": {
+          "make": null,
+          "model": null,
+          "sl_no": "SGKP3062",
+          "engine_sl_no": null,
+          "kva": 650,
+          "capacity": 0,
+          "phase": "three",
+          "power_factor": null,
+          "commissioning_date": null,
+          "emission_norm": "CPCB II",
+          "battery_voltage": null,
+          "alternator_sl_no": null,
+          "panel_sl_no": null,
+          "warranty_exp_date": null,
+          "amf": null,
+          "engine_model": null,
+          "engine_make": null,
+          "alias_name": null,
+          "no_of_poles": null
+        }
+      },
+      {
+        "id": "43510",
+        "name": "Source -2 DG-3020 (Channel 1)",
+        "created_at": "2026-08-17T08:18:24Z",
+        "lifecycle_status": "active",
+        "category_id": 18,
+        "category_name": "DG Set",
+        "asset_info": {
+          "make": null,
+          "model": null,
+          "sl_no": "SGCC3020",
+          "engine_sl_no": null,
+          "kva": 1000,
+          "capacity": 0,
+          "phase": "three",
+          "power_factor": null,
+          "commissioning_date": null,
+          "emission_norm": "CPCB II",
+          "battery_voltage": null,
+          "alternator_sl_no": null,
+          "panel_sl_no": null,
+          "warranty_exp_date": null,
+          "amf": null,
+          "engine_model": null,
+          "engine_make": null,
+          "alias_name": null,
+          "no_of_poles": null
+        }
+      },
+      {
+        "id": "43508",
+        "name": "Source -2 DG-2709 (Channel 4)",
+        "created_at": "2026-08-17T08:11:28Z",
+        "lifecycle_status": "active",
+        "category_id": 18,
+        "category_name": "DG Set",
+        "asset_info": {
+          "make": null,
+          "model": null,
+          "sl_no": "SGCC2709",
+          "engine_sl_no": null,
+          "kva": 1000,
+          "capacity": 0,
+          "phase": "three",
+          "power_factor": null,
+          "commissioning_date": null,
+          "emission_norm": "CPCB II",
+          "battery_voltage": null,
+          "alternator_sl_no": null,
+          "panel_sl_no": null,
+          "warranty_exp_date": null,
+          "amf": null,
+          "engine_model": null,
+          "engine_make": null,
+          "alias_name": null,
+          "no_of_poles": null
+        }
+      },
+      {
+        "id": "43507",
+        "name": "Source -2 DG-3061 (Channel 3)",
+        "created_at": "2026-08-17T07:57:05Z",
+        "lifecycle_status": "active",
+        "category_id": 18,
+        "category_name": "DG Set",
+        "asset_info": {
+          "make": null,
+          "model": null,
+          "sl_no": null,
+          "engine_sl_no": null,
+          "kva": 650,
+          "capacity": 0,
+          "phase": "three",
+          "power_factor": null,
+          "commissioning_date": null,
+          "emission_norm": "CPCB II",
+          "battery_voltage": null,
+          "alternator_sl_no": null,
+          "panel_sl_no": null,
+          "warranty_exp_date": null,
+          "amf": null,
+          "engine_model": null,
+          "engine_make": null,
+          "alias_name": null,
+          "no_of_poles": null
+        }
+      },
+      {
+        "id": "42485",
+        "name": "DG-3062",
+        "created_at": "2026-07-14T14:27:27Z",
+        "lifecycle_status": "active",
+        "category_id": 18,
+        "category_name": "DG Set",
+        "asset_info": {
+          "make": "cummins",
+          "model": null,
+          "sl_no": null,
+          "engine_sl_no": null,
+          "kva": 650,
+          "capacity": 20000,
+          "phase": "three",
+          "power_factor": null,
+          "commissioning_date": null,
+          "emission_norm": "CPCB II",
+          "battery_voltage": null,
+          "alternator_sl_no": null,
+          "panel_sl_no": "SGKP3062",
+          "warranty_exp_date": null,
+          "amf": null,
+          "engine_model": null,
+          "engine_make": null,
+          "alias_name": null,
+          "no_of_poles": null
+        }
+      },
+      {
+        "id": "42484",
+        "name": "DG-3061",
+        "created_at": "2026-07-14T14:25:38Z",
+        "lifecycle_status": "active",
+        "category_id": 18,
+        "category_name": "DG Set",
+        "asset_info": {
+          "make": "cummins",
+          "model": null,
+          "sl_no": null,
+          "engine_sl_no": null,
+          "kva": 650,
+          "capacity": 20000,
+          "phase": "three",
+          "power_factor": null,
+          "commissioning_date": null,
+          "emission_norm": null,
+          "battery_voltage": null,
+          "alternator_sl_no": null,
+          "panel_sl_no": "SGKP3061",
+          "warranty_exp_date": null,
+          "amf": null,
+          "engine_model": null,
+          "engine_make": null,
+          "alias_name": null,
+          "no_of_poles": null
+        }
+      },
+      {
+        "id": "42483",
+        "name": "DG-3020",
+        "created_at": "2026-07-14T14:23:55Z",
+        "lifecycle_status": "active",
+        "category_id": 18,
+        "category_name": "DG Set",
+        "asset_info": {
+          "make": "perkins",
+          "model": null,
+          "sl_no": null,
+          "engine_sl_no": null,
+          "kva": 1000,
+          "capacity": 20000,
+          "phase": "three",
+          "power_factor": null,
+          "commissioning_date": null,
+          "emission_norm": "CPCB II",
+          "battery_voltage": null,
+          "alternator_sl_no": null,
+          "panel_sl_no": "SGCC3020",
+          "warranty_exp_date": null,
+          "amf": null,
+          "engine_model": null,
+          "engine_make": null,
+          "alias_name": null,
+          "no_of_poles": null
+        }
+      },
+      {
+        "id": "42482",
+        "name": "DG-2709",
+        "created_at": "2026-07-14T14:21:58Z",
+        "lifecycle_status": "active",
+        "category_id": 18,
+        "category_name": "DG Set",
+        "asset_info": {
+          "make": "perkins",
+          "model": null,
+          "sl_no": null,
+          "engine_sl_no": null,
+          "kva": 1000,
+          "capacity": 20000,
+          "phase": "three",
+          "power_factor": null,
+          "commissioning_date": null,
+          "emission_norm": null,
+          "battery_voltage": null,
+          "alternator_sl_no": null,
+          "panel_sl_no": "SGCC2709",
+          "warranty_exp_date": null,
+          "amf": null,
+          "engine_model": null,
+          "engine_make": null,
+          "alias_name": null,
+          "no_of_poles": null
+        }
+      },
+      {
+        "id": "42426",
+        "name": "TC new",
+        "created_at": "2026-07-13T15:59:49Z",
+        "lifecycle_status": "active",
+        "category_id": 79,
+        "category_name": "AC Sub-Meter",
+        "asset_info": {
+          "make": null,
+          "model": null,
+          "sl_no": null,
+          "max_current": null
+        }
+      },
+      {
+        "id": "42425",
+        "name": "TC-14",
+        "created_at": "2026-07-13T15:56:53Z",
+        "lifecycle_status": "active",
+        "category_id": 79,
+        "category_name": "AC Sub-Meter",
+        "asset_info": {
+          "make": null,
+          "model": null,
+          "sl_no": null,
+          "max_current": null
+        }
+      },
+      {
+        "id": "42424",
+        "name": "TC-05",
+        "created_at": "2026-07-13T15:49:26Z",
+        "lifecycle_status": "active",
+        "category_id": 79,
+        "category_name": "AC Sub-Meter",
+        "asset_info": {
+          "make": null,
+          "model": null,
+          "sl_no": null,
+          "max_current": null
+        }
+      },
+      {
+        "id": "33902",
+        "name": "Between Package 8 & Package 9 (sub-meter)",
+        "created_at": "2026-02-24T13:20:05Z",
+        "lifecycle_status": "active",
+        "category_id": 79,
+        "category_name": "AC Sub-Meter",
+        "asset_info": {
+          "make": null,
+          "model": null,
+          "sl_no": null,
+          "max_current": 2500
+        }
+      },
+      {
+        "id": "33903",
+        "name": "Canteen - Main Office (sub-meter)",
+        "created_at": "2026-02-24T13:20:05Z",
+        "lifecycle_status": "active",
+        "category_id": 79,
+        "category_name": "AC Sub-Meter",
+        "asset_info": {
+          "make": null,
+          "model": null,
+          "sl_no": null,
+          "max_current": 150
+        }
+      },
+      {
+        "id": "33899",
+        "name": "Tower Crane (sub-meter)",
+        "created_at": "2026-02-24T13:20:05Z",
+        "lifecycle_status": "active",
+        "category_id": 79,
+        "category_name": "AC Sub-Meter",
+        "asset_info": {
+          "make": null,
+          "model": null,
+          "sl_no": null,
+          "max_current": 750
+        }
+      },
+      {
+        "id": "33900",
+        "name": "Laydown Area (sub-meter)",
+        "created_at": "2026-02-24T13:20:05Z",
+        "lifecycle_status": "active",
+        "category_id": 79,
+        "category_name": "AC Sub-Meter",
+        "asset_info": {
+          "make": null,
+          "model": null,
+          "sl_no": null,
+          "max_current": 150
+        }
+      },
+      {
+        "id": "33852",
+        "name": "Rest Area - Package 8 (sub-meter)",
+        "created_at": "2026-02-24T03:28:30Z",
+        "lifecycle_status": "active",
+        "category_id": 79,
+        "category_name": "AC Sub-Meter",
+        "asset_info": {
+          "make": null,
+          "model": null,
+          "sl_no": null,
+          "max_current": 750
+        }
+      },
+      {
+        "id": "33854",
+        "name": "Package 8 (sub-meter)",
+        "created_at": "2026-02-24T03:28:30Z",
+        "lifecycle_status": "active",
+        "category_id": 79,
+        "category_name": "AC Sub-Meter",
+        "asset_info": {
+          "make": null,
+          "model": null,
+          "sl_no": null,
+          "max_current": 2500
+        }
+      },
+      {
+        "id": "33853",
+        "name": "Package 9 (sub-meter)",
+        "created_at": "2026-02-24T03:28:30Z",
+        "lifecycle_status": "active",
+        "category_id": 79,
+        "category_name": "AC Sub-Meter",
+        "asset_info": {
+          "make": null,
+          "model": null,
+          "sl_no": null,
+          "max_current": 2500
+        }
+      },
+      {
+        "id": "33851",
+        "name": "Main Office (sub-meter)",
+        "created_at": "2026-02-24T03:25:48Z",
+        "lifecycle_status": "active",
+        "category_id": 79,
+        "category_name": "AC Sub-Meter",
+        "asset_info": {
+          "make": null,
+          "model": null,
+          "sl_no": null,
+          "max_current": 750
+        }
+      },
+      {
+        "id": "33850",
+        "name": "Power Plant (master load-meter)",
+        "created_at": "2026-02-24T03:24:14Z",
+        "lifecycle_status": "active",
+        "category_id": 79,
+        "category_name": "AC Sub-Meter",
+        "asset_info": {
+          "make": null,
+          "model": null,
+          "sl_no": null,
+          "max_current": 2500
+        }
+      }
+    ],
+    "pagination": {
+      "total": 22,
+      "page": 1,
+      "limit": 1000,
+      "total_pages": 1
+    }
+  }
+}
