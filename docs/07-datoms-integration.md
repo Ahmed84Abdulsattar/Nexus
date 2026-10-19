@@ -64,6 +64,8 @@
 ## 3. What DATOMS has given, and what is still pending
 
 ### 3.1 Provisional test key (received 12 Oct 2026)
+> **The test key expires on 10 Nov 2026. Live S3-03 testing must finish before then. Ahmed requests the production key from DATOMS by 1 Nov 2026 (Q7).**
+
 | Item | Value |
 |---|---|
 | Organisation | `20283`, Innovo's org, on **live** data |
@@ -89,7 +91,7 @@
 - **What the real responses showed (2026-10-12, test key, `fixtures/`):**
   - `GET /assets`: 22 assets in one page (`pagination.total` 22, `total_pages` 1): 12 AC Sub-Meter, 8 DG Set, 1 Fuel Tank, 1 Solar Inverter. Fields per asset: `id` (legacy integer as a string), `name`, `created_at`, `lifecycle_status` (all `active`), `category_id`, `category_name` (the category string), `asset_info` (nameplate, with `null`s). No site, status or location field.
   - `GET /assets/{id}/data/latest` for one asset per category: the parameter keys equal the parameter list exactly (DG Set 103, Fuel Tank 4, AC Sub-Meter 34, Solar Inverter 23; none extra, none missing).
-  - **Null values:** DATOMS sends keys it has no value for as `null` (96 of 103 DG keys, 1 of 4 Fuel Tank keys). `null` is kept as reported, never turned into 0 (`mapping.ts`).
+  - **Null values:** DATOMS sends keys it has no value for as `null` (96 of 103 DG keys, 1 of 4 Fuel Tank keys). **Decision (Ahmed, 2026-10-14): `null` means "no data".** `mapping.ts` drops null-valued keys from `SourceReading.values` (a real `0`, `false` or `""` is kept) and lists every key it saw, null or not, in `seenKeys`, so each key is still recorded in `telemetry.parameter` and the UI shows a never-reported key as "—". A null is never turned into 0.
   - **Bulk rows carry only `asset_id`, `success` and `data { time, parameters }`.** No site, status, location, asset type or alert field is in them, although DATOMS said the portal data is in the bulk response (Q9, Q21, Q22). Those fields stay absent in `mapping.ts` until the sample and field list arrive. `lat`, `long`, `mc_st` and `under_maintenance` are ordinary parameters and are not mapped to location or status.
   - One DG Set (asset 42485) last reported on 2026-10-05, 7 days before the check: `data.time` can be old. Change detection and "no data yet" rules apply as usual.
 - **Not shared yet:** the site list, location and the other fields (status, the asset type field, alerts). DATOMS said on 12 Oct 2026 that they will arrive "in the coming week" (Q1, Q21, Q22).
@@ -105,6 +107,15 @@
 | Date | Result | Notes |
 |---|---|---|
 | 2026-10-12 | **Enabled.** Id mode, 4 ids (one per category), one call: HTTP 200, no error code, 4 rows, all `success: true`, 4 credits charged. | Headers: `X-RateLimit-Unit: asset-read-credits`, `Limit: 2000` (= 4F with F = 500, the 1-minute credit cap), `Remaining: 1996`, `Reset: 61`. Each row's `parameters` equal that asset's `data/latest` exactly. Q34 answered. Fixture: `fixtures/bulk-latest-id-mode.json`. |
+
+| 2026-10-14 | **Fleet mode works.** `{page:1, limit:500}`, 4 calls 60 s apart: each HTTP 200, 22 rows, 22 `success: true`, 0 `false`; `pagination` = `{total:22, page:1, limit:500, total_pages:1}`; 22 credits per call. | Headers: `Unit: asset-read-credits`, `Limit: 2000`, `Remaining` 1978 then 1956 inside the same minute (so 22 credits each), `Reset` 61 then 1 (seconds left in the window). Fixtures `bulk-fleet-page1-run1..4.json`, `bulk-fleet-summary.json`. See the cadence below. |
+
+**Observed reporting cadence (2026-10-14, 4 fleet runs, 3 deltas per asset, answers part of Q12).** `data.time` advanced between runs for 19 of 22 assets. Delta between consecutive different `data.time` values: median 61 s, typically 45 to 90 s (51 deltas; one outlier of 2,342 s is an asset that resumed after about 39 minutes).
+- AC Sub-Meters and the Solar Inverter: about 60 s (50 to 71 s).
+- DG 42482 and 42483 and the Fuel Tank: alternating 45 s and 90 s (about 60 s on average).
+- The four "Source -2 ... (Channel n)" DG Sets: about 80 s.
+- **Stale (never advanced):** DG 42485 (last `data.time` 2026-10-05T04:28:45Z), DG 42484 (2026-09-19T02:00:55Z), AC Sub-Meter 33851 (2026-09-20T09:15:10Z). AC Sub-Meter 33902 was stale for about 39 minutes and updated in the last run. Stale assets still come back as `success: true` with their old `data.time`, so "reported" does not mean "fresh".
+- **Nulls** (last run): AC Sub-Meter 0 of 408 values null (all 34 keys never null); DG Set 673 of 824 null (6 keys never null: `mt_pf`, `mvol`, `calculated_energy`, `lat`, `long`, `mcurr`; 70 always null); Solar Inverter 1 of 23 (`calculated_sol_enrg` always null); Fuel Tank 1 of 4 (`fuel_filled` always null). The four "Channel n" DG Sets have 71 to 72 nulls of 103, the other four DG Sets 96 to 97.
 
 Rate-limit headers seen on 2026-10-12: `GET /assets` sends `Limit: 60`, `Remaining`, `Reset` (60 s) and **no `X-RateLimit-Unit`**; the per-asset latest call sends `Limit: 8`, `Remaining`, `Reset` (300 s) and **no Unit**; the bulk call sends the Unit. The client reads the Unit first and, when it is missing, ignores Limit/Remaining for the credit budget (`budget.ts`).
 
@@ -145,8 +156,8 @@ The first real bulk rows (section 3.2) carry **none** of the sites, status, loca
 3. **Adaptive interval.** Use each asset type's interval (`asset_type.poll_interval_seconds`, otherwise `poll.interval_seconds` = 60). If any window passes 80%, multiply every interval by 2, then by 5, and log a warning. Return to normal when the window clears.
 4. **Retries.** 429 waits `Retry-After`. 5xx and network errors back off with jitter (1 s, 2 s, 4 s, 8 s, maximum 5 tries). 401/403/400 never retry; alert instead.
 5. **Timeouts.** 30 s per request. The whole poll must finish within the interval; if not, skip the next tick (no overlap).
-6. **Change detection.** Write a packet only if `data.time` is newer than `latest_packet.ts` for that asset.
-7. **Mapping.** All of it is in `src/mapping.ts`. It turns raw DATOMS rows into `SourceReading { externalAssetId, ts, values }` plus, when present in the row, status, location, asset type, site link, kind (`physical` / `site_metric`) and alerts. Keys and values pass through unchanged. Unknown keys are recorded in `telemetry.parameter` per (source system, the asset's source type, key) (ADR 0011). A missing field maps to "absent", never to a default value.
+6. **Change detection.** Write a packet only if `data.time` is newer than `latest_packet.ts` for that asset. **Replace, never merge:** a newer packet **replaces** `latest_packet.values` with that packet's values (null keys already dropped by the mapping). Merging into the stored object would keep showing an old value for a parameter that has gone null.
+7. **Mapping.** All of it is in `src/mapping.ts`. It turns raw DATOMS rows into `SourceReading { externalAssetId, ts, values }` plus, when present in the row, status, location, asset type, site link, kind (`physical` / `site_metric`) and alerts. Keys and values pass through unchanged, except that keys whose value is `null` are dropped from `values` (null means "no data"). `seenKeys` lists every key in the row, null or not; **unknown keys, taken from `seenKeys`, are recorded in `telemetry.parameter`** per (source system, the asset's source type, key) (ADR 0011). `latest_packet` is replaced per packet, never merged (item 6). A missing field maps to "absent", never to a default value.
 8. **Logging.** For each call log the endpoint, mode, page, HTTP status, duration, credits, rate-limit headers and correlation id. Never log the token.
 9. **Fixtures and the CLI.** `scripts/record.ts` saves real responses (body plus a `meta` block with the path, method, date, status and rate-limit headers; no request headers or tokens) into `fixtures/`. Run the CLI with `DATOMS_LIVE=true pnpm --filter @nexus/datoms-client live -- --env-file <path-to-.env> list | latest <id> | bulk <id>...` (it compiles first with `tsc`, no extra tool; `--fleet` for fleet mode). It is the **only** code that calls `data/latest`; a test (`test/boundaries.test.ts`) fails if anything else mentions it. Tests and local dev use fixtures. `DATOMS_LIVE=true` is needed to call DATOMS. Live CLI runs use id mode with a short list by default; fleet mode against live DATOMS needs an explicit `--fleet` flag (ADR 0005). With the provisional test key (section 3.1), recording is done from a developer machine only, and the data is live, so check fixtures for anything sensitive before committing.
 10. **Learned page size.** After a 422, keep the smaller page size in `integration.cursor` (`job = 'live_poll'`, `value.pageLimit`) so the next poll starts with it. Try 500 again once a day.

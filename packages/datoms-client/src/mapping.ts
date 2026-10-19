@@ -139,16 +139,24 @@ export function mapAssetListPage(body: RawAssetList): AssetListPage {
 }
 
 /**
- * One telemetry reading. `values` is the `parameters` object unchanged.
+ * One telemetry reading.
  *
- * DECISION (flagged for the user): a parameter that DATOMS sends as `null` is kept as `null`
- * in `values` ("reported null"). It is never turned into 0 or a default, and it is not
- * dropped. Consumers show "â€”" for it. A key that is not in the row at all is "absent".
+ * DECISION (Ahmed, 2026-10-14): a parameter that DATOMS sends as `null` means "no data". Keys
+ * with a `null` value are DROPPED from `values`; all other values (including `0`, `false` and
+ * `""`) pass through unchanged. `seenKeys` lists EVERY key in the row, null or not, in the
+ * order sent, so the worker can still record each key in `telemetry.parameter` per source type
+ * (the UI then lists a never-reported key as "—").
+ *
+ * The worker must REPLACE `latest_packet.values` with `values` on every new packet, never merge
+ * it with the stored object: a value that went null must not keep showing its old value.
  */
 export interface MappedReading {
   externalAssetId: string;
   ts: Date;
+  /** `parameters` without the null-valued keys. */
   values: Record<string, unknown>;
+  /** Every parameter key in the row, including those whose value was null. */
+  seenKeys: string[];
   // Absent until DATOMS gives the field list (Q21, Q22). Never defaulted, never guessed.
   status?: never;
   location?: never;
@@ -183,7 +191,11 @@ export function mapBulkRows(rows: readonly RawBulkRow[]): Omit<MappedBulkPage, '
       invalid.push(id);
       continue;
     }
-    readings.push({ externalAssetId: id, ts, values });
+    const kept: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(values)) {
+      if (v !== null) kept[k] = v;
+    }
+    readings.push({ externalAssetId: id, ts, values: kept, seenKeys: Object.keys(values) });
   }
   return { readings, noData, invalid };
 }
