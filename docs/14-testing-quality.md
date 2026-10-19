@@ -24,6 +24,12 @@
 | Load | k6 + fixture replay | See `12-scalability.md`; scripts and how to run: `tests/load/README.md`. Record each run in the results table in `12-scalability.md` section 3. |
 | Security | `pnpm audit`, Renovate, OWASP ZAP baseline in CI on dev, penetration test before go-live | |
 
+## Database integration tests (S1-01)
+- They need a PostgreSQL 16 server and the variable `TEST_DATABASE_ADMIN_URL`, an administrator login on any database of a throw-away server (docs/04). Each test file creates its own database (`@nexus/db/testing`, `createTestDatabase()`), runs the real migrations, and drops it at the end, so files run in parallel and never touch your data.
+- **Locally:** start Postgres (`docker compose up -d` or `scripts/pg-local.ps1 start`), then `TEST_DATABASE_ADMIN_URL=postgres://nexus@localhost:5432/postgres pnpm test`. Without the variable the database tests are skipped with a warning.
+- **In CI:** `.github/workflows/ci.yml` starts a `postgres:16` service and sets the variable. When `CI` is set and the variable is missing, `@nexus/db/testing` throws, so these tests can never skip silently in CI. `turbo.json` passes both variables through to `pnpm test`. CI also runs `pnpm db:check` (needs `pg_dump`).
+- Role behaviour is tested by connecting as the administrator and running `SET ROLE nexus_api` (or `nexus_worker`), so a missing grant fails exactly as it would in Azure.
+
 ## Fixtures and fake data
 - `packages/datoms-client/fixtures/` holds real recorded responses, cleaned of tokens and headers.
 - `packages/testing` has generators to scale fixtures to N sites / M assets with realistic timing (1 packet per minute, some offline, some status changes).

@@ -11,7 +11,11 @@ import {
 import { Reflector } from '@nestjs/core';
 import { errors, jwtVerify, type JWTPayload, type JWTVerifyGetKey } from 'jose';
 import { APP_CONFIG, type AppConfig } from '../../config/env.js';
-import { AccessContextService, InactiveUserError } from './access-context.js';
+import {
+  AccessContextService,
+  InactiveUserError,
+  type SignedInIdentity,
+} from './access-context.js';
 import { resolveAccessPolicy } from './access-policy.js';
 import type { AuthRequest } from './request.js';
 
@@ -54,7 +58,7 @@ export class EntraJwtGuard implements CanActivate {
 
     const request = context.switchToHttp().getRequest<AuthRequest>();
     const payload = await this.verifyToken(bearerToken(request));
-    const identity = this.identityFrom(payload);
+    const identity = this.identityFrom(payload, request);
 
     let access;
     try {
@@ -112,16 +116,13 @@ export class EntraJwtGuard implements CanActivate {
     return payload;
   }
 
-  private identityFrom(payload: JWTPayload): {
-    oid: string;
-    displayName?: string;
-    email?: string;
-    groupIds: string[];
-  } {
+  private identityFrom(payload: JWTPayload, request: AuthRequest): SignedInIdentity {
     const oid = payload['oid'];
-    if (typeof oid !== 'string' || oid === '') {
-      throw new UnauthorizedException('Token has no user object id.');
+    if (typeof oid !== 'string' || !GUID.test(oid)) {
+      throw new UnauthorizedException('Token has no valid user object id.');
     }
+    // verifyToken already proved tid equals the configured tenant, which is validated as a GUID.
+    const tenantId = this.config.auth.tenantId;
 
     // ADR 0008: groups come only from the "groups assigned to the application" claim. A token
     // with an overage marker instead of `groups` is refused and logged for an admin. No Graph call.
@@ -145,14 +146,24 @@ export class EntraJwtGuard implements CanActivate {
     }
     const email = firstString(payload['email'], payload['preferred_username'], payload['upn']);
     const displayName = firstString(payload['name']);
+    const userAgent = request.headers['user-agent'];
     return {
       oid,
+      tenantId,
       ...(displayName ? { displayName } : {}),
       ...(email ? { email } : {}),
       groupIds: (rawGroups as string[] | undefined) ?? [],
+      request: {
+        ...(request.ip ? { ip: request.ip } : {}),
+        ...(typeof userAgent === 'string' ? { userAgent } : {}),
+        ...(correlationId(request) ? { correlationId: correlationId(request) } : {}),
+      },
     };
   }
 }
+
+/** The oid becomes a uuid column: a token claim that is not a GUID is refused, not sent to SQL. */
+const GUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 function bearerToken(request: AuthRequest): string {
   const header = request.headers['authorization'];
@@ -164,4 +175,16 @@ function bearerToken(request: AuthRequest): string {
 
 function firstString(...values: unknown[]): string | undefined {
   return values.find((v): v is string => typeof v === 'string' && v !== '');
+}
+
+/**
+ * The id the error filter returns as correlationId: a short harmless x-correlation-id header, else the
+ * request id. Kept in step with common/http/problem-json.filter.ts (that folder is owned by S1-03), so
+ * an audit row and an error response of one request carry the same id.
+ */
+function correlationId(request: AuthRequest): string | undefined {
+  const header = request.headers['x-correlation-id'];
+  const value = Array.isArray(header) ? header[0] : header;
+  if (value && /^[\w-]{1,64}$/.test(value)) return value;
+  return request.id === undefined ? undefined : String(request.id);
 }

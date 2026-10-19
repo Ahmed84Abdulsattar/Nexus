@@ -5,7 +5,7 @@
   "description": "NestJS standalone worker. Placeholder: logs startup, runs no jobs, makes no DATOMS calls.",
   "type": "module",
   "scripts": {
-    "dev": "node --watch --import @swc-node/register/esm-register src/main.ts",
+    "dev": "node --env-file-if-exists=../../.env --watch --import @swc-node/register/esm-register src/main.ts",
     "build": "tsc -p tsconfig.build.json",
     "start": "node dist/main.js",
     "typecheck": "tsc --noEmit",
@@ -14,14 +14,17 @@
   "dependencies": {
     "@nestjs/common": "catalog:",
     "@nestjs/core": "catalog:",
+    "@nexus/db": "workspace:*",
+    "kysely": "catalog:",
     "reflect-metadata": "catalog:",
-    "rxjs": "catalog:"
+    "rxjs": "catalog:",
+    "zod": "catalog:"
   },
   "devDependencies": {
-    "@nexus/config": "workspace:*",
     "@nestjs/testing": "catalog:",
-    "@types/node": "catalog:",
+    "@nexus/config": "workspace:*",
     "@swc-node/register": "catalog:",
+    "@types/node": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
   }

@@ -15,7 +15,25 @@ concurrency:
 jobs:
   ci:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
+    # A throw-away PostgreSQL 16 for the database integration tests and `pnpm db:check`.
+    # The password below is only for this disposable CI container; it protects nothing.
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      # Tests create and drop their own databases here (docs/14). Without it they are skipped.
+      TEST_DATABASE_ADMIN_URL: postgres://postgres:postgres@localhost:5432/postgres
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -28,6 +46,14 @@ jobs:
       - run: pnpm format:check
       - run: pnpm typecheck
       - run: pnpm test
+      # S1-01: migrations applied to an empty database must equal db/schema.sql (and db/src/types.ts).
+      - name: Database schema check
+        env:
+          APP_ENV: local
+          DATABASE_ADMIN_URL: postgres://postgres:postgres@localhost:5432/postgres
+        run: |
+          pg_dump --version
+          pnpm db:check
       - run: pnpm build
       # S1-03: the committed OpenAPI spec and the web client types must match the code.
       - name: OpenAPI and generated client are up to date
