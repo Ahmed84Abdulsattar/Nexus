@@ -114,6 +114,7 @@ export interface CoreAsset {
   retired_at: Timestamp | null;
   serial_no: string | null;
   source_created_at: Timestamp | null;
+  source_lifecycle_status: string | null;
   source_system: string;
   source_type_name: string | null;
   updated_at: Generated<Timestamp>;
@@ -332,6 +333,7 @@ export interface IntegrationLinkTodo {
 export interface IntegrationSyncRun {
   api_calls: Generated<number>;
   credits_used: Generated<Int8>;
+  details: Json | null;
   error: Json | null;
   finished_at: Timestamp | null;
   id: Generated<Int8>;

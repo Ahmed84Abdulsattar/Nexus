@@ -10,7 +10,7 @@ import type {
 
 /** An in-memory `CatalogueRepository` for tests and local runs. Same semantics as the SQL one. */
 export class InMemoryCatalogueRepository implements CatalogueRepository {
-  readonly assets = new Map<string, StoredAsset & { lastSeenAt: Date }>();
+  readonly assets = new Map<string, StoredAsset>();
   readonly todos = new Map<string, LinkTodoRow>();
   readonly runs: SyncRunRecord[] = [];
   private seq = 0;
@@ -38,8 +38,8 @@ export class InMemoryCatalogueRepository implements CatalogueRepository {
         nameplate: r.nameplate,
         sourceCreatedAt: r.sourceCreatedAt,
         kind: r.kind ?? 'physical',
+        sourceLifecycleStatus: r.sourceLifecycleStatus,
         retiredAt: null,
-        missCount: 0,
         lastSeenAt: r.seenAt,
       });
     }
@@ -56,8 +56,18 @@ export class InMemoryCatalogueRepository implements CatalogueRepository {
       if (p.nameplate !== undefined) a.nameplate = p.nameplate;
       if (p.sourceCreatedAt !== undefined) a.sourceCreatedAt = p.sourceCreatedAt;
       if (p.kind !== undefined) a.kind = p.kind;
+      if (p.sourceLifecycleStatus !== undefined) a.sourceLifecycleStatus = p.sourceLifecycleStatus;
     }
     return Promise.resolve();
+  }
+
+  loadRetireBaseline(_sys: string, count: number): Promise<Date | undefined> {
+    const complete = this.runs
+      .filter((r) => r.status !== 'failed' && r.details?.complete === true)
+      .map((r) => r.startedAt.getTime())
+      .sort((a, b) => b - a)
+      .slice(0, count);
+    return Promise.resolve(complete.length < count ? undefined : new Date(complete[count - 1]!));
   }
 
   markSeen(_sys: string, ids: string[], at: Date): Promise<void> {
@@ -65,16 +75,7 @@ export class InMemoryCatalogueRepository implements CatalogueRepository {
       const a = this.assets.get(id);
       if (!a) continue;
       a.lastSeenAt = at;
-      a.missCount = 0;
       a.retiredAt = null;
-    }
-    return Promise.resolve();
-  }
-
-  setMisses(_sys: string, misses: { externalId: string; missCount: number }[]): Promise<void> {
-    for (const m of misses) {
-      const a = this.assets.get(m.externalId);
-      if (a) a.missCount = m.missCount;
     }
     return Promise.resolve();
   }
@@ -82,10 +83,7 @@ export class InMemoryCatalogueRepository implements CatalogueRepository {
   retire(_sys: string, ids: string[], at: Date): Promise<void> {
     for (const id of ids) {
       const a = this.assets.get(id);
-      if (a) {
-        a.retiredAt = at;
-        a.missCount = 0;
-      }
+      if (a) a.retiredAt = at;
     }
     return Promise.resolve();
   }

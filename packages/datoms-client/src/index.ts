@@ -15,3 +15,4 @@ export * from './mapping.js';
 export * from './budget.js';
 export * from './retry.js';
 export * from './api.js';
+export * from './fixtures.js';

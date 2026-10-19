@@ -1,3 +1,4 @@
+import type { CatalogueSyncDetails } from '@nexus/shared';
 import type { AssetKind } from '../types.js';
 
 /** Settings (from `core.setting`), passed in as config, never constants. */
@@ -28,9 +29,11 @@ export interface StoredAsset {
   nameplate: Record<string, unknown>;
   sourceCreatedAt: Date | null;
   kind: AssetKind;
+  /** `core.asset.source_lifecycle_status`: display only (the catalogue_sync_details migration). */
+  sourceLifecycleStatus: string | null;
   retiredAt: Date | null;
-  /** Consecutive complete walks that did not contain it (0 = seen last time). */
-  missCount: number;
+  /** When a catalogue walk last contained it. The safe-retire rule compares this with run start times. */
+  lastSeenAt: Date;
 }
 
 export interface NewAssetRow {
@@ -44,6 +47,8 @@ export interface NewAssetRow {
   sourceCreatedAt: Date | null;
   /** Only set when the source states it; otherwise the database default applies. */
   kind: AssetKind | null;
+  /** The source's lifecycle label as reported; display only. */
+  sourceLifecycleStatus: string | null;
   seenAt: Date;
 }
 
@@ -57,6 +62,7 @@ export interface AssetPatch {
   nameplate?: Record<string, unknown>;
   sourceCreatedAt?: Date;
   kind?: AssetKind;
+  sourceLifecycleStatus?: string;
 }
 
 export type LinkTodoReason = 'unknown_asset_type' | 'no_type' | 'no_site' | 'site_not_linked';
@@ -68,31 +74,6 @@ export interface LinkTodoRow {
   payload: Record<string, unknown>;
 }
 
-export type CatalogueAlertCode = 'retire_blocked' | 'incomplete_walk' | 'sync_failed';
-
-export interface CatalogueAlert {
-  code: CatalogueAlertCode;
-  message: string;
-  details: Record<string, unknown>;
-}
-
-export interface CatalogueSummary {
-  /** Assets the source returned. */
-  read: number;
-  total: number | undefined;
-  complete: boolean;
-  inserted: number;
-  updated: number;
-  unchanged: number;
-  /** Retired rows that came back (`retired_at` cleared). */
-  reappeared: number;
-  /** Active rows not in this walk (only counted on a complete walk). */
-  missed: number;
-  retired: number;
-  retireBlocked: boolean;
-  linkTodos: number;
-}
-
 export interface SyncRunRecord {
   job: 'catalogue_sync';
   startedAt: Date;
@@ -100,7 +81,8 @@ export interface SyncRunRecord {
   status: 'ok' | 'partial' | 'failed';
   itemsRead: number;
   itemsWritten: number;
-  summary?: CatalogueSummary;
+  /** Absent only when the run failed. */
+  details?: CatalogueSyncDetails;
   error?: { message: string };
 }
 
@@ -108,8 +90,8 @@ export interface SyncRunRecord {
  * Storage for the catalogue sync. The Kysely implementation (phase 2) lives in the worker; the
  * in-memory one is used by the tests. Batching of large arrays is the implementation's job.
  *
- * `missCount` is not a column of core.asset: the implementation keeps it (phase 2: in
- * `integration.cursor`, job 'catalogue_sync').
+ * There is no per-asset miss counter. Misses are derived from `last_seen_at` and the start times of the
+ * last complete runs (`loadRetireBaseline`), so a sync writes nothing extra per asset (docs/07 section 6).
  */
 export interface CatalogueRepository {
   loadAssetTypes(): Promise<AssetTypeRef[]>;
@@ -117,14 +99,15 @@ export interface CatalogueRepository {
   loadAssets(sourceSystem: string): Promise<StoredAsset[]>;
   insertAssets(sourceSystem: string, rows: NewAssetRow[]): Promise<void>;
   updateAssets(patches: AssetPatch[], at: Date): Promise<void>;
-  /** Sets last_seen_at, resets the miss counter and clears `retired_at` (a retired asset came back). */
+  /**
+   * The start time of the OLDEST of the last `count` complete runs of this job (status ok or partial,
+   * `details.complete = true`), or undefined when fewer than `count` exist. An asset whose `last_seen_at`
+   * is before that time was missing from every one of those walks.
+   */
+  loadRetireBaseline(sourceSystem: string, count: number): Promise<Date | undefined>;
+  /** Sets last_seen_at and clears `retired_at` (a retired asset came back). */
   markSeen(sourceSystem: string, externalIds: string[], at: Date): Promise<void>;
-  /** Stores the new miss counters. */
-  setMisses(
-    sourceSystem: string,
-    misses: { externalId: string; missCount: number }[],
-  ): Promise<void>;
-  /** Sets `retired_at` and clears the counter. Never deletes. */
+  /** Sets `retired_at`. Never deletes. */
   retire(sourceSystem: string, externalIds: string[], at: Date): Promise<void>;
   /** Insert-if-absent on (source_system, entity_type, external_id); never reopens a resolved row. */
   addLinkTodos(sourceSystem: string, rows: LinkTodoRow[]): Promise<void>;

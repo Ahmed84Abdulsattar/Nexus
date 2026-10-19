@@ -45,7 +45,7 @@ function rig(walks: SourceCatalogue[], s: CatalogueSettings = settings) {
       connector,
       repo,
       settings: s,
-      onAlert: (a) => alerts.push(a.code),
+      onWarning: (w) => alerts.push(w.code),
       now: () => new Date((clock += 1000)),
     });
   return { repo, run, alerts };
@@ -58,8 +58,8 @@ function ids(n: number, from = 1): SourceAsset[] {
 describe('catalogue sync: insert and update', () => {
   it('inserts a new asset with its type, no project, and a link_todo for the missing site', async () => {
     const { repo, run } = rig([walk([asset('1')])]);
-    const { summary } = await run();
-    expect(summary.inserted).toBe(1);
+    const { details } = await run();
+    expect(details.inserted).toBe(1);
     const row = repo.assets.get('1')!;
     expect(row.assetTypeId).toBe('t-dg');
     expect(row.projectId).toBeNull();
@@ -83,10 +83,10 @@ describe('catalogue sync: insert and update', () => {
     ]);
     await run();
     const second = await run();
-    expect(second.summary).toMatchObject({ updated: 1, inserted: 0 });
+    expect(second.details).toMatchObject({ updated: 1, inserted: 0 });
     expect(repo.assets.get('1')).toMatchObject({ name: 'Renamed', nameplate: { a: 2 } });
     const third = await run();
-    expect(third.summary).toMatchObject({ updated: 0, unchanged: 1 });
+    expect(third.details).toMatchObject({ updated: 0, unchanged: 1 });
     expect(repo.assets.get('1')).toMatchObject({ name: 'Renamed', nameplate: { a: 2 } });
   });
 
@@ -95,7 +95,7 @@ describe('catalogue sync: insert and update', () => {
     const { run } = rig([same, same]);
     await run();
     const again = await run();
-    expect(again.summary).toMatchObject({ inserted: 0, updated: 0, unchanged: 2, retired: 0 });
+    expect(again.details).toMatchObject({ inserted: 0, updated: 0, unchanged: 2, retired: 0 });
   });
 
   it('nameplate comparison ignores key order', async () => {
@@ -104,7 +104,7 @@ describe('catalogue sync: insert and update', () => {
       walk([asset('1', { nameplate: { b: null, a: 1 } })]),
     ]);
     await run();
-    expect((await run()).summary.updated).toBe(0);
+    expect((await run()).details.updated).toBe(0);
   });
 
   it('an unknown category becomes generic plus one asset_type link_todo', async () => {
@@ -157,6 +157,26 @@ describe('catalogue sync: insert and update', () => {
   });
 });
 
+describe('catalogue sync: lifecycle status (display only)', () => {
+  it('stores the source label as reported and follows changes, without touching anything else', async () => {
+    const { repo, run } = rig([
+      walk([asset('1', { lifecycleStatus: 'active' })]),
+      walk([asset('1', { lifecycleStatus: 'Decommissioned' })]),
+      walk([asset('1')]), // absent: not overwritten
+    ]);
+    await run();
+    expect(repo.assets.get('1')!.sourceLifecycleStatus).toBe('active');
+    const second = await run();
+    expect(second.details.updated).toBe(1);
+    expect(repo.assets.get('1')).toMatchObject({
+      sourceLifecycleStatus: 'Decommissioned',
+      retiredAt: null,
+    });
+    await run();
+    expect(repo.assets.get('1')!.sourceLifecycleStatus).toBe('Decommissioned');
+  });
+});
+
 describe('catalogue sync: safe retire', () => {
   it('an incomplete walk retires nothing and counts no miss', async () => {
     const all = ids(100);
@@ -169,9 +189,9 @@ describe('catalogue sync: safe retire', () => {
     await run();
     for (let k = 0; k < 3; k++) {
       const r = await run();
-      expect(r.summary).toMatchObject({ retired: 0, missed: 0, complete: false });
+      expect(r.details).toMatchObject({ retired: 0, missed: 0, complete: false });
     }
-    expect([...repo.assets.values()].every((a) => !a.retiredAt && a.missCount === 0)).toBe(true);
+    expect([...repo.assets.values()].every((a) => !a.retiredAt)).toBe(true);
     expect(alerts).toContain('incomplete_walk');
     expect(repo.runs.at(-1)!.status).toBe('partial');
   });
@@ -181,8 +201,9 @@ describe('catalogue sync: safe retire', () => {
     const { repo, run } = rig([walk(all), walk(all.slice(0, 99), { total: 100, complete: true })]);
     await run();
     const r = await run();
-    expect(r.summary.complete).toBe(false);
-    expect(repo.assets.get('100')!.missCount).toBe(0);
+    expect(r.details.complete).toBe(false);
+    expect(repo.assets.get('100')!.retiredAt).toBeNull();
+    expect(r.details.warnings).toEqual([{ code: 'incomplete_walk', seen: 99, total: 100 }]);
   });
 
   it('retires only after 2 consecutive complete misses, and sets retired_at, never deletes', async () => {
@@ -191,10 +212,10 @@ describe('catalogue sync: safe retire', () => {
     const { repo, run } = rig([walk(all), walk(rest), walk(rest)]);
     await run();
     const first = await run();
-    expect(first.summary).toMatchObject({ missed: 1, retired: 0 });
-    expect(repo.assets.get('100')).toMatchObject({ missCount: 1, retiredAt: null });
+    expect(first.details).toMatchObject({ missed: 1, retired: 0 });
+    expect(repo.assets.get('100')).toMatchObject({ retiredAt: null });
     const second = await run();
-    expect(second.summary).toMatchObject({ retired: 1 });
+    expect(second.details).toMatchObject({ retired: 1 });
     const gone = repo.assets.get('100')!;
     expect(gone.retiredAt).toBeInstanceOf(Date);
     expect(repo.assets.size).toBe(100); // the row is still there
@@ -216,18 +237,18 @@ describe('catalogue sync: safe retire', () => {
     await run();
     await run(); // miss 1
     await run(); // back
-    expect(repo.assets.get('100')!.missCount).toBe(0);
+    expect(repo.assets.get('100')!.retiredAt).toBeNull();
     const again = await run(); // miss 1 again, not 2
-    expect(again.summary.retired).toBe(0);
+    expect(again.details.retired).toBe(0);
     expect(repo.assets.get('100')!.retiredAt).toBeNull();
     const last = await run(); // second consecutive miss
-    expect(last.summary.retired).toBe(1);
+    expect(last.details.retired).toBe(1);
   });
 
   it('an incomplete walk between two misses neither resets nor advances the counter', async () => {
     const all = ids(100);
     const rest = all.slice(0, 99);
-    const { repo, run } = rig([
+    const { run } = rig([
       walk(all),
       walk(rest),
       walk(rest, { complete: false, total: 100 }),
@@ -236,9 +257,8 @@ describe('catalogue sync: safe retire', () => {
     await run();
     await run();
     await run();
-    expect(repo.assets.get('100')!.missCount).toBe(1);
     const r = await run();
-    expect(r.summary.retired).toBe(1);
+    expect(r.details.retired).toBe(1);
   });
 
   it('retires nothing and alerts when more than 5% would go (all counters still advance)', async () => {
@@ -248,10 +268,14 @@ describe('catalogue sync: safe retire', () => {
     await run();
     await run();
     const blocked = await run();
-    expect(blocked.summary).toMatchObject({ retired: 0, retireBlocked: true });
+    expect(blocked.details).toMatchObject({ retired: 0 });
+    expect(blocked.details.warnings[0]).toMatchObject({
+      code: 'retire_blocked',
+      wouldRetire: 10,
+      active: 100,
+    });
     expect(alerts).toContain('retire_blocked');
     expect([...repo.assets.values()].filter((a) => a.retiredAt)).toHaveLength(0);
-    expect(repo.assets.get('100')!.missCount).toBe(2);
     expect(repo.runs.at(-1)!.status).toBe('partial');
   });
 
@@ -262,11 +286,13 @@ describe('catalogue sync: safe retire', () => {
     const a = rig([walk(all), walk(five), walk(five)]);
     await a.run();
     await a.run();
-    expect((await a.run()).summary.retired).toBe(5);
+    expect((await a.run()).details.retired).toBe(5);
     const b = rig([walk(all), walk(six), walk(six)]);
     await b.run();
     await b.run();
-    expect((await b.run()).summary).toMatchObject({ retired: 0, retireBlocked: true });
+    const blocked = await b.run();
+    expect(blocked.details.retired).toBe(0);
+    expect(blocked.details.warnings[0]?.code).toBe('retire_blocked');
   });
 
   it('an empty complete walk cannot wipe the catalogue', async () => {
@@ -275,7 +301,8 @@ describe('catalogue sync: safe retire', () => {
     await run();
     await run();
     const r = await run();
-    expect(r.summary).toMatchObject({ retired: 0, retireBlocked: true });
+    expect(r.details.retired).toBe(0);
+    expect(r.details.warnings[0]?.code).toBe('retire_blocked');
     expect([...repo.assets.values()].every((a) => !a.retiredAt)).toBe(true);
   });
 
@@ -286,22 +313,59 @@ describe('catalogue sync: safe retire', () => {
     for (let k = 0; k < 3; k++) await run();
     expect(repo.assets.get('100')!.retiredAt).not.toBeNull();
     const back = await run();
-    expect(back.summary.reappeared).toBe(1);
+    expect(back.details.reappeared).toBe(1);
     expect(repo.assets.get('100')!.retiredAt).toBeNull();
   });
 
-  it('a failed walk writes a failed sync_run and raises sync_failed', async () => {
+  it('an asset seen in an incomplete walk starts from zero again', async () => {
+    const all = ids(100);
+    const rest = all.slice(0, 99);
+    const { repo, run } = rig([
+      walk(all),
+      walk(rest), // complete miss 1
+      walk(all, { complete: false, total: 101 }), // incomplete, but 100 is in it
+      walk(rest), // complete: only miss 1 again
+      walk(rest),
+    ]);
+    for (let k = 0; k < 4; k++) await run();
+    expect(repo.assets.get('100')!.retiredAt).toBeNull();
+    expect((await run()).details.retired).toBe(1);
+  });
+
+  it('with fewer complete runs on record than the rule needs, nothing is due', async () => {
+    const all = ids(100);
+    const rest = all.slice(0, 99);
+    // Existing rows but no complete run on record (for example runs pruned): no retire.
+    const { repo, run } = rig([walk(rest)]);
+    for (const a of all) {
+      await repo.insertAssets('datoms', [
+        {
+          externalId: a.externalId,
+          name: a.name ?? '',
+          sourceTypeName: null,
+          assetTypeId: null,
+          projectId: null,
+          nameplate: {},
+          sourceCreatedAt: null,
+          kind: null,
+          sourceLifecycleStatus: null,
+          seenAt: new Date('2026-01-01T00:00:00Z'),
+        },
+      ]);
+    }
+    const r = await run();
+    expect(r.details).toMatchObject({ missed: 1, retired: 0 });
+  });
+
+  it('a failed walk writes a failed sync_run and rethrows', async () => {
     const repo = new InMemoryCatalogueRepository(types);
-    const codes: string[] = [];
     await expect(
       runCatalogueSync({
         connector: { sourceSystem: 'datoms', listAssets: () => Promise.reject(new Error('boom')) },
         repo,
         settings,
-        onAlert: (a) => codes.push(a.code),
       }),
     ).rejects.toThrow('boom');
     expect(repo.runs[0]).toMatchObject({ status: 'failed', error: { message: 'boom' } });
-    expect(codes).toEqual(['sync_failed']);
   });
 });

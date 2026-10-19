@@ -15,7 +15,7 @@ import {
   InMemoryPageSizeStore,
   createDatomsConfig,
 } from '@nexus/datoms-client';
-import { DatomsConnector } from '../src/index.js';
+import { DatomsConnector, createDatomsConnector } from '../src/index.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = join(here, '..', '..', '..', '..');
@@ -102,12 +102,13 @@ describe('DatomsConnector', () => {
     );
     const repo = new InMemoryCatalogueRepository(types);
     const { connector } = connectorFor(fixture('assets-list-page1.json').body);
-    const { summary } = await runCatalogueSync({
+    const { details } = await runCatalogueSync({
       connector,
       repo,
       settings: { retireAfterMisses: 2, retireMaxFraction: 0.05 },
     });
-    expect(summary).toMatchObject({ read: 22, inserted: 22, complete: true });
+    expect(details).toMatchObject({ seen: 22, inserted: 22, complete: true });
+    expect(repo.assets.get('43644')!.sourceLifecycleStatus).toBe('active');
     const byType = new Map<string, number>();
     for (const a of repo.assets.values()) {
       const code = types.find((t) => t.id === a.assetTypeId)!.code;
@@ -124,5 +125,30 @@ describe('DatomsConnector', () => {
     expect([...repo.assets.values()].every((a) => a.projectId === null)).toBe(true);
     // nameplate is kept as DATOMS sent it
     expect(repo.assets.get('43644')!.nameplate).toMatchObject({ capacity: 20000, make: null });
+  });
+
+  it('fixture mode: the factory serves the catalogue and the fleet from fixtures, no token, no network', async () => {
+    const { connector, mode } = createDatomsConnector({ env: { DATOMS_LIVE: 'false' } });
+    expect(mode).toBe('fixtures');
+    const cat = await connector.listAssets();
+    expect(cat).toMatchObject({ total: 22, complete: true });
+    const batches = [];
+    for await (const b of connector.readLatest({ mode: 'fleet' })) batches.push(b);
+    expect(batches.flatMap((b) => b.readings)).toHaveLength(22);
+  });
+
+  it('passes seenKeys through: nulls are dropped from values but every key is listed', async () => {
+    const { connector } = createDatomsConnector({ env: {} });
+    const out = [];
+    for await (const b of connector.readLatest({ mode: 'fleet' })) out.push(...b.readings);
+    const withNull = out.find((r) => r.seenKeys.length > Object.keys(r.values).length);
+    expect(withNull).toBeDefined();
+    for (const r of out) {
+      expect(r.seenKeys).toEqual(expect.arrayContaining(Object.keys(r.values)));
+    }
+  });
+
+  it('live mode refuses to start without an org id and token', () => {
+    expect(() => createDatomsConnector({ env: { DATOMS_LIVE: 'true' } })).toThrow(/DATOMS_ORG_ID/);
   });
 });

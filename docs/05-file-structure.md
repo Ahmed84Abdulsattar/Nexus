@@ -156,7 +156,9 @@ nexus/
 │       └── src/
 │           ├── main.ts
 │           ├── worker.module.ts
-│           ├── leader/               # pg advisory-lock leader election
+│           ├── leader/               # pg advisory-lock leader election (dedicated connection, re-checked before each job)
+│           ├── scheduler/            # in-process scheduler: no overlap, leader check per run, early-run rule
+│           ├── catalogue/            # Kysely CatalogueRepository (batched), catalogue settings from core.setting
 │           ├── jobs/
 │           │   ├── catalogue-sync.job.ts   # hourly (+ early on unknown ids): assets, nameplate; safe retire
 │           │   ├── live-poll.job.ts        # 60 s default, per asset type: BULK endpoint only (ADR 0010) →
@@ -166,6 +168,7 @@ nexus/
 │           │   # history-backfill: ON HOLD until a DATOMS history feed is decided by ADR (ADR 0010)
 │           ├── pipeline/             # map SourceReading → DB writes, change detection, publish
 │           ├── publish/              # Web PubSub publisher (group per project)
+│           ├── observability/        # Metrics (logging today; OpenTelemetry in S8-02): nexus.sync.warning
 │           └── metrics/              # sync_run writer, OpenTelemetry metrics
 │
 ├── packages/
@@ -173,6 +176,7 @@ nexus/
 │   │   └── src/
 │   │       ├── types/                # Project, Asset, Reading, Event, Status, Permission …
 │   │       ├── schemas/              # zod schemas (DTOs) shared by API and web
+│   │       ├── sync-run.ts           # integration.sync_run.details: SyncRunDetails (zod union per job), sync warnings
 │   │       ├── permissions.ts        # permission keys (single source of truth)
 │   │       └── constants.ts          # project states, status display names (labels only, from data)
 │   ├── datoms-client/                # ALL DATOMS knowledge lives here
@@ -184,6 +188,7 @@ nexus/
 │   │   │   ├── mapping.ts            # THE ONLY place DATOMS field names live: DATOMS JSON → Source* types
 │   │   │   │                         # (values, status, location, asset type, site link, kind, alerts). When
 │   │   │   │                         # the DATOMS sample (Q21) arrives, only this file + its tests change.
+│   │   │   ├── fixtures.ts           # DATOMS_LIVE=false: a fetch that answers from fixtures/ (no network, no token)
 │   │   │   ├── errors.ts
 │   │   │   └── types.ts              # raw DATOMS response types (private to this package)
 │   │   ├── fixtures/                 # recorded real responses (tokens/headers removed), incl. the DATOMS sample bulk response (Q21)
@@ -192,7 +197,7 @@ nexus/
 │   │   └── test/
 │   ├── connectors/
 │   │   ├── core/                     # SourceConnector interface + Source* types
-│   │   └── datoms/                   # DatomsConnector implements SourceConnector using datoms-client
+│   │   └── datoms/                   # DatomsConnector implements SourceConnector using datoms-client; createDatomsConnector (live or fixtures)
 │   ├── config/                       # shared eslint/tsconfig/vitest presets
 │   └── testing/                      # fixture loaders, fake connector, data generators
 │

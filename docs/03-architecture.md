@@ -77,11 +77,11 @@ sequenceDiagram
     D-->>C: assets page
   end
   C-->>W: SourceAsset[] (Nexus types)
-  W->>DB: upsert assets (names, nameplate) by (source_system, external_id)
-  Note over W,DB: sites, asset types and parameter keys come from the bulk rows in the live poll (ADR 0010)
-  W->>DB: if the walk was complete: retire assets missed in 2 complete walks (never delete; stop if > 5%)
+  W->>DB: upsert assets (names, nameplate, category, lifecycle label) by (source_system, external_id); set last_seen_at
+  Note over W,DB: the asset TYPE comes from this catalogue (category_name, matched to asset_type.source_names). Bulk rows carry no type. Sites, status, location and parameter keys come from the bulk rows in the live poll (ADR 0010)
+  W->>DB: if the walk was complete: retire assets missing from 2 complete walks (never delete; retire nothing if > 5%)
   W->>DB: new unmatched items → integration.link_todo
-  W->>DB: insert integration.sync_run (counts, duration, errors)
+  W->>DB: insert integration.sync_run (counts, duration, errors; details jsonb with the typed summary and warnings)
 ```
 
 ### 4.2 Live poll (every 60 s by default; per asset type, ADR 0006)

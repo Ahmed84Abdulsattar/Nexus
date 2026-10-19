@@ -28,7 +28,11 @@ export interface SourceAsset {
   /** The source's own type (DATOMS: category name). Matched to `core.asset_type.source_names`. */
   sourceTypeName?: string;
   sourceTypeId?: string;
-  /** The source's lifecycle label (DATOMS: lifecycle_status). Not stored in phase 1. */
+  /**
+   * The source's lifecycle label (DATOMS: lifecycle_status), exactly as reported. Stored in
+   * core.asset.source_lifecycle_status; display only, never used for status, counts, poll scope or
+   * retirement.
+   */
   lifecycleStatus?: string;
   /** Nameplate as the source sends it (nulls included). */
   nameplate?: Record<string, unknown>;
@@ -62,8 +66,13 @@ export interface SourceReading {
   externalAssetId: string;
   /** The source's packet time (`data.time`): the change-detection key. */
   ts: Date;
-  /** Parameters unchanged. `null` means the source reported null; a missing key is absent. */
+  /**
+   * Parameters unchanged, with the source's null-valued keys DROPPED (null means "no data"; docs/07 section 4 item 7).
+   * The consumer REPLACES the stored latest values with this object, never merges.
+   */
   values: Record<string, unknown>;
+  /** EVERY parameter key in the row, null-valued ones included, so new keys are recorded in the dictionary. */
+  seenKeys: string[];
   status?: SourceStatus;
   location?: SourceLocation;
   siteExternalId?: string;

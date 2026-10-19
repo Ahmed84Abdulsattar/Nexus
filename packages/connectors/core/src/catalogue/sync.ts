@@ -1,12 +1,11 @@
+import type { CatalogueSyncDetails, CatalogueWarning } from '@nexus/shared';
 import type { SourceConnector } from '../connector.js';
 import type { SourceAsset } from '../types.js';
 import type {
   AssetPatch,
   AssetTypeRef,
-  CatalogueAlert,
   CatalogueRepository,
   CatalogueSettings,
-  CatalogueSummary,
   LinkTodoRow,
   NewAssetRow,
   StoredAsset,
@@ -19,14 +18,18 @@ export interface CatalogueSyncDeps {
   connector: Pick<SourceConnector, 'sourceSystem' | 'listAssets'>;
   repo: CatalogueRepository;
   settings: CatalogueSettings;
-  /** Receives alerts (retire blocked, incomplete walk, failed sync). Wired to logging/notifications by the worker. */
-  onAlert?: (alert: CatalogueAlert) => void;
+  /**
+   * Called once per warning (incomplete walk, retire blocked). The worker logs it as
+   * `nexus.sync.warning` and counts it in the metric of that name. The warning is also stored in
+   * `sync_run.details.warnings`; it is never an event or a link_todo.
+   */
+  onWarning?: (warning: CatalogueWarning) => void;
   now?: () => Date;
 }
 
 export interface CatalogueSyncResult {
-  summary: CatalogueSummary;
-  alerts: CatalogueAlert[];
+  /** What is stored in `integration.sync_run.details`. */
+  details: CatalogueSyncDetails;
 }
 
 /**
@@ -38,20 +41,24 @@ export interface CatalogueSyncResult {
  * - New asset: insert. Type from `asset_type.source_names`; unknown or absent type is `generic`
  *   plus a link_todo. `project_id` stays null plus a link_todo (linking is S3-02).
  * - Existing asset: update only fields the source states and that differ. An absent field never
- *   overwrites a stored value.
- * - Retire: only after a COMPLETE walk, only after `retireAfterMisses` consecutive complete walks
- *   without the asset, and never more than `retireMaxFraction` of the active assets in one sync.
- *   An incomplete walk neither counts a miss nor resets one.
+ *   overwrites a stored value. `source_lifecycle_status` is stored as reported and used for nothing.
+ * - Every asset in the walk gets `last_seen_at` = this sync's time.
+ * - Retire: only after a COMPLETE walk, only for assets missing from `retireAfterMisses` consecutive
+ *   complete walks, and never more than `retireMaxFraction` of the active assets in one sync.
+ *   "Missing from N complete walks" needs no per-asset counter: the asset is absent now and its
+ *   `last_seen_at` is before the start of the oldest of the last N-1 earlier complete runs (recorded
+ *   in `sync_run.details.complete`). An incomplete walk is not a complete run, so it neither counts a
+ *   miss nor resets one (an asset it did contain has a newer `last_seen_at` and starts from zero).
  */
 export async function runCatalogueSync(deps: CatalogueSyncDeps): Promise<CatalogueSyncResult> {
   const { connector, repo, settings } = deps;
   const now = deps.now ?? (() => new Date());
   const sys = connector.sourceSystem;
   const startedAt = now();
-  const alerts: CatalogueAlert[] = [];
-  const alert = (a: CatalogueAlert): void => {
-    alerts.push(a);
-    deps.onAlert?.(a);
+  const warnings: CatalogueWarning[] = [];
+  const warn = (w: CatalogueWarning): void => {
+    warnings.push(w);
+    deps.onWarning?.(w);
   };
 
   try {
@@ -95,6 +102,7 @@ export async function runCatalogueSync(deps: CatalogueSyncDeps): Promise<Catalog
           nameplate: a.nameplate ?? {},
           sourceCreatedAt: a.createdAt ?? null,
           kind: a.kind ?? null,
+          sourceLifecycleStatus: a.lifecycleStatus ?? null,
           seenAt: at,
         });
         typeTodo(a, type.known, addTodo);
@@ -115,53 +123,47 @@ export async function runCatalogueSync(deps: CatalogueSyncDeps): Promise<Catalog
     // ---- Misses and safe retire (only on a complete walk) ----
     let missed = 0;
     let retired = 0;
-    let retireBlocked = false;
     if (!complete) {
-      alert({
+      warn({
         code: 'incomplete_walk',
-        message: 'Catalogue walk was not complete: no asset can be counted as missing or retired',
-        details: { read: catalogue.assets.length, total: catalogue.total ?? null },
+        seen: catalogue.assets.length,
+        total: catalogue.total ?? null,
       });
     } else {
       const active = stored.filter((s) => !s.retiredAt);
       const missing = active.filter((s) => !incoming.has(s.externalId));
       missed = missing.length;
-      const due = missing.filter((s) => s.missCount + 1 >= settings.retireAfterMisses);
+      // This walk is miss number 1. The other N-1 come from earlier complete runs; with fewer
+      // than N-1 on record nothing is due yet.
+      const needed = Math.max(1, settings.retireAfterMisses);
+      const baseline = needed === 1 ? startedAt : await repo.loadRetireBaseline(sys, needed - 1);
+      const due = baseline ? missing.filter((s) => s.lastSeenAt < baseline) : [];
       const limit = settings.retireMaxFraction * active.length;
       if (due.length > 0 && due.length > limit) {
-        retireBlocked = true;
-        alert({
+        warn({
           code: 'retire_blocked',
-          message: `Catalogue sync would retire ${due.length} of ${active.length} active assets (above the ${settings.retireMaxFraction * 100}% guard): nothing retired`,
-          details: {
-            wouldRetire: due.length,
-            active: active.length,
-            maxFraction: settings.retireMaxFraction,
-          },
+          wouldRetire: due.length,
+          active: active.length,
+          fraction: due.length / active.length,
+          maxFraction: settings.retireMaxFraction,
         });
-      }
-      const toRetire = retireBlocked ? [] : due;
-      const retireSet = new Set(toRetire.map((s) => s.externalId));
-      const counters = missing
-        .filter((s) => !retireSet.has(s.externalId))
-        .map((s) => ({ externalId: s.externalId, missCount: s.missCount + 1 }));
-      if (counters.length) await repo.setMisses(sys, counters);
-      if (toRetire.length) {
+      } else if (due.length > 0) {
         await repo.retire(
           sys,
-          toRetire.map((s) => s.externalId),
+          due.map((s) => s.externalId),
           at,
         );
+        retired = due.length;
       }
-      retired = toRetire.length;
     }
 
     const todoRows = [...todos.values()];
     if (todoRows.length) await repo.addLinkTodos(sys, todoRows);
 
-    const summary: CatalogueSummary = {
-      read: catalogue.assets.length,
-      total: catalogue.total,
+    const details: CatalogueSyncDetails = {
+      job: 'catalogue_sync',
+      seen: catalogue.assets.length,
+      total: catalogue.total ?? null,
       complete,
       inserted: inserts.length,
       updated: patches.length,
@@ -169,22 +171,21 @@ export async function runCatalogueSync(deps: CatalogueSyncDeps): Promise<Catalog
       reappeared,
       missed,
       retired,
-      retireBlocked,
       linkTodos: todoRows.length,
+      warnings,
     };
     await repo.writeSyncRun(sys, {
       job: 'catalogue_sync',
       startedAt,
       finishedAt: now(),
-      status: complete && !retireBlocked ? 'ok' : 'partial',
-      itemsRead: summary.read,
+      status: warnings.length === 0 ? 'ok' : 'partial',
+      itemsRead: details.seen,
       itemsWritten: inserts.length + patches.length + retired,
-      summary,
+      details,
     });
-    return { summary, alerts };
+    return { details };
   } catch (err) {
     const message = err instanceof Error ? err.message : 'unknown error';
-    alert({ code: 'sync_failed', message: `Catalogue sync failed: ${message}`, details: {} });
     try {
       await repo.writeSyncRun(sys, {
         job: 'catalogue_sync',
@@ -277,6 +278,10 @@ function diff(
   let changed = false;
   if (a.name !== undefined && a.name !== row.name) {
     p.name = a.name;
+    changed = true;
+  }
+  if (a.lifecycleStatus !== undefined && a.lifecycleStatus !== row.sourceLifecycleStatus) {
+    p.sourceLifecycleStatus = a.lifecycleStatus;
     changed = true;
   }
   if (a.nameplate !== undefined && !jsonEqual(a.nameplate, row.nameplate)) {
