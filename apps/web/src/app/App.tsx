@@ -1,8 +1,13 @@
+import { useState } from 'react';
+import { RouterProvider } from 'react-router';
+import { Providers } from './providers';
+import { createAppRouter } from './router';
+
 export function App() {
+  const [router] = useState(createAppRouter);
   return (
-    <main className="p-6">
-      <h1 className="text-2xl font-semibold">Nexus by Innovo</h1>
-      <p>Placeholder. The app shell arrives in S0-05.</p>
-    </main>
+    <Providers>
+      <RouterProvider router={router} />
+    </Providers>
   );
 }

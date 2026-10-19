@@ -15,7 +15,7 @@ This file covers setting up your machine, creating the repo, checking the agents
 | **Git** (Windows: **Git for Windows**) | Repo; lets Claude Code use Bash on Windows | git-scm.com |
 | **Node.js 22 LTS** | Runs the project | nodejs.org (or `nvm`) |
 | **pnpm** | Package manager for the monorepo | `corepack enable` then `corepack prepare pnpm@latest --activate` |
-| **Docker Desktop** | Local PostgreSQL 16 | docker.com |
+| **Docker Desktop** | Local PostgreSQL 16 (on Windows without Docker, use `scripts/pg-local.ps1` instead; see Step 7) | docker.com |
 | **Claude account** | Claude Code needs a paid plan: **Pro, Max, Team or Enterprise** (or a Claude Console account). The free plan has no Claude Code. | claude.ai |
 
 ## Step 2: Install Claude Code in VS Code
@@ -74,7 +74,7 @@ It should name the 8 agents: **architect, datoms-integration, backend-api, datab
 | 1 | Architecture check | **Prompt A** | Read the concerns. Accept or reject each one; update the docs if you change anything. |
 | 2 | Plan sprint S0 | **Prompt B** with `S0` | `docs/sprints/S0.md` has tasks, owners and acceptance checks |
 | 3 | Repo skeleton | **Prompt 1** | `pnpm install`, `pnpm dev`, `pnpm test` and `pnpm build` all work |
-| 4 | Local database | `docker compose up -d`, then **Prompt 2** | `pnpm db:migrate` and `pnpm db:check` pass, and the seed timings look like docs/06 section 6 |
+| 4 | Local database | `docker compose up -d` (Windows without Docker: `powershell -ExecutionPolicy Bypass -File scripts/pg-local.ps1 start`), then **Prompt 2** | `pnpm db:migrate` and `pnpm db:check` pass, and the seed timings look like docs/06 section 6 |
 | 5 | Commit | — | One PR per task, with the backlog ID in the title |
 
 Your colleague starts on the frontend shell (**Prompt 7**) as soon as the skeleton from item 3 is merged. He works against MSW mocks until the API exists.

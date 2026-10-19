@@ -25,11 +25,12 @@ Check contrast in both light and dark themes (WCAG AA).
 
 ## Layout and responsiveness
 - Breakpoints: `sm` 640 (phone), `md` 768 (tablet portrait), `lg` 1024 (tablet landscape / small laptop), `xl` 1280+.
-- **Portfolio:**
-  - Desktop: map full screen, with the project list as a right side panel.
-  - Tablet: the list is a collapsible drawer.
+- **Layout modes** (`app/layout/PageLayout`, S1-06): desktop from `xl` (1280), tablet from `md` to below `xl` (768–1279, so 1024 is tablet), phone below `md` (768).
+- **Portfolio** (decided by Ahmed, 2026-10-14, following backlog S1-06 and PR #15; Q37 if the mockup shows otherwise):
+  - Desktop: project list on the left, map in the centre, a details panel for the selected project on the right.
+  - Tablet: the list collapses to a button that opens a drawer; the details panel stays on the right.
   - Phone: map and list are tabs, with a bottom sheet for the selected project.
-- **Project page:**
+- **Project page** (this section wins over the generic S1-06 shell; S4-04 builds it):
   - Desktop: map on the left (≈ 65%), info boxes in a right column.
   - Tablet: map on top, boxes in a 2-column grid below.
   - Phone: map (50 vh) with the boxes stacked, and the asset side panel as a bottom sheet.
