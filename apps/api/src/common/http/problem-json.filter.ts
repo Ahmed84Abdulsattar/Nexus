@@ -7,6 +7,7 @@ import {
 } from '@nestjs/common';
 import { PROBLEM_JSON, type ProblemDetails, type ProblemFieldError } from '@nexus/shared';
 import { ZodValidationException } from 'nestjs-zod';
+import { TooManyRequestsException } from '../rate-limit/rate-limit.js';
 import type { ZodError } from 'zod';
 
 interface Reply {
@@ -24,6 +25,7 @@ const TITLES: Record<number, string> = {
   401: 'Unauthorized',
   403: 'Forbidden',
   404: 'Not Found',
+  413: 'Content Too Large',
   422: 'Unprocessable Entity',
   429: 'Too Many Requests',
   503: 'Service Unavailable',
@@ -77,6 +79,9 @@ export class ProblemJsonFilter implements ExceptionFilter {
 
     reply.status(status).header('content-type', PROBLEM_JSON);
     if (status === 401) reply.header('www-authenticate', 'Bearer');
+    if (exception instanceof TooManyRequestsException) {
+      reply.header('retry-after', String(exception.retryAfterSeconds));
+    }
     const body: ProblemDetails = {
       type: 'about:blank',
       title: TITLES[status] ?? (status >= 500 ? 'Internal Server Error' : 'Error'),

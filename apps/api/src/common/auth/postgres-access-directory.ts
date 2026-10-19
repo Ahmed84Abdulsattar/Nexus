@@ -39,11 +39,21 @@ export class PostgresAccessDirectory implements AccessDirectory {
         email        = COALESCE(EXCLUDED.email, access.app_user.email),
         display_name = COALESCE(EXCLUDED.display_name, access.app_user.display_name),
         last_seen_at = now()
+      WHERE access.app_user.is_active
       RETURNING id, is_active,
         coalesce((SELECT last_seen_at FROM previous) < now() - make_interval(mins => ${gapMinutes}), true)
           AS new_session`.execute(this.db);
     const row = rows[0];
-    if (!row) throw new Error('access.app_user upsert returned no row');
+    if (!row) {
+      // The conflict branch skips deactivated users (no write for them): read the flag instead.
+      const existing = await this.db
+        .selectFrom('access.app_user')
+        .select(['id', 'is_active'])
+        .where('entra_oid', '=', identity.oid)
+        .executeTakeFirst();
+      if (!existing) throw new Error('access.app_user upsert returned no row');
+      return { userId: existing.id, isActive: existing.is_active };
+    }
 
     if (row.is_active && row.new_session) await this.auditSignIn(row.id, identity);
     return { userId: row.id, isActive: row.is_active };
