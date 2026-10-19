@@ -4,10 +4,19 @@ import { ZodSerializerInterceptor, ZodValidationPipe } from 'nestjs-zod';
 import { AuthModule } from './common/auth/auth.module.js';
 import { DatabaseModule } from './common/db/database.module.js';
 import { ConfigModule } from './config/config.module.js';
+import { AccessModule } from './modules/access/access.module.js';
+import { ClientConfigModule } from './modules/config/client-config.module.js';
 import { HealthModule } from './modules/health/health.module.js';
 
 @Module({
-  imports: [ConfigModule, DatabaseModule, AuthModule, HealthModule],
+  imports: [
+    ConfigModule,
+    DatabaseModule,
+    AuthModule,
+    HealthModule,
+    AccessModule,
+    ClientConfigModule,
+  ],
   providers: [
     // Every body, query and param typed with a zod DTO from @nexus/shared is validated (422).
     { provide: APP_PIPE, useClass: ZodValidationPipe },

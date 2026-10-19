@@ -25,6 +25,15 @@ import {
 import { JWT_KEY_RESOLVER } from '../../src/common/auth/entra-jwt.guard.js';
 import { AccessChangeListener } from '../../src/common/auth/access-change-listener.js';
 import { InMemoryAccessDirectory } from '../../src/common/auth/in-memory-access-directory.js';
+import {
+  ME_REPOSITORY,
+  type MeRepository,
+  type StoredProfile,
+} from '../../src/modules/access/me.repository.js';
+import {
+  CLIENT_CONFIG_REPOSITORY,
+  type ClientConfigRepository,
+} from '../../src/modules/config/config.repository.js';
 import { mountDocs } from '../../src/openapi/setup.js';
 import { applySecurity, createHttpAdapter } from '../../src/common/http/security.js';
 import { configureApp } from '../../src/common/http/configure-app.js';
@@ -48,6 +57,24 @@ export const TEST_ENV = {
   // Nothing in the unit tests connects (the pool is lazy and the directory below is in memory).
   DATABASE_URL: 'postgres://nexus_api_local@127.0.0.1:1/nexus_unit_tests?sslmode=require',
 } as const;
+
+/** Stored profiles by user id, for /v1/me in tests without a database. */
+export const storedProfiles = new Map<string, StoredProfile>();
+const fakeMeRepository: MeRepository = {
+  profile: (userId) => Promise.resolve(storedProfiles.get(userId) ?? { name: null, email: null }),
+};
+/** What the settings tables hold, for /v1/config in tests without a database. */
+export const storedConfig = {
+  featureFlags: { 'project.weather': false, 'explorer.csv_export': true } as Record<
+    string,
+    boolean
+  >,
+  displayStatusKeys: ['running', 'idle'] as string[],
+};
+const fakeConfigRepository: ClientConfigRepository = {
+  featureFlags: () => Promise.resolve({ ...storedConfig.featureFlags }),
+  displayStatusKeys: () => Promise.resolve([...storedConfig.displayStatusKeys]),
+};
 
 export interface TestKeys {
   kid: string;
@@ -246,6 +273,10 @@ export async function createTestApp(
     .useClass(InMemoryAccessDirectory)
     .overrideProvider(AccessChangeListener)
     .useValue({})
+    .overrideProvider(ME_REPOSITORY)
+    .useValue(fakeMeRepository)
+    .overrideProvider(CLIENT_CONFIG_REPOSITORY)
+    .useValue(fakeConfigRepository)
     .overrideProvider(JWT_KEY_RESOLVER)
     .useValue(
       options.resolver ??
