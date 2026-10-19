@@ -1,10 +1,15 @@
 import { render, screen } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { RouterProvider } from 'react-router';
 import { expect, it } from 'vitest';
 import { createTestRouter } from '../src/app/router';
 
 function visit(path: string) {
-  render(<RouterProvider router={createTestRouter(path)} />);
+  render(
+    <QueryClientProvider client={new QueryClient()}>
+      <RouterProvider router={createTestRouter(path)} />
+    </QueryClientProvider>,
+  );
 }
 
 it('renders the portfolio placeholder at /', async () => {

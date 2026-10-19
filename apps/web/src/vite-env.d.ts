@@ -3,4 +3,9 @@
 interface ImportMetaEnv {
   /** Base URL of the Nexus API (docs/04), e.g. http://localhost:3000/v1. */
   readonly VITE_API_BASE_URL?: string;
+  /**
+   * Local development only (docs/04, S0-09): the developer's own ArcGIS key, read by the MSW
+   * /v1/config mock in Vite dev mode. A production build fails if it is set.
+   */
+  readonly VITE_DEV_ARCGIS_API_KEY?: string;
 }

@@ -1,4 +1,6 @@
+import { QueryClientProvider } from '@tanstack/react-query';
 import { render, screen, within } from '@testing-library/react';
+import { createQueryClient } from '../src/app/queryClient';
 import userEvent from '@testing-library/user-event';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
@@ -77,7 +79,11 @@ describe('S1-05 QA: no invented data', () => {
 
 describe('S1-05 QA: landmarks', () => {
   it.each(['/', '/nope', '/admin'])('exactly one banner and one main on %s', async (path) => {
-    const { unmount } = render(<RouterProvider router={createTestRouter(path)} />);
+    const { unmount } = render(
+      <QueryClientProvider client={createQueryClient({ retry: false })}>
+        <RouterProvider router={createTestRouter(path)} />
+      </QueryClientProvider>,
+    );
     await screen.findByRole('main');
     expect(screen.getAllByRole('banner')).toHaveLength(1);
     expect(screen.getAllByRole('main')).toHaveLength(1);

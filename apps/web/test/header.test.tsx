@@ -1,4 +1,6 @@
+import { QueryClientProvider } from '@tanstack/react-query';
 import { render, screen, within } from '@testing-library/react';
+import { createQueryClient } from '../src/app/queryClient';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, RouterProvider } from 'react-router';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -89,7 +91,11 @@ describe('user menu', () => {
 describe('app shell', () => {
   it('wraps the routes: header on a page and on not-found', async () => {
     for (const path of ['/', '/nope']) {
-      const { unmount } = render(<RouterProvider router={createTestRouter(path)} />);
+      const { unmount } = render(
+        <QueryClientProvider client={createQueryClient({ retry: false })}>
+          <RouterProvider router={createTestRouter(path)} />
+        </QueryClientProvider>,
+      );
       expect(await screen.findByRole('banner')).toBeInTheDocument();
       expect(screen.getAllByRole('main')).toHaveLength(1);
       unmount();

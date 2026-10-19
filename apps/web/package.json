@@ -6,7 +6,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "node --max-old-space-size=6144 ./node_modules/vite/bin/vite.js build",
+    "measure:map": "node scripts/measure-map-load.mjs",
     "api:generate": "openapi-typescript ../api/openapi.json -o src/api/schema.d.ts",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
@@ -14,6 +15,8 @@
     "test:e2e": "playwright test"
   },
   "dependencies": {
+    "@arcgis/core": "catalog:",
+    "@nexus/shared": "workspace:*",
     "@radix-ui/react-dialog": "catalog:",
     "@radix-ui/react-dropdown-menu": "catalog:",
     "@radix-ui/react-slot": "catalog:",
@@ -38,6 +41,7 @@
     "@vitejs/plugin-react": "catalog:",
     "axe-core": "catalog:",
     "jsdom": "catalog:",
+    "msw": "catalog:",
     "openapi-typescript": "catalog:",
     "tailwindcss": "catalog:",
     "typescript": "catalog:",

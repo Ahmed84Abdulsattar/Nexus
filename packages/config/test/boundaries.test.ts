@@ -31,6 +31,27 @@ describe('import boundary rules', () => {
     });
   });
 
+  describe('dev-only mocks (msw and apps/web/src/test)', () => {
+    const msw = "import { http } from 'msw';\nexport const h = http;\n";
+    const mock = "import { server } from '../test/server';\nexport const s = server;\n";
+
+    it('fails in web source outside src/test and main.tsx', async () => {
+      expect(await messages('apps/web/src/features/portfolio/Page.tsx', msw)).toHaveLength(1);
+      expect(await messages('apps/web/src/features/portfolio/Page.tsx', mock)).toHaveLength(1);
+      expect(await messages('apps/web/src/components/map/MapView.tsx', mock)).toHaveLength(1);
+      expect(await messages('apps/web/src/components/map/arcgis/view.ts', msw)).toHaveLength(1);
+    });
+    it('passes in src/test and main.tsx', async () => {
+      expect(await messages('apps/web/src/test/server.ts', msw)).toHaveLength(0);
+      const main = "const m = await import('./test/browser');\nexport { m };\n";
+      expect(await messages('apps/web/src/main.tsx', main)).toHaveLength(0);
+      expect(await messages('apps/web/src/main.tsx', msw)).toHaveLength(0);
+    });
+    it('passes in the vitest folder, which tests the mocks', async () => {
+      expect(await messages('apps/web/test/map-view.test.tsx', msw)).toHaveLength(0);
+    });
+  });
+
   describe('@nexus/datoms-client', () => {
     const code =
       "import { DatomsClient } from '@nexus/datoms-client';\nexport const c = DatomsClient;\n";

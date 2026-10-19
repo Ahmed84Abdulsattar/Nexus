@@ -43,7 +43,12 @@ export function resolveApiBase(
     if (isProd) throw new Error('VITE_API_BASE_URL is required in a production build.');
     return new URL('/v1', pageOrigin);
   }
-  return new URL(configured, pageOrigin);
+  const base = new URL(configured, pageOrigin);
+  // The Entra bearer token is sent to this origin, so a production build only talks https.
+  if (isProd && base.protocol !== 'https:') {
+    throw new Error('VITE_API_BASE_URL must be an https URL in a production build.');
+  }
+  return base;
 }
 
 /**
@@ -86,6 +91,14 @@ function authMiddleware(apiOrigin: string): Middleware {
       );
     },
   };
+}
+
+/**
+ * Auth middleware for clients that cannot use `api` (endpoints not in schema.d.ts yet). The token
+ * origin is always derived from the configured API base, so a caller cannot widen it.
+ */
+export function apiAuthMiddleware(): Middleware {
+  return authMiddleware(resolveApiBase().origin);
 }
 
 /**

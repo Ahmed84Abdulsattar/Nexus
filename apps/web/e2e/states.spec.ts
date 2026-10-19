@@ -6,6 +6,9 @@ const viewports = {
   sm: { width: 390, height: 844 },
 } as const;
 
+// The dev MSW service worker would answer /health/live before page.route sees it (S0-09).
+test.use({ serviceWorkers: 'block' });
+
 async function axeClean(page: Page) {
   const results = await new AxeBuilder({ page }).analyze();
   expect(results.violations.map((v) => v.id)).toEqual([]);
