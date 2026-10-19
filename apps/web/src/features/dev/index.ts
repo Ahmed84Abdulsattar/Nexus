@@ -6,4 +6,8 @@ export const devRoutes: RouteObject[] = [
     path: 'dev/components',
     lazy: async () => ({ Component: (await import('./ComponentsPage')).ComponentsPage }),
   },
+  {
+    path: 'dev/states',
+    lazy: async () => ({ Component: (await import('./StatesPage')).StatesPage }),
+  },
 ];

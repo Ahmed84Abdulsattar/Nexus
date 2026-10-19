@@ -1,6 +1,9 @@
-import { type ReactNode } from 'react';
+import { QueryClientProvider } from '@tanstack/react-query';
+import { useState, type ReactNode } from 'react';
+import { createQueryClient } from './queryClient';
 
-/** App-wide providers. Query, auth and live providers are added by their tasks (S0-08, S1-xx). */
+/** App-wide providers. Auth and live providers are added by their tasks (S0-08, S1-xx). */
 export function Providers({ children }: { children: ReactNode }) {
-  return <>{children}</>;
+  const [client] = useState(() => createQueryClient());
+  return <QueryClientProvider client={client}>{children}</QueryClientProvider>;
 }
