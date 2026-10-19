@@ -87,7 +87,12 @@ describe('QA: 422 resume page (odd limits, limit 1, no gap)', () => {
     [5, 1, { page: 1, limit: 2 }], // page 1 stays page 1
   ])('limit %i failing on page %i resumes at %o', async (start, failPage, expected) => {
     const store = new InMemoryPageSizeStore({ limit: start, learnedAt: T0 });
-    const s = bulkServer(1600, (limit, page) => limit === start && page === failPage);
+    // Just enough rows to reach the failing page: after halving to limit 1, a large fleet
+    // means one call per row (1,600 calls timed out on CI).
+    const s = bulkServer(
+      start * (failPage + 1) + 10,
+      (limit, page) => limit === start && page === failPage,
+    );
     const r = rig(s.impl, { pageSizes: store });
     await drain(r.api.walkFleet());
     const i = s.calls.findIndex((c) => bodyOf(c).page === failPage && bodyOf(c).limit === start);
