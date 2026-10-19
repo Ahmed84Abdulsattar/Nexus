@@ -173,6 +173,9 @@ catalogs:
     '@eslint/js':
       specifier: ^9.39.5
       version: 9.39.5
+    '@fastify/cors':
+      specifier: ^11.3.0
+      version: 11.3.0
     '@fastify/helmet':
       specifier: ^13.0.2
       version: 13.1.2
@@ -349,6 +352,9 @@ importers:
 
   apps/api:
     dependencies:
+      '@fastify/cors':
+        specifier: 'catalog:'
+        version: 11.3.0
       '@fastify/helmet':
         specifier: 'catalog:'
         version: 13.1.2

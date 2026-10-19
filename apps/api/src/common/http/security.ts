@@ -1,6 +1,7 @@
 import helmet from '@fastify/helmet';
 import { FastifyAdapter, type NestFastifyApplication } from '@nestjs/platform-fastify';
 import type { AppConfig } from '../../config/env.js';
+import { IpRateLimiter } from '../rate-limit/rate-limit.js';
 import { DOCS_PATH } from '../../openapi/setup.js';
 
 /**
@@ -35,6 +36,16 @@ export async function applySecurity(app: NestFastifyApplication, config: AppConf
     strictTransportSecurity: { maxAge: 31_536_000, includeSubDomains: true },
     referrerPolicy: { policy: 'no-referrer' },
   });
+
+  // Per-address flood guard, before routing, body parsing and any guard, so it also covers unknown
+  // paths, oversized bodies and bad tokens. The thrown 429 goes through ProblemJsonFilter.
+  const ipLimiter = new IpRateLimiter(config.http.rateLimit.ipPerMinute);
+  app
+    .getHttpAdapter()
+    .getInstance()
+    .addHook('onRequest', async (request) => {
+      ipLimiter.check(request.ip);
+    });
 
   if (config.appEnv === 'local' || config.appEnv === 'dev') {
     // Same allow-list as mountDocs(). onSend runs after helmet's onRequest, so this wins.

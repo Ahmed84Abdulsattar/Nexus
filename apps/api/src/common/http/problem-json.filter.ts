@@ -7,7 +7,7 @@ import {
 } from '@nestjs/common';
 import { PROBLEM_JSON, type ProblemDetails, type ProblemFieldError } from '@nexus/shared';
 import { ZodValidationException } from 'nestjs-zod';
-import { TooManyRequestsException } from '../rate-limit/rate-limit.guard.js';
+import { TooManyRequestsException } from '../rate-limit/rate-limit.js';
 import type { ZodError } from 'zod';
 
 interface Reply {

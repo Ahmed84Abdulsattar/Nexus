@@ -1,7 +1,7 @@
 import { Module } from '@nestjs/common';
 import { APP_FILTER, APP_GUARD } from '@nestjs/core';
 import { APP_CONFIG, type AppConfig } from '../../config/env.js';
-import { IpRateLimitGuard, UserRateLimitGuard } from '../rate-limit/rate-limit.guard.js';
+import { UserRateLimiter } from '../rate-limit/rate-limit.js';
 import { ProblemJsonFilter } from '../http/problem-json.filter.js';
 import { AccessChangeListener } from './access-change-listener.js';
 import { ACCESS_DIRECTORY, AccessContextService, CLOCK } from './access-context.js';
@@ -33,10 +33,9 @@ import { ProjectScopeGuard } from './project-scope.guard.js';
     AccessContextService,
     // Clears the access cache on every instance when the database announces a change.
     AccessChangeListener,
-    // Order matters: flood guard, token check, then the per-user limit on the verified oid.
-    { provide: APP_GUARD, useClass: IpRateLimitGuard },
+    // The per-address limit is an onRequest hook (applySecurity); EntraJwtGuard calls the per-user one.
+    UserRateLimiter,
     { provide: APP_GUARD, useClass: EntraJwtGuard },
-    { provide: APP_GUARD, useClass: UserRateLimitGuard },
     { provide: APP_GUARD, useClass: PermissionGuard },
     { provide: APP_GUARD, useClass: ProjectScopeGuard },
     { provide: APP_FILTER, useClass: ProblemJsonFilter },

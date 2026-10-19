@@ -39,6 +39,8 @@ export const ISSUER = `https://login.microsoftonline.com/${TENANT_ID}/v2.0`;
 export const TEST_ENV = {
   APP_ENV: 'local',
   AUTH_MODE: 'entra',
+  // Required outside local (Q46); tests state "no proxy" explicitly.
+  TRUST_PROXY: 'false',
   ENTRA_TENANT_ID: TENANT_ID,
   ENTRA_API_CLIENT_ID: API_CLIENT_ID,
   ENTRA_WEB_CLIENT_ID: WEB_CLIENT_ID,

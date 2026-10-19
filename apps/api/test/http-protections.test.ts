@@ -245,14 +245,27 @@ describe('TRUST_PROXY validation', () => {
   it('accepts off and address lists', () => {
     expect(load('').http.trustProxy).toBe(false);
     expect(load('false').http.trustProxy).toBe(false);
+    expect(load('2001:db8::/32').http.trustProxy).toEqual(['2001:db8::/32']);
     expect(load('10.0.0.0/8, 127.0.0.1').http.trustProxy).toEqual(['10.0.0.0/8', '127.0.0.1']);
   });
-  it.each(['true', '0.0.0.0/0', '::/0', '0', '1', '2', 'banana', '10.0.0.0/33'])(
-    'refuses %s',
-    (v) => {
-      expect(() => load(v)).toThrow(/TRUST_PROXY/);
-    },
-  );
+  it.each([
+    'true',
+    '0.0.0.0/0',
+    '::/0',
+    '0',
+    '1',
+    '2',
+    'banana',
+    '10.0.0.0/33',
+    '10.0.0.0/7',
+    '2001:db8::/31',
+    '::ffff:10.0.0.1',
+    '::ffff:10.0.0.0/104',
+    '0.0.0.0/1,128.0.0.0/1',
+    '10.0.0.0/8,::/1',
+  ])('refuses %s', (v) => {
+    expect(() => load(v)).toThrow(/TRUST_PROXY/);
+  });
 });
 
 describe('rate limit settings', () => {

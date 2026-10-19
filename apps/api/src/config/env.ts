@@ -52,10 +52,14 @@ function parseTrustProxy(raw: string | undefined): { value: TrustProxy; problem?
   const ok = list.every((a) => {
     const [addr, bits, ...rest] = a.split('/');
     if (rest.length > 0 || addr === undefined || isIP(addr) === 0) return false;
+    // IPv4-mapped notation hides an IPv4 range inside IPv6; write the IPv4 range instead.
+    if (/^::ffff:/i.test(addr)) return false;
     if (bits === undefined) return true;
-    // /0 would trust every address, which is the same as "true".
+    // Wide ranges would trust (nearly) every address, which is the same as "true": at least /8
+    // for IPv4 and /32 for IPv6. A proxy network is never wider than that.
+    const min = isIP(addr) === 4 ? 8 : 32;
     return (
-      /^\d{1,3}$/.test(bits) && Number(bits) >= 1 && Number(bits) <= (isIP(addr) === 4 ? 32 : 128)
+      /^\d{1,3}$/.test(bits) && Number(bits) >= min && Number(bits) <= (isIP(addr) === 4 ? 32 : 128)
     );
   });
   return ok
@@ -63,7 +67,7 @@ function parseTrustProxy(raw: string | undefined): { value: TrustProxy; problem?
     : {
         value: false,
         problem:
-          'use false, or a comma-separated list of proxy IP addresses or CIDRs (not true, not /0, not a hop count)',
+          'use false, or a comma-separated list of proxy IP addresses or CIDRs (IPv4 not wider than /8, IPv6 not wider than /32, no ::ffff: notation; not true, not a hop count)',
       };
 }
 
@@ -120,6 +124,17 @@ const envSchema = z
     const proxy = parseTrustProxy(env.TRUST_PROXY);
     if (proxy.problem)
       ctx.addIssue({ code: 'custom', path: ['TRUST_PROXY'], message: proxy.problem });
+    // Behind Azure ingress, an unset TRUST_PROXY makes every user share the ingress address, so a
+    // flood of junk tokens would trip the per-address limit for everybody (Q46). Setting it to
+    // "false" is an explicit decision and still allowed.
+    if (env.APP_ENV !== 'local' && env.TRUST_PROXY === undefined) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['TRUST_PROXY'],
+        message:
+          'required when APP_ENV is dev or prod: set it to the Container Apps environment infrastructure subnet CIDR, or to "false" to decide explicitly that no proxy is trusted (Q46)',
+      });
+    }
     // The API holds a LISTEN connection for access-cache invalidation. Through a pooler in transaction
     // mode (Azure's built-in PgBouncer, port 6432) LISTEN is silently deaf, so refuse to start.
     try {
