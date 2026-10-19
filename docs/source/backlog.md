@@ -3,6 +3,8 @@
 > Read-only copy for agents. The spreadsheet is the source and tracks status. Regenerate this file when the sheet changes.
 > Map decided: Esri ArcGIS (docs/adr/0002). Database: PostgreSQL 16 without TimescaleDB (docs/adr/0003). Where a task disagrees with docs/, docs/ wins.
 > Regenerated from the spreadsheet on 2026-10-08 after architecture review 1 (ADRs 0005–0010). Changed rows: the sprint dependencies for S2–S6, S0-04, S2-02, S3-01, S3-03, S3-04 (on hold), S4-01, S4-02, S4-03, S4-05, S5-01, S5-02, S5-03, S6-01, S6-02, S6-03, S6-04, S9-02.
+> Changed on 2026-10-14 (S0-09 security review, accepted by Ahmed): extra steps in S0-03, S0-07, S0-08 and S7-02.
+> Changed on 2026-10-14 (decisions by Ahmed on the S1/S2 sprint plans): new tasks S1-10, S3-08 and S3-09 added below. `Nexus_Phase1_Sprint_Plan.xlsx` needs the same three rows added by hand.
 > Changed on 2026-10-12 (DATOMS provisional test key, docs/07 section 3): the S2 sprint dependency and S2-02 (Steps, External blocker, Acceptance check) now show S2-02 as unblocked.
 
 ## Sprints
@@ -59,6 +61,7 @@
 - **Steps (how to do it):** 1. Create a pipeline that runs on every pull request: install, lint, test.
   2. On merge to main: build Docker images for api and worker, push to Azure Container Registry, deploy to Container Apps (dev).
   3. Test by merging a small change and seeing it live.
+  4. Add `pnpm audit --prod` to the PR pipeline. Check whether `@vaadin/vaadin-usage-statistics` (pulled in by `@arcgis/core`) sends usage data at run time, and disable it if it does (security review of S0-09, item I6, 2026-10-14). This step needs no Azure access and is done ahead of the rest of S0-03.
 - **Output when done:** Merge to main = deployed to dev
 - **Now done by:** You (backend)
 - **Requirement:** Foundation
@@ -118,6 +121,8 @@
 - **Steps (how to do it):** 1. Create Azure Static Web App for dev.
   2. Add a pipeline: on merge to main, build and deploy apps/web.
   3. Check the dev URL works.
+  4. The deploy must build with `pnpm --filter @nexus/web build`, so the build-time guards run (no MSW, no sample data, no dev key in `dist/`; security review of S0-09, item L2, 2026-10-14).
+  5. The static host must serve HTTP/2 or later, with a long immutable cache for the hashed files under `assets/` and `assets/arcgis/*` (about 1,000 ArcGIS chunks; QA of S0-09, 2026-10-14).
 - **Output when done:** Web app auto-deploys to dev
 - **Now done by:** You (backend)
 - **Requirement:** Foundation
@@ -133,6 +138,7 @@
   2. Use the 'Nexus Web' client ID from S0-04.
   3. Sign-in button redirects to Microsoft; after sign-in show the user's name.
   4. Test with a user outside the Nexus groups: they must be refused.
+  5. On sign-out: `queryClient.clear()` (drops the previous user's cached data) and `esriConfig.apiKey = undefined` through the map adapter (security review of S0-09, item I3, 2026-10-14).
 - **Output when done:** Users sign in with their Innovo Microsoft account
 - **Now done by:** Colleague (frontend)
 - **Requirement:** Innovo: permissions
@@ -290,6 +296,21 @@
 - **Estimate (days):** 1
 - **Acceptance check:** Automated tests: a non-Nexus origin gets no CORS headers; a user over the limit gets 429 with Retry-After; an oversized body gets 413; secure headers on every response; Swagger UI gives 404 when APP_ENV=prod
 
+### S1-10 · Current user and client config endpoints: GET /v1/me and GET /v1/config
+- **Sprint:** S1
+- **Week:** W2
+- **Work package:** Foundation
+- **Steps (how to do it):** 1. `GET /v1/me` (`@AnySignedIn`): the signed-in user's name, roles, permissions and project scope from the access context (docs/08 §5, docs/10).
+  2. `GET /v1/config` (`@AnySignedIn`): feature flags, enums and the ArcGIS settings, including the per-environment ArcGIS key from config / Key Vault (docs/09, docs/10).
+  3. Add both to OpenAPI and regenerate the typed web client; the web app's interim `/v1/config` and `/v1/projects` calls (S0-09 `pendingClient.ts`) switch to the typed client.
+  (Added 2026-10-14 (architect S1 plan, decision D2).)
+- **Output when done:** The web app can read who the user is and its runtime config from the API
+- **Now done by:** You (backend)
+- **Requirement:** Innovo: permissions; Brief: interactive map
+- **Depends on:** S1-09
+- **Estimate (days):** 1
+- **Acceptance check:** Tests: `/v1/me` returns the caller's permissions and nothing else; `/v1/config` needs a valid sign-in and never returns a secret other than the referrer-restricted ArcGIS key; both appear in the generated client
+
 ### S2-01 · Projects API: list, filter (status, type, district), search, scoped to user
 - **Sprint:** S2
 - **Week:** W1
@@ -298,6 +319,7 @@
   2. Apply the project-scope filter from S1-02.
   3. Return the fields DATOMS provides for each site (name, location, type, status).
   4. Add seed data for 5 sample sites so the frontend can work before DATOMS is connected.
+  5. Do not read any project source column (`source_system`, `external_id`, `source_payload`, `*_seen_at` on `core.project`): ADR 0012 drops them in S3-09. Source ids are not part of the normal project response.
 - **Output when done:** Projects list endpoint the map uses
 - **Now done by:** You (backend)
 - **Requirement:** Sheet: Top level
@@ -331,6 +353,7 @@
   3. Call GET /projects and draw one pin per project.
   4. Colour pins: Active green, Central Store blue, Finished grey, In bid yellow (structure sheet).
   5. Click a pin = zoom to that project.
+  6. Acceptance is split (decision S2 D3): part A (no key, test data, stubbed tiles) is the merge gate. Part B runs when the ArcGIS key arrives (Q23): the real-key spec checks there are no failed `arcgis.com` / `basemaps3d` responses, the marker or cluster count equals the 10 sample projects, and a screenshot comparison passes (QA of S0-09, 2026-10-14).
 - **Output when done:** Top-level portfolio map
 - **Now done by:** Colleague (frontend)
 - **Requirement:** Sheet: Top level
@@ -394,7 +417,7 @@
 - **Depends on:** S2-02
 - **External blocker:** DATOMS sample + field list (Q21, Q22) + read-only key; id stability (Q11)
 - **Estimate (days):** 2
-- **Acceptance check:** New DATOMS site appears in Nexus within 1 hour
+- **Acceptance check:** A new DATOMS asset appears in Nexus within 1 hour of being added to DATOMS, typed from its catalogue category (unmapped categories go to `generic` plus a to-do); assets are retired only by the safe-retire rule. New DATOMS **sites** appear only once DATOMS sends site data (Q21, Q22); until then admins create projects (S3-09). (Reworded 2026-10-14, ADR 0012.)
 
 ### S3-02 · Auto-link new sites and devices on exact match; others to admin to-do list
 - **Sprint:** S3
@@ -406,7 +429,7 @@
 - **Output when done:** New sites appear automatically, no guessing
 - **Now done by:** You (backend)
 - **Requirement:** Innovo: sites added automatically
-- **Depends on:** S3-01
+- **Depends on:** S3-01, S3-09 (ADR 0012 link table). Exact-name matching follows the `linking.name_match` setting (off / suggest / auto, default suggest; ADR 0012).
 - **Estimate (days):** 2
 - **Acceptance check:** No guessed links; unmatched items listed
 
@@ -481,6 +504,36 @@
 - **Depends on:** S2-06
 - **Estimate (days):** 2
 - **Acceptance check:** Admin assigns a user to a project
+
+### S3-08 · Partition maintenance job: create future partitions, drop expired ones (critical)
+- **Sprint:** S3
+- **Week:** W1
+- **Work package:** DATOMS connector
+- **Steps (how to do it):** 1. Worker job `maintenance` (docs/07 §5), daily at 02:00 Asia/Dubai and once at start-up, leader only.
+  2. Create partitions ahead for every partitioned table (raw packets, API-call log, events, audit log) using the existing SQL functions; drop partitions past retention through `drop_partitions_before` (with its audit floor).
+  3. Record each run in `integration.sync_run` and raise a health warning when tomorrow's (or next month's) partition is missing.
+  (Added 2026-10-14 (architect S1 plan, decision D4).)
+- **Output when done:** Inserts never fail for lack of a partition; retention runs on its own
+- **Now done by:** You (backend)
+- **Requirement:** Foundation; N-10 retention
+- **Depends on:** S1-01, S3-01 (worker scheduler and leader lock)
+- **Estimate (days):** 1
+- **Acceptance check:** Integration test: with the clock moved forward 40 days, every partitioned table still accepts inserts and expired partitions are gone; a missing partition raises the health warning. Merged before or with S3-03.
+
+### S3-09 · Admin projects API (R-63): create and edit projects, assign DATOMS assets
+- **Sprint:** S3
+- **Week:** W2
+- **Work package:** Admin console
+- **Steps (how to do it):** 1. Write ADR 0012 (project source identity, link table) first.
+  2. `/v1/admin/projects`: create, edit and retire projects with the admin-held fields (name, location, district, state, type, client / consultant / PM); never delete (hard rule 8).
+  3. Assign DATOMS assets to projects from the linking to-do; every change goes to the audit log.
+  (Added 2026-10-14 (architect S2 plan, decisions D2 and D10).)
+- **Output when done:** Admins can build the portfolio until DATOMS sends site data (Q21, Q22, Q43)
+- **Now done by:** You (backend)
+- **Requirement:** R-63
+- **Depends on:** ADR 0012 (accepted 2026-10-14), S2-06, S3-01
+- **Estimate (days):** 2
+- **Acceptance check:** An admin creates a project and links an asset to it; a non-admin gets 403; the change is in the audit log
 
 ### S4-01 · Chart summaries (5-minute, 1-hour, 1-day) as Nexus rollup tables
 - **Sprint:** S4
@@ -813,6 +866,7 @@
   2. Rotate keys in Key Vault.
   3. Firewall: only Container Apps can reach the database.
   4. Web app security headers and CSP (docs/08 §6) in staticwebapp.config.json: a CSP that allows only the MSAL (Entra) and ArcGIS domains plus the API and Web PubSub hosts; HSTS, X-Content-Type-Options, Referrer-Policy, frame-ancestors none. (Added by the S0 plan, 2026-10-09.)
+  5. ArcGIS (security review of S0-09, PR #19, accepted by Ahmed 2026-10-14): the ArcGIS SDK puts the key in tile, style and elevation URLs (`token=`). Exclude `*.arcgis.com` and `*.arcgisonline.com` from App Insights automatic dependency tracking and strip `token=` in a telemetry initializer. CSP for the map (assets self-hosted, decision L6): `script-src 'self' 'wasm-unsafe-eval'`; `worker-src 'self' blob:`; `img-src 'self' data: blob: https://*.arcgis.com`; `connect-src` with `https://*.arcgis.com` (basemapstyles-api, ibasemaps-api, elevation3d, basemaps3d, static); `font-src 'self'`; check Calcite styles under `style-src`; no `unsafe-eval` (verify with a report-only CSP first). `Referrer-Policy: strict-origin-when-cross-origin`, never `no-referrer` (the ArcGIS key is referrer-restricted). Details in docs/09.
 - **Output when done:** Data not reachable from the internet; the web app sends a CSP and security headers
 - **Now done by:** You (backend)
 - **Requirement:** Innovo: security
