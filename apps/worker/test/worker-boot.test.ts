@@ -40,16 +40,19 @@ describe.skipIf(testDatabaseAdminUrl === undefined)(
       const admin = new pg.Client({ connectionString: testDb.adminUrl });
       await admin.connect();
       try {
-        let assets = 0;
-        for (let i = 0; i < 100 && assets < 22; i++) {
-          assets = Number((await admin.query('SELECT count(*) AS n FROM core.asset')).rows[0].n);
-          if (assets < 22) await new Promise((r) => setTimeout(r, 100));
+        // Wait for the finished run: the sync_run row is written after the assets, so polling on
+        // the asset count alone races the end of the job on a slow CI runner.
+        const runQuery = `SELECT status, details->>'inserted' AS inserted FROM integration.sync_run WHERE job = 'catalogue_sync'`;
+        let run = await admin.query(runQuery);
+        for (let i = 0; i < 300 && run.rows.length === 0; i++) {
+          await new Promise((r) => setTimeout(r, 100));
+          run = await admin.query(runQuery);
         }
-        expect(assets).toBe(22);
-        const run = await admin.query(
-          `SELECT status, details->>'inserted' AS inserted FROM integration.sync_run WHERE job = 'catalogue_sync'`,
-        );
         expect(run.rows).toEqual([{ status: 'ok', inserted: '22' }]);
+        const assets = Number(
+          (await admin.query('SELECT count(*) AS n FROM core.asset')).rows[0].n,
+        );
+        expect(assets).toBe(22);
 
         // The lock is held by a session of this worker.
         const held = await admin.query(
