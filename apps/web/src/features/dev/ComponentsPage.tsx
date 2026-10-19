@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Header, PageLayout } from '../../app/layout';
 import { applyTheme, initialTheme, type Theme } from '../../app/theme';
 import {
   Button,
@@ -32,7 +33,7 @@ export function ComponentsPage() {
   };
 
   return (
-    <main className="mx-auto max-w-5xl space-y-6 p-4 md:p-6">
+    <main className="mx-auto w-full max-w-5xl min-w-0 space-y-6 p-4 md:p-6">
       <header className="flex flex-wrap items-center justify-between gap-2">
         <h1 className="text-2xl font-semibold">Components</h1>
         <Button variant="secondary" onClick={toggleTheme}>
@@ -57,6 +58,14 @@ export function ComponentsPage() {
             </li>
           ))}
         </ul>
+      </Card>
+
+      <Card aria-labelledby="hd">
+        <CardTitle id="hd">Header (sample user)</CardTitle>
+        <Header
+          session={{ user: { name: 'Sample User' }, signOut: () => undefined }}
+          searchLabel="Global search (sample)"
+        />
       </Card>
 
       <Card aria-labelledby="bt">
@@ -126,6 +135,25 @@ export function ComponentsPage() {
           <TabsContent value="a">Equipment content</TabsContent>
           <TabsContent value="b">Energy content</TabsContent>
         </Tabs>
+      </Card>
+
+      <Card aria-labelledby="pl">
+        <CardTitle id="pl">PageLayout</CardTitle>
+        <p className="mb-3 text-sm text-fg-muted">
+          Desktop (1280+): list, content, details. Tablet: the list is a button. Phone: both open as
+          bottom drawers.
+        </p>
+        <div className="flex overflow-hidden rounded-md border border-border">
+          <PageLayout
+            contentAs="div"
+            listLabel="Demo list"
+            detailsLabel="Demo details"
+            list={<p className="text-sm">List panel content.</p>}
+            details={<p className="text-sm">Details panel content.</p>}
+          >
+            <p className="text-sm">Content area (the map goes here).</p>
+          </PageLayout>
+        </div>
       </Card>
 
       <Card aria-labelledby="sp">

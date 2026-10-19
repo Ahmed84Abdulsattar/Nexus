@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router';
 import { useConfig, useProjects } from '../../api/queries';
+import { QueryState } from '../../components/feedback';
 import { MapView, markerToken, ModeSwitch } from '../../components/map';
 import type { MapFocus, MapMarker, MapMode } from '../../components/map';
 import { Tag } from '../../components/ui';
@@ -70,9 +71,17 @@ export function PortfolioPage() {
           <h2 id="project-list-title" className="text-lg font-semibold">
             Projects
           </h2>
-          {projects.isPending ? <p role="status">Loading projects…</p> : null}
-          {projects.isError ? <p role="alert">Projects could not be loaded.</p> : null}
-          {projects.isSuccess && items.length === 0 ? <p>No projects yet.</p> : null}
+          {/* Loading, error with retry, or empty (never a zero). The list below shows the data. */}
+          {items.length === 0 ? (
+            <QueryState
+              query={projects}
+              loadingLabel="Loading projects"
+              emptyTitle="No projects yet"
+              isEmpty={(page) => page.items.length === 0}
+            >
+              {() => null}
+            </QueryState>
+          ) : null}
           <ul className="mt-2 flex max-h-[50vh] flex-col gap-2 overflow-auto">
             {items.map((p) => (
               <li key={p.id}>

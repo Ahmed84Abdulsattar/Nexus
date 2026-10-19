@@ -33,10 +33,10 @@ describe('assertWebEnv', () => {
       assertWebEnv({
         command: 'build',
         nodeEnv: 'production',
-        env: { VITE_DEV_ARCGIS_API_KEY: 'super-secret-value' },
+        env: { VITE_DEV_ARCGIS_API_KEY: 'zq9zq9' },
       });
     } catch (error) {
-      expect(String(error)).not.toContain('super-secret-value');
+      expect(String(error)).not.toContain('zq9zq9');
     }
   });
   it('rejects a build with NODE_ENV=development', () => {

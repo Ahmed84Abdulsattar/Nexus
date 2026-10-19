@@ -18,6 +18,7 @@
     "@arcgis/core": "catalog:",
     "@nexus/shared": "workspace:*",
     "@radix-ui/react-dialog": "catalog:",
+    "@radix-ui/react-dropdown-menu": "catalog:",
     "@radix-ui/react-slot": "catalog:",
     "@radix-ui/react-tabs": "catalog:",
     "@tanstack/react-query": "catalog:",
