@@ -1,19 +1,25 @@
 import 'reflect-metadata';
+import { BUDGET_RESTORE_DAYS } from '@nexus/connectors-datoms';
 import { createDatabase, type Database } from '@nexus/db';
 import { createTestDatabase, testDatabaseAdminUrl, type TestDatabase } from '@nexus/db/testing';
 import { SYNC_WARNING_METRIC, syncRunDetailsSchema } from '@nexus/shared';
 import pg from 'pg';
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { MaintenanceJob } from '../src/jobs/maintenance.job.js';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { MAINTENANCE_RETRY_MS, MaintenanceJob } from '../src/jobs/maintenance.job.js';
 import {
   PARTITIONED_TABLES,
+  RETENTION_LIMITS,
   listPartitions,
   msUntilNextDubaiHour,
+  needsEarlyRetry,
   nextPartitionName,
   partitionUpperBound,
+  pruneSyncRuns,
   runMaintenance,
+  safeError,
 } from '../src/maintenance/run-maintenance.js';
 import { Metrics } from '../src/observability/metrics.js';
+import type { ScheduledJob } from '../src/scheduler/scheduler.js';
 import type { SchedulerService } from '../src/scheduler/scheduler.service.js';
 
 const DAY = 86_400_000;
@@ -242,7 +248,7 @@ describe.skipIf(testDatabaseAdminUrl === undefined)(
 
       const by = Object.fromEntries(details.clamped.map((c) => [c.setting, c]));
       expect(by['retention.packet_days']).toMatchObject({ used: 7, reason: 'below_minimum' });
-      expect(by['retention.api_call_days']).toMatchObject({ used: 7, reason: 'below_minimum' });
+      expect(by['retention.api_call_days']).toMatchObject({ used: 30, reason: 'below_minimum' });
       expect(by['retention.rollup_5m_days']).toMatchObject({ used: 60, reason: 'invalid' });
       expect(by['retention.audit_days']).toMatchObject({ used: 730 });
       expect(by['retention.event_days']).toMatchObject({ used: 730 });
@@ -300,6 +306,185 @@ describe.skipIf(testDatabaseAdminUrl === undefined)(
 
       // Put it back so the missing-partition state does not leak into later tests.
       await admin.query(`ALTER TABLE telemetry.packet_renamed RENAME TO packet_p${tomorrow}`);
+    });
+
+    it('keeps at least 30 days of api_call: a setting of 7 is raised to 30 (budget restore reads 30 days)', async () => {
+      await setSetting('retention.api_call_days', 7);
+      const { details } = await runMaintenance({ db });
+      expect(RETENTION_LIMITS['retention.api_call_days'].min).toBe(BUDGET_RESTORE_DAYS);
+      expect(details.clamped).toContainEqual({
+        setting: 'retention.api_call_days',
+        configured: 7,
+        used: 30,
+        reason: 'below_minimum',
+      });
+    });
+
+    it('a clamp is counted in the metric but the run stays ok', async () => {
+      await setSetting('retention.packet_days', 0);
+      const counted: [string, Record<string, string | number> | undefined][] = [];
+      const metrics: Metrics = { increment: (n, a) => void counted.push([n, a]) };
+      const job = new MaintenanceJob(db, metrics, { register() {} } as unknown as SchedulerService);
+      await job.run();
+      expect(counted).toContainEqual([
+        SYNC_WARNING_METRIC,
+        { code: 'retention_clamped', job: 'maintenance' },
+      ]);
+      const row = (
+        await admin.query(`SELECT status FROM integration.sync_run WHERE job = 'maintenance'`)
+      ).rows[0];
+      expect(row.status).toBe('ok');
+    });
+
+    it('takes now from the database when no clock is given', async () => {
+      const before = Date.now();
+      const { startedAt, finishedAt } = await runMaintenance({ db });
+      expect(Math.abs(startedAt.getTime() - before)).toBeLessThan(60_000);
+      expect(finishedAt.getTime()).toBeGreaterThanOrEqual(startedAt.getTime());
+    });
+
+    it('fills a long gap: after 80 days without a run every daily partition up to +7 days exists', async () => {
+      const real = new Date();
+      const fake = daysFrom(real, 80);
+      // Earlier tests created partitions up to about +47 days; the retention must reach the cutoff
+      // into the past (the database refuses a drop date in the future).
+      await setSetting('retention.packet_days', 100);
+      await setSetting('retention.api_call_days', 100);
+      await setSetting('retention.rollup_5m_days', 100);
+      const { details } = await runMaintenance({ db, now: () => fake });
+      expect(details.warnings).toEqual([]);
+      // The initial partitions end at real+8; everything from there to fake+7 is created.
+      for (let d = 8; d <= 87; d++) {
+        expect(await exists('telemetry', `packet_p${compact(daysFrom(real, d))}`), `+${d}`).toBe(
+          true,
+        );
+        expect(await exists('integration', `api_call_p${compact(daysFrom(real, d))}`)).toBe(true);
+      }
+      expect(details.created).toContainEqual(
+        expect.objectContaining({ table: 'telemetry.packet' }),
+      );
+    });
+
+    describe('lock timeout', () => {
+      let locker: pg.Client;
+      beforeEach(async () => {
+        locker = new pg.Client({ connectionString: testDb.adminUrl });
+        await locker.connect();
+      });
+      afterEach(async () => {
+        await locker.query('ROLLBACK').catch(() => undefined);
+        await locker.end();
+      });
+
+      it('gives up fast when a long query holds the table, records step_failed, and asks for a retry in 15 minutes', async () => {
+        // 160 days ahead: new monthly and daily partitions are needed; retentions reach the cutoff back.
+        await setSetting('retention.packet_days', 200);
+        await setSetting('retention.api_call_days', 200);
+        await setSetting('retention.rollup_5m_days', 200);
+        const fake = daysFrom(new Date(), 160);
+        await locker.query('BEGIN');
+        await locker.query('LOCK TABLE telemetry.rollup_5m IN ACCESS EXCLUSIVE MODE');
+
+        let registered: ScheduledJob | undefined;
+        const scheduler = {
+          register: (j: ScheduledJob) => void (registered = j),
+        } as unknown as SchedulerService;
+        const counted: string[] = [];
+        const metrics: Metrics = { increment: (_n, a) => void counted.push(String(a?.['code'])) };
+        const job = new MaintenanceJob(db, metrics, scheduler);
+        job.onModuleInit();
+
+        const started = Date.now();
+        const details = await job.run(() => fake);
+        const elapsed = Date.now() - started;
+
+        expect(elapsed).toBeLessThan(20_000);
+        expect(details.warnings).toContainEqual(
+          expect.objectContaining({
+            code: 'step_failed',
+            step: 'create',
+            table: 'telemetry.rollup_5m',
+            message: expect.stringContaining('55P03'),
+          }),
+        );
+        // Other tables were still created.
+        expect(details.created.length).toBeGreaterThan(0);
+        expect(counted).toContain('partition_missing');
+        const wait = await registered!.intervalMs();
+        expect(wait).toBeLessThanOrEqual(MAINTENANCE_RETRY_MS);
+        expect(needsEarlyRetry(details)).toBe(true);
+
+        // Once the lock is gone the next run succeeds and goes back to the daily schedule.
+        await locker.query('ROLLBACK');
+        const again = await job.run(() => fake);
+        // (Drops of the 600-day-old test partitions are refused by the database floor at this
+        // far-future clock; that is unrelated to creation.)
+        expect(again.warnings.filter((w) => w.code !== 'step_failed' || w.step !== 'drop')).toEqual(
+          [],
+        );
+        expect(needsEarlyRetry(again)).toBe(false);
+        expect(await registered!.intervalMs()).toBeGreaterThan(MAINTENANCE_RETRY_MS);
+      });
+    });
+
+    it('skips the drop and prune steps when the signal is aborted (leadership lost)', async () => {
+      const real = new Date();
+      const old = daysFrom(real, -60);
+      await setSetting('retention.packet_days', 30);
+      await makePartition('telemetry.packet', 'day', old);
+      await admin.query(
+        `INSERT INTO integration.sync_run (source_system, job, status, started_at)
+         VALUES ('datoms', 'live_poll', 'ok', now() - interval '400 days')`,
+      );
+      const controller = new AbortController();
+      controller.abort();
+      const { details } = await runMaintenance({ db, signal: controller.signal });
+      expect(details.dropped).toEqual([]);
+      expect(details.syncRunsPruned).toBe(0);
+      expect(details.warnings).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ step: 'drop', message: 'aborted: leadership lost' }),
+          expect.objectContaining({ step: 'prune_sync_run' }),
+        ]),
+      );
+      expect(await exists('telemetry', `packet_p${compact(old)}`)).toBe(true);
+      // Next run without the signal does the work.
+      const next = await runMaintenance({ db });
+      expect(next.details.dropped.flatMap((d) => d.partitions)).toContain(
+        `telemetry.packet_p${compact(old)}`,
+      );
+    });
+
+    it('deletes sync_run in batches', async () => {
+      for (let i = 0; i < 7; i++) {
+        await admin.query(
+          `INSERT INTO integration.sync_run (source_system, job, status, started_at)
+           VALUES ('datoms', 'live_poll', 'ok', now() - interval '400 days')`,
+        );
+      }
+      const n = await pruneSyncRuns(db, new Date(), 2, { batchSize: 2 });
+      expect(n).toBe(7);
+    });
+
+    describe('safeError', () => {
+      it('keeps the name and SQLSTATE, never the database message', () => {
+        const e = Object.assign(new Error('relation "secret_table" value=42'), {
+          name: 'error',
+          code: '55P03',
+        });
+        expect(safeError(e)).toBe('error 55P03: lock timeout (a long query holds the table)');
+        expect(safeError(Object.assign(new Error('x'), { code: '99999' }))).toBe('Error 99999');
+      });
+
+      it('redacts and caps a message without a code', () => {
+        const long = safeError(
+          new Error(`connect failed postgres://u:pw@h/db token=abc ${'x'.repeat(500)}`),
+        );
+        expect(long).not.toContain('pw@h');
+        expect(long).not.toContain('abc');
+        expect(long.length).toBeLessThanOrEqual(200);
+        expect(safeError('nope')).toBe('unknown error');
+      });
     });
 
     describe('sync_run pruning', () => {

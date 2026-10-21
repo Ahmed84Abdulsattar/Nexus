@@ -1,5 +1,6 @@
 import type { Database } from '@nexus/db';
 import type { MaintenanceDetails, MaintenanceWarning } from '@nexus/shared';
+import { BUDGET_RESTORE_DAYS } from '@nexus/connectors-datoms';
 import { sql } from 'kysely';
 
 /**
@@ -62,7 +63,8 @@ export const RETENTION_LIMITS: Record<RetentionKey, { min: number; fallback: num
   'retention.packet_days': { min: 7, fallback: 90 },
   'retention.rollup_5m_days': { min: 7, fallback: 60 },
   'retention.rollup_1h_days': { min: 90, fallback: 1830 },
-  'retention.api_call_days': { min: 7, fallback: 30 },
+  // The budget restore reads this many days of the usage log back (BUDGET_RESTORE_DAYS).
+  'retention.api_call_days': { min: BUDGET_RESTORE_DAYS, fallback: 30 },
   'retention.audit_days': { min: 730, fallback: 730 },
   'retention.event_days': { min: 730, fallback: 730 },
   'retention.status_history_days': { min: 30, fallback: 730 },
@@ -80,7 +82,16 @@ const FALLBACK_RETIRE_AFTER_MISSES = 2;
 
 export interface MaintenanceOptions {
   db: Database;
+  /**
+   * Test clock. In production leave it unset: the run then takes `now` from the database
+   * (`clock_timestamp()`), so a skewed worker clock cannot shift a retention cutoff (security review L1).
+   */
   now?: () => Date;
+  /**
+   * Checked before the drop and prune steps (and between prune batches). When it is aborted, for
+   * example because the leader lock was lost, the remaining destructive steps are skipped.
+   */
+  signal?: AbortSignal;
   onWarning?: (warning: MaintenanceWarning) => void;
   onClamp?: (clamp: MaintenanceDetails['clamped'][number]) => void;
 }
@@ -91,11 +102,20 @@ export interface MaintenanceResult {
   finishedAt: Date;
 }
 
+/** Each partition DDL call runs in its own transaction and gives up on a lock after this long (M2). */
+export const DDL_LOCK_TIMEOUT = '3s';
+/** `sync_run` rows are deleted in batches of this size (I3). */
+export const SYNC_RUN_DELETE_BATCH = 10_000;
+/** Daily creation always reaches back this many days, so late packets have a partition (L5). */
+export const DAILY_MIN_LOOKBACK_DAYS = 7;
+/** core.create_range_partitions accepts at most this many periods per call. */
+const MAX_PERIODS_PER_CALL = 400;
+
 export async function runMaintenance(options: MaintenanceOptions): Promise<MaintenanceResult> {
   const { db } = options;
-  const clock = options.now ?? (() => new Date());
-  const startedAt = clock();
-  const now = startedAt;
+  const clock = options.now;
+  const now = clock ? clock() : await databaseNow(db);
+  const startedAt = now;
   const details: MaintenanceDetails = {
     job: 'maintenance',
     created: [],
@@ -109,44 +129,65 @@ export async function runMaintenance(options: MaintenanceOptions): Promise<Maint
     options.onWarning?.(w);
   };
 
-  // 1. Create ahead. Always first: a missing partition stops inserts, an old one only wastes disk.
-  for (const t of PARTITIONED_TABLES) {
-    try {
-      const made = await createAhead(db, t, now);
-      if (made > 0) details.created.push({ table: t.table, count: made });
-    } catch (error) {
-      warn({ code: 'step_failed', step: 'create', table: t.table, message: describe(error) });
-    }
-  }
-
-  // 2. Drop expired, with clamped retention. If the settings cannot be read, nothing is dropped.
+  // 0. Settings first: the retention decides how far back daily partitions are filled. If they
+  // cannot be read, creation still runs with the defaults and nothing is dropped.
   let settings: Map<string, unknown> | undefined;
   try {
     settings = await readSettings(db);
   } catch (error) {
-    warn({ code: 'step_failed', step: 'settings', message: describe(error) });
+    warn({ code: 'step_failed', step: 'settings', message: safeError(error) });
   }
-  if (settings) {
-    const days = new Map<RetentionKey, number>();
-    for (const key of Object.keys(RETENTION_LIMITS) as RetentionKey[]) {
-      days.set(key, clampRetention(key, settings.get(key), details, options.onClamp));
+  const days = new Map<RetentionKey, number>();
+  for (const key of Object.keys(RETENTION_LIMITS) as RetentionKey[]) {
+    days.set(
+      key,
+      settings
+        ? clampRetention(key, settings.get(key), details, options.onClamp)
+        : RETENTION_LIMITS[key].fallback,
+    );
+  }
+
+  // 1. Create ahead. Always first: a missing partition stops inserts, an old one only wastes disk.
+  for (const t of PARTITIONED_TABLES) {
+    try {
+      const made = await createAhead(db, t, now, days.get(t.retention)!);
+      if (made > 0) details.created.push({ table: t.table, count: made });
+    } catch (error) {
+      warn({ code: 'step_failed', step: 'create', table: t.table, message: safeError(error) });
     }
-    for (const t of PARTITIONED_TABLES) {
-      try {
-        const cutoff = new Date(now.getTime() - days.get(t.retention)! * DAY_MS);
-        const dropped = await dropExpired(db, t, cutoff);
-        if (dropped.length > 0) details.dropped.push({ table: t.table, partitions: dropped });
-      } catch (error) {
-        warn({ code: 'step_failed', step: 'drop', table: t.table, message: describe(error) });
+  }
+
+  // 2. Drop expired, with clamped retention. If the settings cannot be read, nothing is dropped.
+  if (settings) {
+    const aborted = (step: 'drop' | 'prune_sync_run'): boolean => {
+      if (!options.signal?.aborted) return false;
+      warn({ code: 'step_failed', step, message: 'aborted: leadership lost' });
+      return true;
+    };
+    if (!aborted('drop')) {
+      for (const t of PARTITIONED_TABLES) {
+        try {
+          const cutoff = new Date(now.getTime() - days.get(t.retention)! * DAY_MS);
+          const dropped = await dropExpired(db, t, cutoff);
+          if (dropped.length > 0) details.dropped.push({ table: t.table, partitions: dropped });
+        } catch (error) {
+          warn({ code: 'step_failed', step: 'drop', table: t.table, message: safeError(error) });
+        }
+        if (aborted('drop')) break;
       }
     }
-    try {
-      const keep =
-        positiveInt(settings.get('catalogue.retire_after_misses')) ?? FALLBACK_RETIRE_AFTER_MISSES;
-      const cutoff = new Date(now.getTime() - days.get('retention.sync_run_days')! * DAY_MS);
-      details.syncRunsPruned = await pruneSyncRuns(db, cutoff, keep);
-    } catch (error) {
-      warn({ code: 'step_failed', step: 'prune_sync_run', message: describe(error) });
+    if (!aborted('prune_sync_run')) {
+      try {
+        const keep =
+          positiveInt(settings.get('catalogue.retire_after_misses')) ??
+          FALLBACK_RETIRE_AFTER_MISSES;
+        const cutoff = new Date(now.getTime() - days.get('retention.sync_run_days')! * DAY_MS);
+        details.syncRunsPruned = await pruneSyncRuns(db, cutoff, keep, {
+          ...(options.signal ? { signal: options.signal } : {}),
+        });
+      } catch (error) {
+        warn({ code: 'step_failed', step: 'prune_sync_run', message: safeError(error) });
+      }
     }
   }
 
@@ -160,10 +201,23 @@ export async function runMaintenance(options: MaintenanceOptions): Promise<Maint
       }
     }
   } catch (error) {
-    warn({ code: 'step_failed', step: 'create', message: `health check: ${describe(error)}` });
+    // Reported as `create` until the shared schema has a `health` step.
+    warn({ code: 'step_failed', step: 'create', message: `health check: ${safeError(error)}` });
   }
 
-  return { details, startedAt, finishedAt: clock() };
+  return { details, startedAt, finishedAt: clock ? clock() : await databaseNow(db) };
+}
+
+/** True when the run should be retried soon (about 15 minutes) instead of tomorrow (M2). */
+export function needsEarlyRetry(details: MaintenanceDetails): boolean {
+  return details.warnings.some(
+    (w) => w.code === 'partition_missing' || (w.code === 'step_failed' && w.step === 'create'),
+  );
+}
+
+async function databaseNow(db: Database): Promise<Date> {
+  const res = await sql<{ now: Date }>`SELECT clock_timestamp() AS now`.execute(db);
+  return new Date(res.rows[0]!.now);
 }
 
 /** Records the run in integration.sync_run (the maintenance job is not tied to one source). */
@@ -226,16 +280,58 @@ function positiveInt(v: unknown): number | undefined {
   return typeof v === 'number' && Number.isInteger(v) && v >= 1 ? v : undefined;
 }
 
-async function createAhead(db: Database, t: PartitionedTable, now: Date): Promise<number> {
+/**
+ * One DDL call in its own transaction with a lock timeout: a long query on the parent table makes
+ * the call fail fast (SQLSTATE 55P03) instead of queueing behind it and blocking every later insert
+ * into that table (security review M2).
+ */
+async function withDdlTimeout<T>(db: Database, fn: (trx: Transaction) => Promise<T>): Promise<T> {
+  return db.transaction().execute(async (trx) => {
+    await sql`SELECT set_config('lock_timeout', ${DDL_LOCK_TIMEOUT}, true)`.execute(trx);
+    return fn(trx);
+  });
+}
+type Transaction = Parameters<Parameters<ReturnType<Database['transaction']>['execute']>[0]>[0];
+
+/**
+ * Daily tables: from max(now - retention, min(end of the newest existing partition, today - 7)) to
+ * today + 7, so a long worker outage is filled (L5) and the last week always has partitions for late
+ * packets. Capped to the function's 400 periods. Monthly tables: this month and the next two.
+ */
+async function createAhead(
+  db: Database,
+  t: PartitionedTable,
+  now: Date,
+  retentionDays: number,
+): Promise<number> {
   const today = utcDate(now);
-  const [from, count] =
-    t.step === 'day'
-      ? [addDays(today, -DAILY_DAYS_BEHIND), DAILY_DAYS_BEHIND + 1 + DAILY_DAYS_AHEAD]
-      : [`${today.slice(0, 7)}-01`, MONTHLY_MONTHS_COUNT];
-  const res = await sql<{ made: number }>`
-    SELECT core.create_range_partitions(${t.table}, ${t.step}, ${from}::date, ${count}::int) AS made
-  `.execute(db);
-  return Number(res.rows[0]?.made ?? 0);
+  let from: string;
+  let count: number;
+  if (t.step === 'day') {
+    const last = addDays(today, DAILY_DAYS_AHEAD);
+    const lookback = addDays(today, -DAILY_MIN_LOOKBACK_DAYS);
+    const uppers = (await listPartitions(db, t.table))
+      .map(partitionUpperBound)
+      .filter((d): d is Date => d !== undefined);
+    const newestUpper =
+      uppers.length > 0 ? utcDate(new Date(Math.max(...uppers.map((d) => d.getTime())))) : lookback;
+    const oldestUseful = addDays(today, -retentionDays);
+    from = maxDate(oldestUseful, minDate(newestUpper, lookback));
+    count = Math.round((Date.parse(last) - Date.parse(from)) / DAY_MS) + 1;
+    if (count > MAX_PERIODS_PER_CALL) {
+      count = MAX_PERIODS_PER_CALL;
+      from = addDays(last, -(MAX_PERIODS_PER_CALL - 1));
+    }
+  } else {
+    from = `${today.slice(0, 7)}-01`;
+    count = MONTHLY_MONTHS_COUNT;
+  }
+  return withDdlTimeout(db, async (trx) => {
+    const res = await sql<{ made: number }>`
+      SELECT core.create_range_partitions(${t.table}, ${t.step}, ${from}::date, ${count}::int) AS made
+    `.execute(trx);
+    return Number(res.rows[0]?.made ?? 0);
+  });
 }
 
 async function dropExpired(db: Database, t: PartitionedTable, cutoff: Date): Promise<string[]> {
@@ -244,31 +340,49 @@ async function dropExpired(db: Database, t: PartitionedTable, cutoff: Date): Pro
     return upper !== undefined && upper.getTime() <= cutoff.getTime();
   });
   if (expired.length === 0) return [];
-  const res = await sql<{ dropped: string }>`
-    SELECT core.drop_partitions_before(${t.table}, ${cutoff.toISOString()}::timestamptz) AS dropped
-  `.execute(db);
-  return res.rows.map((r) => r.dropped);
+  return withDdlTimeout(db, async (trx) => {
+    const res = await sql<{ dropped: string }>`
+      SELECT core.drop_partitions_before(${t.table}, ${cutoff.toISOString()}::timestamptz) AS dropped
+    `.execute(trx);
+    return res.rows.map((r) => r.dropped);
+  });
 }
 
 /**
- * Deletes old run history. Always keeps, per source system, the newest `keep` complete catalogue
- * runs (the same rows `loadRetireBaseline` reads), however old: without them a safe retirement
- * could never fire (docs/07 section 6).
+ * Deletes old run history in batches of `SYNC_RUN_DELETE_BATCH`. Always keeps, per source system,
+ * the newest `keep` complete catalogue runs (the same rows `loadRetireBaseline` reads), however old:
+ * without them a safe retirement could never fire (docs/07 section 6).
  */
-export async function pruneSyncRuns(db: Database, cutoff: Date, keep: number): Promise<number> {
-  const res = await sql`
-    DELETE FROM integration.sync_run
-    WHERE started_at < ${cutoff.toISOString()}::timestamptz
-      AND id NOT IN (
-        SELECT id FROM (
-          SELECT id, row_number() OVER (PARTITION BY source_system ORDER BY started_at DESC) AS rn
-          FROM integration.sync_run
-          WHERE job = 'catalogue_sync' AND status IN ('ok', 'partial') AND details->>'complete' = 'true'
-        ) newest
-        WHERE rn <= ${keep}
+export async function pruneSyncRuns(
+  db: Database,
+  cutoff: Date,
+  keep: number,
+  options: { batchSize?: number; signal?: AbortSignal } = {},
+): Promise<number> {
+  const batch = options.batchSize ?? SYNC_RUN_DELETE_BATCH;
+  let total = 0;
+  for (;;) {
+    const res = await sql`
+      DELETE FROM integration.sync_run
+      WHERE id IN (
+        SELECT id FROM integration.sync_run
+        WHERE started_at < ${cutoff.toISOString()}::timestamptz
+          AND id NOT IN (
+            SELECT id FROM (
+              SELECT id, row_number() OVER (PARTITION BY source_system ORDER BY started_at DESC) AS rn
+              FROM integration.sync_run
+              WHERE job = 'catalogue_sync' AND status IN ('ok', 'partial') AND details->>'complete' = 'true'
+            ) newest
+            WHERE rn <= ${keep}
+          )
+        ORDER BY id
+        LIMIT ${batch}
       )
-  `.execute(db);
-  return Number(res.numAffectedRows ?? 0);
+    `.execute(db);
+    const n = Number(res.numAffectedRows ?? 0);
+    total += n;
+    if (n < batch || options.signal?.aborted) return total;
+  }
 }
 
 /**
@@ -308,6 +422,14 @@ export function partitionUpperBound(name: string): Date | undefined {
   return undefined;
 }
 
+function minDate(a: string, b: string): string {
+  return a < b ? a : b;
+}
+
+function maxDate(a: string, b: string): string {
+  return a > b ? a : b;
+}
+
 function utcDate(d: Date): string {
   return d.toISOString().slice(0, 10);
 }
@@ -333,6 +455,36 @@ export function msUntilNextDubaiHour(now: Date, hour: number): number {
   return wait;
 }
 
-function describe(error: unknown): string {
-  return error instanceof Error ? `${error.name}: ${error.message}` : 'unknown error';
+const KNOWN_SQLSTATE: Record<string, string> = {
+  '55P03': 'lock timeout (a long query holds the table)',
+  '57014': 'statement timeout or cancelled',
+  '40P01': 'deadlock',
+  '42501': 'permission denied',
+  P0001:
+    'refused by a database rule (for example a drop date in the future or the retention floor)',
+  '42P17': 'invalid partition definition (for example an overlap)',
+  '53300': 'too many connections',
+  '57P01': 'database shutting down',
+};
+
+/**
+ * What may be stored in `details` and logs (security review L2): the error name and the SQLSTATE
+ * code, with a short fixed text for known codes. The database message is never copied (it can name
+ * objects or carry values). Without a code, the message is redacted and capped at 200 characters.
+ */
+export function safeError(error: unknown): string {
+  if (!(error instanceof Error)) return 'unknown error';
+  const code = (error as { code?: unknown }).code;
+  if (typeof code === 'string' && /^[0-9A-Z]{5}$/.test(code)) {
+    const known = KNOWN_SQLSTATE[code];
+    return `${error.name} ${code}${known ? `: ${known}` : ''}`;
+  }
+  const redacted = error.message
+    .replace(/\b[a-z][a-z0-9+.-]*:\/\/\S+/gi, '[url]')
+    .replace(
+      /\b(password|passwd|pwd|token|secret|key|authorization)\s*[=:]\s*\S+/gi,
+      '$1=[redacted]',
+    )
+    .replace(/\s+/g, ' ');
+  return `${error.name}: ${redacted}`.slice(0, 200);
 }

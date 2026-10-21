@@ -221,13 +221,17 @@ Add indexes (~10–20%), and remember that zone-redundant HA keeps a second copy
 | `retention.packet_days` | 90 | 7 |
 | `retention.rollup_5m_days` | 60 | 7 |
 | `retention.rollup_1h_days` | 1830 | 90 |
-| `retention.api_call_days` | 30 | 7 |
+| `retention.api_call_days` | 30 | 30 (`BUDGET_RESTORE_DAYS`: the budget tracker reads 30 days of the usage log after a restart) |
 | `retention.status_history_days` | 730 | 30 |
 | `retention.location_history_days` | 400 | 30 |
 | `retention.sync_run_days` | 90 | 7 (and the newest `catalogue.retire_after_misses` complete catalogue runs per source are never pruned) |
 | `retention.audit_days`, `retention.event_days` | 730 | 730 (the database floor) |
 
-A drop date is always now minus the retention in days, so it can never be in the future. Raising a minimum later is a code change; lowering the audit or event floor needs a migration of the database functions.
+A drop date is always now minus the retention in days, so it can never be in the future. `now` comes from the database (`clock_timestamp()`), not the worker clock.
+
+**How the maintenance job runs DDL (security review M2, L5, L2).** Each `create_range_partitions` / `drop_partitions_before` call runs in its own transaction with `lock_timeout = 3s`: a long query on a parent table makes the call fail fast (SQLSTATE `55P03`, a `step_failed` warning) instead of queueing behind it and blocking inserts. When a create step failed, the next run is about 15 minutes away, not about 24 h. Daily creation starts at `max(now - retention, min(end of the newest existing partition, today - 7))`, so a long worker outage is filled, and goes to today + 7 (at most 400 periods per call). Warnings and logs carry the error name and SQLSTATE with a fixed short text, never the database message. `integration.sync_run` is deleted in batches of 10,000.
+
+**Rollups and retention (I6).** `telemetry.refresh_rollup_combine` must never run for an hour whose 5-minute rows were already dropped (older than `retention.rollup_5m_days`): it would overwrite a good hourly row with an empty one. The rollups job (S4-01) must skip, or refuse, hours older than the 5-minute retention. Raising a minimum later is a code change; lowering the audit or event floor needs a migration of the database functions.
 
 ## 7. Indexes (already in the schema)
 - `asset(project_id)` (partial, active only), `asset(asset_type_id)`.
