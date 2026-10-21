@@ -121,7 +121,7 @@ export const maintenanceDetailsSchema = z.object({
       setting: z.string(),
       configured: z.unknown(),
       used: z.number(),
-      reason: z.enum(['below_minimum', 'invalid']),
+      reason: z.enum(['below_minimum', 'invalid', 'rounded']),
     }),
   ),
   /** Rows deleted from integration.sync_run (the newest complete catalogue runs are always kept). */
