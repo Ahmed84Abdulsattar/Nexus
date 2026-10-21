@@ -16,16 +16,28 @@ import { DatomsConnector } from './connector.js';
 export interface CreateDatomsConnectorOptions {
   /** DATOMS_LIVE, DATOMS_BASE_URL, DATOMS_ORG_ID, DATOMS_TOKEN. Only `DATOMS_LIVE=true` reaches DATOMS. */
   env: NodeJS.ProcessEnv;
-  /** `budget.max_share` (ADR 0005). Default 1. */
-  maxShare?: number;
+  /**
+   * `budget.max_share` (ADR 0005). REQUIRED: there is no default, so a forgotten share can never mean
+   * "use everything". Change it later with `handle.setMaxShare`.
+   */
+  maxShare: number;
   /** Number of assets in the fleet, for the credit caps. Default 500. */
   fleetSize?: number;
   log?: Logger;
 }
 
+export type DatomsMode = 'live' | 'fixtures';
+
+/** `live` only for DATOMS_LIVE=true; everything else is fixtures. */
+export function datomsMode(env: NodeJS.ProcessEnv): DatomsMode {
+  return env['DATOMS_LIVE'] === 'true' ? 'live' : 'fixtures';
+}
+
 export interface DatomsConnectorHandle {
   connector: SourceConnector;
-  mode: 'live' | 'fixtures';
+  mode: DatomsMode;
+  /** Applies a new `budget.max_share` to the running budget tracker (throws on a value outside (0, 1]). */
+  setMaxShare(share: number): void;
 }
 
 /**
@@ -39,12 +51,12 @@ export interface DatomsConnectorHandle {
 export function createDatomsConnector(
   options: CreateDatomsConnectorOptions,
 ): DatomsConnectorHandle {
-  const live = options.env['DATOMS_LIVE'] === 'true';
+  const live = datomsMode(options.env) === 'live';
   const config = live ? loadDatomsConfig(options.env) : createFixtureConfig();
   if (live) assertLive(config);
   const budget = new BudgetTracker({
     fleetSize: options.fleetSize ?? 500,
-    maxShare: options.maxShare ?? 1,
+    maxShare: options.maxShare,
   });
   const api = new DatomsApi({
     client: new DatomsClient(config, live ? undefined : createFixtureFetch()),
@@ -53,5 +65,9 @@ export function createDatomsConnector(
     pageSizes: new InMemoryPageSizeStore(),
     ...(options.log ? { log: options.log } : {}),
   });
-  return { connector: new DatomsConnector(api), mode: live ? 'live' : 'fixtures' };
+  return {
+    connector: new DatomsConnector(api),
+    mode: live ? 'live' : 'fixtures',
+    setMaxShare: (share) => budget.setMaxShare(share),
+  };
 }

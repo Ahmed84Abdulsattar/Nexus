@@ -81,7 +81,7 @@ describe.skipIf(testDatabaseAdminUrl === undefined)(
         poolMax: 4,
       });
       repo = new KyselyCatalogueRepository(db);
-      const { connector } = createDatomsConnector({ env: { DATOMS_LIVE: 'false' } });
+      const { connector } = createDatomsConnector({ env: { DATOMS_LIVE: 'false' }, maxShare: 0.1 });
       fixtureAssets = (await connector.listAssets()).assets;
     });
 
@@ -400,7 +400,7 @@ describe.skipIf(testDatabaseAdminUrl === undefined)(
     });
 
     it('the job class wires connector, repository and settings; warnings reach the metric', async () => {
-      const { connector } = createDatomsConnector({ env: {} });
+      const { connector } = createDatomsConnector({ env: {}, maxShare: 0.1 });
       const incrementCalls: { name: string; attributes?: Record<string, string | number> }[] = [];
       const metrics = new (class extends Metrics {
         increment(name: string, attributes?: Record<string, string | number>): void {

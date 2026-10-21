@@ -33,6 +33,12 @@ export const SEEDS: readonly SeedFile[] = [
     why: 'DATOMS parameter list and category names (ADR 0011): source data, every environment',
   },
   {
+    file: 'dev-datoms-scope.sql',
+    envs: ['local', 'dev'],
+    asAdmin: false,
+    why: 'small DATOMS budget share and a four-asset poll subset for non-production (ADR 0005)',
+  },
+  {
     file: 'dev-roles.sql',
     envs: ['local', 'dev'],
     asAdmin: false,

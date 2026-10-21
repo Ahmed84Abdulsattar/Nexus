@@ -1,3 +1,5 @@
+import { sanitizeErrorText } from '@nexus/connectors-core';
+
 export interface SchedulerLogger {
   log(message: string): void;
   warn(message: string): void;
@@ -11,7 +13,8 @@ export interface ScheduledJob {
   runOnStart: boolean;
   /** Read after every run, so a changed setting applies to the next wait. */
   intervalMs: () => number | Promise<number>;
-  run: () => Promise<void>;
+  /** `signal` aborts when the leader lock is lost: check it between pages and batches. */
+  run: (signal: AbortSignal) => Promise<void>;
   /** Early runs (`requestEarly`) are at least this far apart. Default: none allowed. */
   minEarlyGapMs?: number;
 }
@@ -21,6 +24,8 @@ export type RunOutcome = 'ran' | 'failed' | 'skipped_overlap' | 'skipped_not_lea
 export interface SchedulerOptions {
   /** Called before EVERY job run. False means another replica leads: the job does not run. */
   ensureLeader: () => Promise<boolean>;
+  /** The signal of the current leader term, read right after `ensureLeader()` said yes. */
+  leaderSignal?: () => AbortSignal;
   logger?: SchedulerLogger;
   now?: () => number;
 }
@@ -31,7 +36,12 @@ interface JobState {
   lastStartedAt: number | undefined;
   timer: ReturnType<typeof setTimeout> | undefined;
   earlyTimer: ReturnType<typeof setTimeout> | undefined;
+  /** An early run was asked for while the job was running: re-armed once after the run. */
+  earlyWhileRunning: boolean;
 }
+
+/** setTimeout fires immediately (and warns) above this many milliseconds. */
+export const MAX_TIMER_MS = 2 ** 31 - 1;
 
 const quiet: SchedulerLogger = { log() {}, warn() {}, error() {} };
 
@@ -51,6 +61,7 @@ export class Scheduler {
   private readonly log: SchedulerLogger;
   private readonly now: () => number;
   private started = false;
+  private stopped = false;
 
   constructor(private readonly options: SchedulerOptions) {
     this.log = options.logger ?? quiet;
@@ -65,12 +76,14 @@ export class Scheduler {
       lastStartedAt: undefined,
       timer: undefined,
       earlyTimer: undefined,
+      earlyWhileRunning: false,
     });
   }
 
   start(): void {
     if (this.started) return;
     this.started = true;
+    this.stopped = false;
     for (const state of this.jobs.values()) {
       if (state.job.runOnStart) void this.runNow(state.job.name);
       else void this.scheduleNext(state);
@@ -79,6 +92,7 @@ export class Scheduler {
 
   stop(): void {
     this.started = false;
+    this.stopped = true;
     for (const state of this.jobs.values()) {
       clearTimeout(state.timer);
       clearTimeout(state.earlyTimer);
@@ -87,11 +101,20 @@ export class Scheduler {
     }
   }
 
-  /** Waits until no job is running (shutdown). */
-  async idle(): Promise<void> {
+  /**
+   * Waits until no job is running (shutdown), at most `timeoutMs`. Returns false when a job was
+   * still running at the deadline (the caller goes on and the lock is released anyway).
+   */
+  async idle(timeoutMs = 30_000): Promise<boolean> {
+    const deadline = this.now() + timeoutMs;
     while ([...this.jobs.values()].some((s) => s.running)) {
+      if (this.now() >= deadline) {
+        this.log.warn('shutdown: a job is still running after the wait; continuing');
+        return false;
+      }
       await new Promise((resolve) => setTimeout(resolve, 25));
     }
+    return true;
   }
 
   /**
@@ -118,7 +141,7 @@ export class Scheduler {
       } else {
         state.lastStartedAt = this.now();
         try {
-          await state.job.run();
+          await state.job.run(this.options.leaderSignal?.() ?? new AbortController().signal);
           outcome = 'ran';
         } catch (error) {
           this.log.error(`${name}: run failed: ${describe(error)}`);
@@ -131,6 +154,12 @@ export class Scheduler {
     // A replica that is not the leader looks again soon, so a dead leader is replaced quickly.
     if (this.started)
       await this.scheduleNext(state, outcome === 'skipped_not_leader' ? 60_000 : undefined);
+    // An early request that arrived during the run: one more run, still at least the gap after this
+    // run's start.
+    if (state.earlyWhileRunning) {
+      state.earlyWhileRunning = false;
+      if (this.started && outcome !== 'skipped_not_leader') this.requestEarly(name);
+    }
     return outcome;
   }
 
@@ -144,8 +173,11 @@ export class Scheduler {
   ): 'started' | 'deferred' | 'already_pending' | 'running' | 'not_allowed' {
     const state = this.mustGet(name);
     const gap = state.job.minEarlyGapMs;
-    if (gap === undefined) return 'not_allowed';
-    if (state.running) return 'running';
+    if (gap === undefined || this.stopped) return 'not_allowed';
+    if (state.running) {
+      state.earlyWhileRunning = true;
+      return 'running';
+    }
     if (state.earlyTimer) return 'already_pending';
     const waitMs =
       state.lastStartedAt === undefined ? 0 : Math.max(0, state.lastStartedAt + gap - this.now());
@@ -174,7 +206,7 @@ export class Scheduler {
     if (!this.started) return;
     state.timer = setTimeout(
       () => void this.runNow(state.job.name),
-      Math.max(1_000, capMs === undefined ? ms : Math.min(ms, capMs)),
+      Math.min(MAX_TIMER_MS, Math.max(1_000, capMs === undefined ? ms : Math.min(ms, capMs))),
     );
   }
 
@@ -185,7 +217,7 @@ export class Scheduler {
   }
 }
 
-/** Error name and message only. Messages here never carry credentials (the db and DATOMS layers redact). */
+/** Cut, cleaned text; database errors keep only name and SQLSTATE (see sanitizeErrorText). */
 function describe(error: unknown): string {
-  return error instanceof Error ? `${error.name}: ${error.message}` : 'unknown error';
+  return sanitizeErrorText(error);
 }

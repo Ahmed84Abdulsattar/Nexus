@@ -97,7 +97,7 @@ export const partitionMissingWarningSchema = z.object({
 
 export const maintenanceStepFailedWarningSchema = z.object({
   code: z.literal('step_failed'),
-  step: z.enum(['create', 'drop', 'prune_sync_run', 'settings']),
+  step: z.enum(['create', 'drop', 'prune_sync_run', 'settings', 'health']),
   table: z.string().optional(),
   /** Error name and message only. */
   message: z.string(),
