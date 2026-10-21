@@ -374,7 +374,7 @@ describe.skipIf(testDatabaseAdminUrl === undefined)(
       expect(run.rows[0]).toEqual({
         status: 'failed',
         details: null,
-        error: { message: 'DATOMS unreachable' },
+        error: { message: 'Error: DATOMS unreachable' },
       });
     });
 

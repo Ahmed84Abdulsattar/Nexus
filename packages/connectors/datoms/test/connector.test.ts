@@ -130,7 +130,7 @@ describe('DatomsConnector', () => {
   it('fixture mode: the factory serves the catalogue and the fleet from fixtures, no token, no network', async () => {
     const { connector, mode } = createDatomsConnector({
       env: { DATOMS_LIVE: 'false' },
-      maxShare: 0.1,
+      maxShare: 1,
     });
     expect(mode).toBe('fixtures');
     const cat = await connector.listAssets();
@@ -141,7 +141,7 @@ describe('DatomsConnector', () => {
   });
 
   it('passes seenKeys through: nulls are dropped from values but every key is listed', async () => {
-    const { connector } = createDatomsConnector({ env: {}, maxShare: 0.1 });
+    const { connector } = createDatomsConnector({ env: {}, maxShare: 1 });
     const out = [];
     for await (const b of connector.readLatest({ mode: 'fleet' })) out.push(...b.readings);
     const withNull = out.find((r) => r.seenKeys.length > Object.keys(r.values).length);
