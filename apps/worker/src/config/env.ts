@@ -1,4 +1,4 @@
-import { DatabaseConfigError, resolveDatabaseUrl } from '@nexus/db';
+import { DatabaseConfigError, assertDirectConnection, resolveDatabaseUrl } from '@nexus/db';
 import { z } from 'zod';
 
 /**
@@ -38,6 +38,9 @@ export function loadWorkerConfig(env: NodeJS.ProcessEnv): WorkerConfig {
   try {
     // WORKER_DATABASE_URL; falls back to DATABASE_URL only when APP_ENV=local (see @nexus/db urls.ts).
     database = resolveDatabaseUrl(env, 'worker');
+    // The leader lock is a session advisory lock: through PgBouncer (6432) two workers could both
+    // hold it. Refused at start-up, naming the variable that was actually used.
+    assertDirectConnection(database.url, database.variable);
   } catch (error) {
     if (error instanceof DatabaseConfigError)
       throw new WorkerConfigError(`Invalid environment:\n  ${error.message}`);

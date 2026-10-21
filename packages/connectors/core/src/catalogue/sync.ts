@@ -1,5 +1,6 @@
 import type { CatalogueSyncDetails, CatalogueWarning } from '@nexus/shared';
 import type { SourceConnector } from '../connector.js';
+import { sanitizeErrorText } from '../safe-error.js';
 import type { SourceAsset } from '../types.js';
 import type {
   AssetPatch,
@@ -25,6 +26,10 @@ export interface CatalogueSyncDeps {
    */
   onWarning?: (warning: CatalogueWarning) => void;
   now?: () => Date;
+  /** Aborts the sync between steps and pages (leader lock lost, shutdown). Nothing half-written is committed beyond a finished batch. */
+  signal?: AbortSignal;
+  /** Recorded in `sync_run.details.mode`. */
+  mode?: 'live' | 'fixtures';
 }
 
 export interface CatalogueSyncResult {
@@ -62,15 +67,27 @@ export async function runCatalogueSync(deps: CatalogueSyncDeps): Promise<Catalog
   };
 
   try {
-    const catalogue = await connector.listAssets();
+    const signal = deps.signal;
+    const catalogue = await connector.listAssets(signal ? { signal } : undefined);
+    signal?.throwIfAborted();
     // The same id twice in one walk would insert twice; the last one wins.
     const incoming = new Map<string, SourceAsset>();
     for (const a of catalogue.assets) incoming.set(a.externalId, a);
     // "Seen equals total": compared on the raw count, so a duplicate-ridden walk is not complete.
+    // Complete also needs the UNIQUE ids to equal the total (a duplicate must not stand in for a
+    // missing asset), no dropped invalid row and no cap.
+    const duplicates = catalogue.assets.length - incoming.size;
+    const invalidRows = catalogue.invalidRows ?? 0;
     const complete =
       catalogue.complete &&
       catalogue.total !== undefined &&
-      catalogue.assets.length === catalogue.total;
+      catalogue.assets.length === catalogue.total &&
+      incoming.size === catalogue.total &&
+      invalidRows === 0 &&
+      catalogue.capped !== true;
+    if (duplicates > 0) warn({ code: 'duplicate_ids', count: duplicates });
+    if (invalidRows > 0) warn({ code: 'invalid_rows', count: invalidRows });
+    if (catalogue.capped === true) warn({ code: 'capped' });
 
     const [types, stored] = await Promise.all([repo.loadAssetTypes(), repo.loadAssets(sys)]);
     const typeIndex = indexTypes(types);
@@ -116,9 +133,13 @@ export async function runCatalogueSync(deps: CatalogueSyncDeps): Promise<Catalog
       else unchanged++;
     }
 
+    signal?.throwIfAborted();
     if (inserts.length) await repo.insertAssets(sys, inserts);
+    signal?.throwIfAborted();
     if (patches.length) await repo.updateAssets(patches, at);
+    signal?.throwIfAborted();
     if (seenIds.length) await repo.markSeen(sys, seenIds, at);
+    signal?.throwIfAborted();
 
     // ---- Misses and safe retire (only on a complete walk) ----
     let missed = 0;
@@ -173,6 +194,7 @@ export async function runCatalogueSync(deps: CatalogueSyncDeps): Promise<Catalog
       retired,
       linkTodos: todoRows.length,
       warnings,
+      ...(deps.mode ? { mode: deps.mode } : {}),
     };
     await repo.writeSyncRun(sys, {
       job: 'catalogue_sync',
@@ -185,7 +207,7 @@ export async function runCatalogueSync(deps: CatalogueSyncDeps): Promise<Catalog
     });
     return { details };
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'unknown error';
+    const message = sanitizeErrorText(err);
     try {
       await repo.writeSyncRun(sys, {
         job: 'catalogue_sync',

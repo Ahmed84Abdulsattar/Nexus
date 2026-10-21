@@ -1,5 +1,6 @@
-import { Inject, Injectable, Logger, type OnModuleInit } from '@nestjs/common';
+import { Inject, Injectable, Logger, Optional, type OnModuleInit } from '@nestjs/common';
 import { runCatalogueSync, type SourceConnector } from '@nexus/connectors-core';
+import { datomsMode, type DatomsMode } from '@nexus/connectors-datoms';
 import type { Database } from '@nexus/db';
 import {
   SYNC_WARNING_METRIC,
@@ -14,6 +15,13 @@ import { SchedulerService } from '../scheduler/scheduler.service.js';
 
 /** Injection token of the source connector (the worker only ever sees the interface). */
 export const SOURCE_CONNECTOR = Symbol('SOURCE_CONNECTOR');
+
+/** A connector that can re-read `budget.max_share` (the worker's wrapper does). */
+export interface BudgetAwareConnector extends SourceConnector {
+  refreshBudgetShare?(): Promise<void>;
+}
+
+export const SOURCE_MODE = Symbol('SOURCE_MODE');
 
 export const CATALOGUE_JOB_NAME = 'catalogue-sync';
 /** Early runs (unknown ids seen by the poll) are at least this far apart (docs/07 section 5). */
@@ -36,6 +44,7 @@ export class CatalogueSyncJob implements OnModuleInit {
     @Inject(SOURCE_CONNECTOR) private readonly connector: SourceConnector,
     private readonly metrics: Metrics,
     private readonly scheduler: SchedulerService,
+    @Optional() @Inject(SOURCE_MODE) private readonly mode: DatomsMode = datomsMode(process.env),
   ) {
     this.repo = new KyselyCatalogueRepository(db);
   }
@@ -46,8 +55,8 @@ export class CatalogueSyncJob implements OnModuleInit {
       runOnStart: true,
       minEarlyGapMs: CATALOGUE_EARLY_GAP_MS,
       intervalMs: () => this.intervalMs(),
-      run: async () => {
-        await this.run();
+      run: async (signal) => {
+        await this.run(signal);
       },
     });
   }
@@ -58,12 +67,16 @@ export class CatalogueSyncJob implements OnModuleInit {
     this.logger.log(`early catalogue sync requested (${unknownIds} unknown ids): ${result}`);
   }
 
-  async run(): Promise<CatalogueSyncDetails> {
-    const settings = await loadCatalogueSettings(this.db);
+  async run(signal?: AbortSignal): Promise<CatalogueSyncDetails> {
+    // budget.max_share is re-read at the start of EVERY job (ADR 0005).
+    await (this.connector as BudgetAwareConnector).refreshBudgetShare?.();
+    const settings = await loadCatalogueSettings(this.db, (v) => this.warnInterval(v));
     const { details } = await runCatalogueSync({
       connector: this.connector,
-      repo: this.repo,
+      repo: signal ? this.repo.withSignal(signal) : this.repo,
       settings: settings.retire,
+      mode: this.mode,
+      ...(signal ? { signal } : {}),
       onWarning: (w) => this.onWarning(w),
     });
     this.logger.log(
@@ -74,9 +87,21 @@ export class CatalogueSyncJob implements OnModuleInit {
     return details;
   }
 
+  private warnInterval(configured: unknown): void {
+    this.logger.warn(
+      JSON.stringify({
+        event: 'nexus.catalogue.interval_invalid',
+        setting: 'catalogue.interval_minutes',
+        // A number only: the stored value is not echoed.
+        configuredType: typeof configured,
+        usedMinutes: 60,
+      }),
+    );
+  }
+
   private async intervalMs(): Promise<number> {
     try {
-      return (await loadCatalogueSettings(this.db)).intervalMs;
+      return (await loadCatalogueSettings(this.db, (v) => this.warnInterval(v))).intervalMs;
     } catch {
       return FALLBACK_INTERVAL_MS;
     }
