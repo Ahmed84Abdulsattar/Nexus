@@ -13,6 +13,7 @@ import { DB } from '../db/database.module.js';
 import { LoggingMetrics, Metrics } from '../observability/metrics.js';
 import { SchedulerService } from '../scheduler/scheduler.service.js';
 import { CatalogueSyncJob, SOURCE_CONNECTOR } from './catalogue-sync.job.js';
+import { MaintenanceJob } from './maintenance.job.js';
 
 /**
  * Builds the connector on first use, so that creating the application connects to nothing (the
@@ -76,7 +77,8 @@ async function loadMaxShare(db: Database): Promise<number> {
         }),
     },
     CatalogueSyncJob,
+    MaintenanceJob,
   ],
-  exports: [CatalogueSyncJob, SchedulerService],
+  exports: [CatalogueSyncJob, MaintenanceJob, SchedulerService],
 })
 export class JobsModule {}

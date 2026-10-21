@@ -63,5 +63,55 @@ export const catalogueSyncDetailsSchema = z.object({
 });
 export type CatalogueSyncDetails = z.infer<typeof catalogueSyncDetailsSchema>;
 
-export const syncRunDetailsSchema = z.discriminatedUnion('job', [catalogueSyncDetailsSchema]);
+/**
+ * Maintenance job (S3-08, docs/07 section 5). Warnings are Nexus operational warnings like the
+ * catalogue ones: a named log event and the `nexus.sync.warning` metric (attributes `code`, `job`).
+ */
+export const partitionMissingWarningSchema = z.object({
+  code: z.literal('partition_missing'),
+  /** For example 'telemetry.packet'. */
+  table: z.string(),
+  /** The partition that should exist after the run, for example 'packet_p20261020'. */
+  partition: z.string(),
+});
+
+export const maintenanceStepFailedWarningSchema = z.object({
+  code: z.literal('step_failed'),
+  step: z.enum(['create', 'drop', 'prune_sync_run', 'settings']),
+  table: z.string().optional(),
+  /** Error name and message only. */
+  message: z.string(),
+});
+
+export const maintenanceWarningSchema = z.discriminatedUnion('code', [
+  partitionMissingWarningSchema,
+  maintenanceStepFailedWarningSchema,
+]);
+export type MaintenanceWarning = z.infer<typeof maintenanceWarningSchema>;
+
+export const maintenanceDetailsSchema = z.object({
+  job: z.literal('maintenance'),
+  /** Partitions created in this run, per table (only tables where something was created). */
+  created: z.array(z.object({ table: z.string(), count: z.number().int().min(1) })),
+  /** Partitions dropped in this run, per table, by name. */
+  dropped: z.array(z.object({ table: z.string(), partitions: z.array(z.string()) })),
+  /** Retention settings whose configured value was unsafe or invalid; `used` is what was applied. */
+  clamped: z.array(
+    z.object({
+      setting: z.string(),
+      configured: z.unknown(),
+      used: z.number(),
+      reason: z.enum(['below_minimum', 'invalid']),
+    }),
+  ),
+  /** Rows deleted from integration.sync_run (the newest complete catalogue runs are always kept). */
+  syncRunsPruned: z.number().int().min(0),
+  warnings: z.array(maintenanceWarningSchema),
+});
+export type MaintenanceDetails = z.infer<typeof maintenanceDetailsSchema>;
+
+export const syncRunDetailsSchema = z.discriminatedUnion('job', [
+  catalogueSyncDetailsSchema,
+  maintenanceDetailsSchema,
+]);
 export type SyncRunDetails = z.infer<typeof syncRunDetailsSchema>;

@@ -930,6 +930,7 @@ INSERT INTO core.setting (key, value, description) VALUES
   ('retention.rollup_5m_days',    '60',  '5-minute rollups kept (days). Decided 2026-10-08 (architecture review 1); older ranges use hourly rollups.'),
   ('retention.rollup_1h_days',    '1830','Hourly rollups kept (days)'),
   ('retention.api_call_days',     '30',  'External API call log kept (days)'),
+  ('retention.sync_run_days',     '90',  'Job run history (integration.sync_run) kept (days). The newest catalogue.retire_after_misses complete catalogue runs are always kept, whatever their age.'),
   ('retention.audit_days',        '730', 'Audit log kept (days)'),
   ('audit.sign_in_gap_minutes',   '60',  'A sign-in is audited (auth.sign_in) when the access cache misses and the user previous last_seen_at is older than this many minutes (docs/08 section 2 step 6). TODO: switch to the Entra sid claim if S0-04 confirms tokens carry it (Q38).'),
   ('retention.event_days',        '730', 'Events kept (days)'),
