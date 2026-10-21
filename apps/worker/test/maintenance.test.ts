@@ -9,6 +9,8 @@ import { MAINTENANCE_RETRY_MS, MaintenanceJob } from '../src/jobs/maintenance.jo
 import {
   PARTITIONED_TABLES,
   RETENTION_LIMITS,
+  RETENTION_MAX_DAYS,
+  clampRetention,
   listPartitions,
   msUntilNextDubaiHour,
   needsEarlyRetry,
@@ -31,6 +33,36 @@ const monthStart = (d: Date, plus = 0): Date =>
 const ym = (d: Date): string => iso(d).slice(0, 7).replace('-', '');
 
 describe('maintenance schedule helpers', () => {
+  describe('clampRetention', () => {
+    const run = (configured: unknown) => {
+      const details = { clamped: [] } as unknown as Parameters<typeof clampRetention>[2];
+      const used = clampRetention('retention.packet_days', configured, details);
+      return { used, clamp: details.clamped[0] };
+    };
+    it('keeps a whole value inside the limits and reports nothing', () => {
+      expect(run(90)).toEqual({ used: 90, clamp: undefined });
+    });
+    it('raises a value below the minimum', () => {
+      expect(run(0)).toMatchObject({ used: 7, clamp: { reason: 'below_minimum', used: 7 } });
+    });
+    it('rounds a fractional value above the minimum up and says so', () => {
+      expect(run(90.5)).toMatchObject({ used: 91, clamp: { reason: 'rounded', used: 91 } });
+    });
+    it('caps a huge value (a mistyped 999999999 must not break partition creation)', () => {
+      for (const v of [1e9, 999_999_999, Number.MAX_SAFE_INTEGER]) {
+        expect(run(v)).toMatchObject({
+          used: RETENTION_MAX_DAYS,
+          clamp: { reason: 'above_maximum', used: RETENTION_MAX_DAYS },
+        });
+      }
+    });
+    it('uses the fallback for a value that is not a finite number', () => {
+      for (const v of ['90', null, undefined, Number.POSITIVE_INFINITY, Number.NaN]) {
+        expect(run(v).clamp).toMatchObject({ reason: 'invalid' });
+      }
+    });
+  });
+
   it('waits until the next 02:00 in Asia/Dubai (UTC+4)', () => {
     expect(msUntilNextDubaiHour(new Date('2026-10-20T21:59:00Z'), 2)).toBe(60_000);
     expect(msUntilNextDubaiHour(new Date('2026-10-20T22:00:00Z'), 2)).toBe(DAY);
@@ -260,6 +292,25 @@ describe.skipIf(testDatabaseAdminUrl === undefined)(
       // A table with live data is never emptied: today's partitions are all still there.
       expect(await exists('telemetry', `packet_p${compact(real)}`)).toBe(true);
       expect(details.warnings).toEqual([]);
+    });
+
+    it('a huge retention value (1e9 days) is capped and partition creation still works', async () => {
+      const real = new Date();
+      await setSetting('retention.packet_days', 1e9);
+      await setSetting('retention.api_call_days', 999_999_999);
+      const { details } = await runMaintenance({ db });
+      const by = Object.fromEntries(details.clamped.map((c) => [c.setting, c]));
+      expect(by['retention.packet_days']).toMatchObject({
+        used: RETENTION_MAX_DAYS,
+        reason: 'above_maximum',
+      });
+      expect(by['retention.api_call_days']).toMatchObject({
+        used: RETENTION_MAX_DAYS,
+        reason: 'above_maximum',
+      });
+      expect(details.warnings).toEqual([]);
+      expect(await exists('telemetry', `packet_p${compact(daysFrom(real, 7))}`)).toBe(true);
+      expect(await exists('integration', `api_call_p${compact(daysFrom(real, 7))}`)).toBe(true);
     });
 
     it("warns when tomorrow's partition is missing after the run, and the job records and counts it", async () => {
