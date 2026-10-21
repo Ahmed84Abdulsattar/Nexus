@@ -49,6 +49,7 @@ export interface MapViewProps {
 
 ## 3. Portfolio map (top level)
 - **View:** `MapView` (2D), basemap `arcgis/light-gray` or `arcgis/navigation`, centred on the UAE (≈ 24.4 N, 54.4 E, zoom 7). It is constrained to the UAE extent plus a margin.
+- **Extent (confirmed by Ahmed on 2026-10-19):** 51.0 to 57.0 E, 22.0 to 26.6 N. It is a config value (`UAE_EXTENT` and `INITIAL_VIEW` in `apps/api/src/modules/config/client-config.ts`, served by `GET /v1/config`); do not hard-code it elsewhere.
 - **Layer:** a client-side `FeatureLayer` built from `markers` (source graphics, `objectIdField`, fields: id, state, name).
 - **Renderer:** `UniqueValueRenderer` on `state`:
   - `active` green

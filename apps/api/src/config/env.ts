@@ -41,13 +41,20 @@ function parseOrigins(raw: string, appEnv: string): { origins: string[]; problem
 }
 
 /**
- * TRUST_PROXY: off, or the addresses/CIDRs of the proxies in front of the API. A hop count is not
- * accepted: Fastify 5 treats a number as "trust nobody" (it cannot check the immediate peer), and
- * "true" would let any client choose its address through X-Forwarded-For.
+ * TRUST_PROXY (Q46, answered 2026-10-19): off, a hop count of exactly 1 or 2, or the addresses/CIDRs
+ * of the proxies in front of the API.
+ * - 1 = Azure Container Apps ingress with nothing in front of it; 2 = Front Door or App Gateway
+ *   added later. Unset locally.
+ * - Fastify 5 itself treats a number as "trust nobody" (it fails closed). A hop count is therefore
+ *   turned into a trust function in createHttpAdapter (security.ts): the connecting peer and the
+ *   next N-1 addresses in X-Forwarded-For are proxies; the next one is the client. It is only safe
+ *   when the ingress is the one way in, which holds on Container Apps.
+ * - "true" is refused (any client could choose its address through X-Forwarded-For).
  */
 function parseTrustProxy(raw: string | undefined): { value: TrustProxy; problem?: string } {
   const v = (raw ?? '').trim().toLowerCase();
   if (v === '' || v === 'false') return { value: false };
+  if (v === '1' || v === '2') return { value: v === '1' ? 1 : 2 };
   const list = v.split(',').map((a) => a.trim());
   const ok = list.every((a) => {
     const [addr, bits, ...rest] = a.split('/');
@@ -67,11 +74,12 @@ function parseTrustProxy(raw: string | undefined): { value: TrustProxy; problem?
     : {
         value: false,
         problem:
-          'use false, or a comma-separated list of proxy IP addresses or CIDRs (IPv4 not wider than /8, IPv6 not wider than /32, no ::ffff: notation; not true, not a hop count)',
+          'use false, a hop count of 1 or 2, or a comma-separated list of proxy IP addresses or CIDRs (IPv4 not wider than /8, IPv6 not wider than /32, no ::ffff: notation; not true, no other number)',
       };
 }
 
-export type TrustProxy = false | string[];
+/** false, a hop count (1 or 2), or proxy addresses/CIDRs. */
+export type TrustProxy = false | 1 | 2 | string[];
 
 const envSchema = z
   .object({
@@ -141,7 +149,7 @@ const envSchema = z
         code: 'custom',
         path: ['TRUST_PROXY'],
         message:
-          'required when APP_ENV is dev or prod: set it to the Container Apps environment infrastructure subnet CIDR, or to "false" to decide explicitly that no proxy is trusted (Q46)',
+          'required when APP_ENV is dev or prod: set it to 1 (Azure Container Apps ingress; 2 if Front Door or App Gateway is added), to proxy CIDRs, or to "false" to decide explicitly that no proxy is trusted (Q46)',
       });
     }
     // The API holds a LISTEN connection for access-cache invalidation. Through a pooler in transaction

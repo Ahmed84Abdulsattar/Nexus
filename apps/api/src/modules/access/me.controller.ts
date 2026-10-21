@@ -1,12 +1,13 @@
 import { Controller, Get, Header, Inject } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { meResponseSchema } from '@nexus/shared';
-import { createZodDto, ZodResponse } from 'nestjs-zod';
+import { ZodResponse } from 'nestjs-zod';
+import { createDto } from '../../common/http/dto.js';
 import { AnySignedIn } from '../../common/auth/decorators.js';
 import { CurrentAuth, type CurrentAuthValue } from './current-auth.js';
 import { ME_REPOSITORY, type MeRepository } from './me.repository.js';
 
-class MeResponseDto extends createZodDto(meResponseSchema) {}
+class MeResponseDto extends createDto(meResponseSchema) {}
 
 @ApiTags('access')
 @Controller('me')

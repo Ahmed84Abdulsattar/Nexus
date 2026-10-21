@@ -1,10 +1,11 @@
 import { Controller, Get } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { healthLiveSchema } from '@nexus/shared';
-import { createZodDto, ZodResponse } from 'nestjs-zod';
+import { ZodResponse } from 'nestjs-zod';
+import { createDto } from '../../common/http/dto.js';
 import { Public } from '../../common/auth/decorators.js';
 
-class HealthLiveDto extends createZodDto(healthLiveSchema) {}
+class HealthLiveDto extends createDto(healthLiveSchema) {}
 
 /** Liveness only. /health/* is the one @Public area (docs/10). /health/ready comes with the database. */
 @ApiTags('health')

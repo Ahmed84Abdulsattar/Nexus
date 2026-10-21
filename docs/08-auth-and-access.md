@@ -67,7 +67,7 @@ Permission keys live in `packages/shared/src/permissions.ts`, the single source 
 
 ## 5. Frontend
 - MSAL `PublicClientApplication`, redirect flow on mobile and popup or redirect on desktop. Tokens stay in memory; `sessionStorage` is the MSAL cache.
-- `GET /v1/me` returns the user, roles, permissions and a project count. The UI hides things based on it, but **the API is the real check**.
+- `GET /v1/me` returns the user, roles, permissions and `projectScope` (`all`, and `projectIds` when not `all`). The UI hides things based on it, but **the API is the real check**.
 - Sign-out clears the MSAL cache and the live connection.
 
 ## 6. Security baseline
@@ -79,7 +79,7 @@ Built in S1-09 (`apps/api/src/common/http/security.ts`, `common/rate-limit/`). E
   2. Per client address, in a Fastify `onRequest` hook before routing, body parsing and any guard, so unknown paths, oversized bodies and floods of bad tokens are covered too: `RATE_LIMIT_IP_PER_MINUTE`, default 3000 (high because an office shares one address). This is also the "by IP before sign-in" fallback.
   - Over the limit: 429 problem+json with `Retry-After`.
   - **The counters are per API instance, not shared across replicas:** with N replicas a client can reach N times the limit, and a restart resets them. This guards against runaway clients and is not a security boundary, so no Postgres write is made per request. A shared store is a later change if abuse needs it.
-- **Client address:** `TRUST_PROXY` must list the proxies in front of the API, otherwise the sign-in audit IP and the IP limit see the proxy's address. It is **required when `APP_ENV` is dev or prod** (startup fails without it; `false` is an explicit choice). Refused: `true`, hop counts (Fastify 5: a number trusts nobody), IPv4 wider than /8, IPv6 wider than /32, `::ffff:` notation. The address is counted as IPv4 when it is IPv4-mapped, and IPv6 clients by their /64. The Azure value (infrastructure subnet CIDR) is Q46.
+- **Client address:** `TRUST_PROXY` says which proxies sit in front of the API, otherwise the sign-in audit IP and the IP limit see the proxy's address. It is **required when `APP_ENV` is dev or prod** (startup fails without it; `false` is an explicit choice). Accepted: `false`; a **hop count of exactly `1` or `2`**; or a list of proxy IPs/CIDRs. **Rule (Q46, answered 2026-10-19):** use `1` for Azure Container Apps ingress with nothing in front of it, `2` if Front Door or App Gateway is added later, and leave it unset locally. Verify on the first deploy that the audit IP is the real client address. Fastify 5 treats a plain number as "trust nobody", so a hop count is turned into a trust function (the connecting peer and the next N-1 `X-Forwarded-For` entries are proxies; the next one is the client). That is only safe because the ingress is the one way in. Refused: `true`, any other number, IPv4 wider than /8, IPv6 wider than /32, `::ffff:` notation. The address is counted as IPv4 when it is IPv4-mapped, and IPv6 clients by their /64.
 - **Body limit:** `BODY_LIMIT_BYTES` (default 1 MiB); larger bodies get 413 problem+json before any handler runs.
 - **Swagger UI and the spec:** `/docs` and `/openapi.json` exist only for `APP_ENV` local or dev (404 in prod).
 - HTTPS only. The ArcGIS domains belong in the CSP of the **web app** (Static Web Apps headers), not of the JSON API.

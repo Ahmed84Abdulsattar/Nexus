@@ -63,8 +63,8 @@ export interface components {
         MeResponseDto_Output: {
             /** Format: uuid */
             id: string;
-            name: string[];
-            email: string[];
+            name: string | null;
+            email: string | null;
             roles: ("admin" | "leadership" | "project_manager" | "site_user" | "viewer")[];
             permissions: ("portfolio.read" | "project.read" | "asset.read" | "telemetry.history" | "events.read" | "explorer.use" | "explorer.export" | "admin.users.manage" | "admin.projects.manage" | "admin.integrations" | "admin.settings" | "audit.read" | "cctv.view" | "media.read" | "bim.view")[];
             projectScope: {

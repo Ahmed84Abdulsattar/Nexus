@@ -1,7 +1,8 @@
 import { Controller, Get, Header, Inject } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { configResponseSchema } from '@nexus/shared';
-import { createZodDto, ZodResponse } from 'nestjs-zod';
+import { ZodResponse } from 'nestjs-zod';
+import { createDto } from '../../common/http/dto.js';
 import { AnySignedIn } from '../../common/auth/decorators.js';
 import { APP_CONFIG, type AppConfig } from '../../config/env.js';
 import {
@@ -14,7 +15,7 @@ import {
 } from './client-config.js';
 import { CLIENT_CONFIG_REPOSITORY, type ClientConfigRepository } from './config.repository.js';
 
-class ConfigResponseDto extends createZodDto(configResponseSchema) {}
+class ConfigResponseDto extends createDto(configResponseSchema) {}
 
 @ApiTags('config')
 @Controller('config')
