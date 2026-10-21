@@ -72,8 +72,13 @@ export const RETENTION_LIMITS: Record<RetentionKey, { min: number; fallback: num
   'retention.sync_run_days': { min: 7, fallback: 90 },
 };
 
-/** Daily tables are created from yesterday to 7 days ahead; monthly ones for this and the next 2 months. */
-export const DAILY_DAYS_BEHIND = 1;
+/**
+ * Largest retention any setting may ask for (100 years). Larger values are clamped down: a mistyped
+ * 999999999 would otherwise push dates outside the JS Date range and break partition creation.
+ */
+export const RETENTION_MAX_DAYS = 36_600;
+
+/** Daily tables are created up to 7 days ahead (gaps are filled backwards); monthly ones for this and the next 2 months. */
 export const DAILY_DAYS_AHEAD = 7;
 export const MONTHLY_MONTHS_COUNT = 3;
 const DAY_MS = 86_400_000;
@@ -252,14 +257,18 @@ export function clampRetention(
 ): number {
   const { min, fallback } = RETENTION_LIMITS[key];
   const valid = typeof configured === 'number' && Number.isFinite(configured);
-  const used = valid ? Math.max(min, Math.ceil(configured)) : Math.max(min, fallback);
+  const used = valid
+    ? Math.min(RETENTION_MAX_DAYS, Math.max(min, Math.ceil(configured)))
+    : Math.max(min, fallback);
   if (!valid || used !== configured) {
-    const clamp = {
-      setting: key,
-      configured: configured ?? null,
-      used,
-      reason: valid ? ('below_minimum' as const) : ('invalid' as const),
-    };
+    const reason = !valid
+      ? ('invalid' as const)
+      : configured > RETENTION_MAX_DAYS
+        ? ('above_maximum' as const)
+        : configured < min
+          ? ('below_minimum' as const)
+          : ('rounded' as const);
+    const clamp = { setting: key, configured: configured ?? null, used, reason };
     details.clamped.push(clamp);
     onClamp?.(clamp);
   }
@@ -315,7 +324,8 @@ async function createAhead(
       .filter((d): d is Date => d !== undefined);
     const newestUpper =
       uppers.length > 0 ? utcDate(new Date(Math.max(...uppers.map((d) => d.getTime())))) : lookback;
-    const oldestUseful = addDays(today, -retentionDays);
+    // Nothing older than MAX_PERIODS_PER_CALL days can be created in one call anyway.
+    const oldestUseful = addDays(today, -Math.min(retentionDays, MAX_PERIODS_PER_CALL));
     from = maxDate(oldestUseful, minDate(newestUpper, lookback));
     count = Math.round((Date.parse(last) - Date.parse(from)) / DAY_MS) + 1;
     if (count > MAX_PERIODS_PER_CALL) {
@@ -422,12 +432,13 @@ export function partitionUpperBound(name: string): Date | undefined {
   return undefined;
 }
 
+// Compare as time values, not strings: ISO strings only sort correctly for 4-digit years.
 function minDate(a: string, b: string): string {
-  return a < b ? a : b;
+  return Date.parse(a) < Date.parse(b) ? a : b;
 }
 
 function maxDate(a: string, b: string): string {
-  return a > b ? a : b;
+  return Date.parse(a) > Date.parse(b) ? a : b;
 }
 
 function utcDate(d: Date): string {
