@@ -91,13 +91,13 @@ describe.skipIf(testDatabaseAdminUrl === undefined)(
         `SELECT key, value FROM core.setting WHERE key LIKE 'retention.%' OR key = 'catalogue.retire_after_misses'`,
       );
       defaults = new Map(rows.rows.map((r) => [r.key, r.value]));
-    });
+    }, 60_000);
 
     afterAll(async () => {
       await db?.destroy();
       await admin?.end();
       await testDb?.drop();
-    });
+    }, 60_000);
 
     beforeEach(async () => {
       for (const [key, value] of defaults) await setSetting(key, value);

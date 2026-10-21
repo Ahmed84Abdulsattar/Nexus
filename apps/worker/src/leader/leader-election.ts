@@ -34,6 +34,7 @@ const silent: LeaderLogger = { log() {}, warn() {} };
 export class LeaderElection {
   private client: pg.Client | undefined;
   private held = false;
+  private checking: Promise<boolean> | undefined;
   private readonly log: LeaderLogger;
   private readonly lockName: string;
 
@@ -46,7 +47,19 @@ export class LeaderElection {
     return this.held;
   }
 
-  async ensureLeader(): Promise<boolean> {
+  /**
+   * Concurrent callers (two jobs starting together) share ONE check. Without this each would open its
+   * own session, the second `pg_try_advisory_lock` would fail against the first (same lock name,
+   * different session), and that job would be skipped as "not leader" for a whole retry cycle.
+   */
+  ensureLeader(): Promise<boolean> {
+    this.checking ??= this.check().finally(() => {
+      this.checking = undefined;
+    });
+    return this.checking;
+  }
+
+  private async check(): Promise<boolean> {
     if (this.client && !this.held) await this.drop(); // an error event marked it lost
     if (this.client && this.held) {
       try {

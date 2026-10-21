@@ -39,6 +39,12 @@ describe.skipIf(testDatabaseAdminUrl === undefined)(
       expect(await b.ensureLeader()).toBe(false);
     });
 
+    it('two jobs asking at the same moment share one check, so both see the leader', async () => {
+      const a = make(lockName());
+      const [first, second] = await Promise.all([a.ensureLeader(), a.ensureLeader()]);
+      expect([first, second]).toEqual([true, true]);
+    });
+
     it('a released lock goes to the other replica', async () => {
       const name = lockName();
       const a = make(name);
