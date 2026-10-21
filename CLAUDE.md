@@ -28,7 +28,7 @@ Read `docs/00-README.md` first, then the docs it lists for your role. The docs a
 5. **Respect the DATOMS limits** (`docs/07-datoms-integration.md`): the budget tracker, 422 halving, 429 Retry-After, and never `data/latest` in the poll loop.
 6. **Every endpoint has `@RequirePermission` (or `@AnySignedIn` / `@Public` where `docs/10` says so), and every project-data query uses `withProjectScope`.** Default deny. Out-of-scope gives 404.
 7. **ArcGIS (`@arcgis/*`) is imported only in `apps/web/src/components/map/arcgis/`.** Pages use `<MapView>` from `components/map/`.
-8. **Never delete synced rows.** Set `retired_at`. Keep `source_system` + `external_id` and the building/level/zone links (BIM-ready).
+8. **Never delete synced rows.** Set `retired_at`. Keep `source_system` + `external_id` and the building/level/zone links (BIM-ready). `db/migrations/0001_init.sql` is frozen (Ahmed, 2026-10-19): every schema change is a new migration plus the `db/schema.sql` update, and `pnpm db:check` must pass.
 9. **Time:** store UTC (`timestamptz`), display Asia/Dubai. Daily rollups use Dubai days.
 10. **Secrets** come only from env / Key Vault. Never commit `.env`, tokens or keys, and never paste them into prompts or logs.
 11. **Definition of done:** `pnpm lint && pnpm typecheck && pnpm test && pnpm build` pass. The acceptance check is shown. Docs, `db/schema.sql` and OpenAPI are updated in the same PR (`docs/14-testing-quality.md`).
