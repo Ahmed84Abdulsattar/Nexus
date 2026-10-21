@@ -1,8 +1,10 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { afterAll, describe, expect, it } from 'vitest';
+import { z } from 'zod';
+import { registeredSchemas } from '../src/common/http/dto.js';
 import { mountDocs } from '../src/openapi/setup.js';
-import { createTestApp, type TestApp } from './helpers/auth.js';
+import { createTestApp, nullableKindsSchema, type TestApp } from './helpers/auth.js';
 
 const apps: TestApp[] = [];
 async function appFor(appEnv: string, withTestRoutes = false): Promise<TestApp> {
@@ -83,6 +85,88 @@ describe('the OpenAPI document', () => {
     expect(doc.paths['/v1/test-auth/echo']?.['post']?.responses['422']).toMatchObject(ref);
     // The @Public health route needs no token, so it documents no 401.
     expect(doc.paths['/health/live']?.['get']?.responses['401']).toBeUndefined();
+  });
+
+  type Schema = Record<string, unknown>;
+  const schemasOf = (doc: unknown): Record<string, Schema> =>
+    (doc as { components: { schemas: Record<string, Schema> } }).components.schemas;
+  const typesOf = (s: Schema | undefined): string[] => {
+    if (!s) return [];
+    const own = Array.isArray(s['type'])
+      ? (s['type'] as string[])
+      : s['type']
+        ? [s['type'] as string]
+        : [];
+    const any = ((s['anyOf'] as Schema[] | undefined) ?? []).flatMap((b) => typesOf(b));
+    return [...own, ...any];
+  };
+
+  it('describes /v1/me name and email as string or null (not an array)', async () => {
+    const t = await appFor('local');
+    const me = schemasOf((await t.get('/openapi.json')).json())['MeResponseDto_Output'] as {
+      properties: Record<string, Schema>;
+    };
+    for (const field of ['name', 'email']) {
+      const types = typesOf(me.properties[field]);
+      expect(types, field).toContain('string');
+      expect(types, field).toContain('null');
+      expect(types, field).not.toContain('array');
+    }
+  });
+
+  it('renders every nullable scalar as its type plus null, never as an array', async () => {
+    const t = await appFor('local', true);
+    const schemas = schemasOf((await t.get('/openapi.json')).json());
+    const dto = schemas['NullableKindsDto_Output'] as { properties: Record<string, Schema> };
+    const expected: Record<string, string> = {
+      text: 'string',
+      id: 'string',
+      bounded: 'string',
+      count: 'integer',
+      ratio: 'number',
+      flag: 'boolean',
+      kind: 'string',
+    };
+    for (const [field, type] of Object.entries(expected)) {
+      const types = typesOf(dto.properties[field]);
+      expect(types, field).toEqual(expect.arrayContaining([type, 'null']));
+      expect(types, field).not.toContain('array');
+    }
+    // Value constraints stay on the non-null branch.
+    expect(JSON.stringify(dto.properties['bounded'])).toContain('"maxLength":5');
+    expect(JSON.stringify(dto.properties['kind'])).toContain('"enum":["a","b"]');
+    // A real array stays an array, and a nullable array is an array or null.
+    expect(dto.properties['list']?.['type']).toBe('array');
+    expect(typesOf(dto.properties['maybeList'])).toEqual(expect.arrayContaining(['array', 'null']));
+  });
+
+  it('keeps every nullable property of every DTO nullable in the document', async () => {
+    const t = await appFor('local', true);
+    const docSchemas = Object.values(schemasOf((await t.get('/openapi.json')).json()));
+    expect(registeredSchemas).toContain(nullableKindsSchema);
+    for (const schema of registeredSchemas) {
+      const json = z.toJSONSchema(schema, { io: 'output' }) as {
+        properties?: Record<string, { type?: unknown }>;
+      };
+      const nullable = Object.entries(json.properties ?? {}).filter(
+        ([, p]) => Array.isArray(p.type) && p.type.includes('null'),
+      );
+      if (nullable.length === 0) continue;
+      const names = Object.keys(json.properties ?? {})
+        .sort()
+        .join();
+      const component = docSchemas.find(
+        (c) =>
+          Object.keys((c['properties'] as object | undefined) ?? {})
+            .sort()
+            .join() === names,
+      ) as { properties: Record<string, Schema> } | undefined;
+      expect(component, `component for ${names}`).toBeDefined();
+      for (const [field] of nullable) {
+        const types = typesOf(component?.properties[field]);
+        expect(types, field).toContain('null');
+      }
+    }
   });
 
   it('matches the committed apps/api/openapi.json (run pnpm build to refresh it)', async () => {
