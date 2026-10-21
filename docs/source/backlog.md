@@ -536,6 +536,8 @@
 - **Acceptance check:** An admin creates a project and links an asset to it; a non-admin gets 403; the change is in the audit log
 
 ### S4-01 · Chart summaries (5-minute, 1-hour, 1-day) as Nexus rollup tables
+
+> Note (S3-08 review I6): `refresh_rollup_combine` must not run for an hour whose 5-minute rows were dropped (older than `retention.rollup_5m_days`); skip such hours. See docs/06 section 6a.
 - **Sprint:** S4
 - **Week:** W1
 - **Work package:** Project page

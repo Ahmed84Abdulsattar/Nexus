@@ -12,6 +12,13 @@ const MIN = 60_000;
 const HOUR = 60 * MIN;
 const DAY = 24 * HOUR;
 
+/**
+ * How far back `restore()` reads the usage log after a restart. The maintenance job must keep at least
+ * this many days of `integration.api_call` (its `retention.api_call_days` minimum), or the 30-day
+ * budget window would restart from a partial history.
+ */
+export const BUDGET_RESTORE_DAYS = 30;
+
 export interface WindowSpec {
   name: string;
   ms: number;
@@ -140,7 +147,7 @@ export class BudgetTracker {
 
   /** Load earlier usage after a restart. */
   async restore(store: BudgetStore): Promise<void> {
-    const since = this.now() - 30 * DAY;
+    const since = this.now() - BUDGET_RESTORE_DAYS * DAY;
     for (const r of await store.loadSince(since))
       this.record(r.at, r.credits, r.requests, r.mode === 'assets' ? 'assets' : 'bulk');
   }
