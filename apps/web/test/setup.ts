@@ -3,8 +3,9 @@ import { cleanup, configure } from '@testing-library/react';
 import { afterAll, afterEach, beforeAll } from 'vitest';
 import { server } from '../src/test/server';
 
-// Lazy route chunks are transformed on first use, which can take longer than the 1 s default.
-configure({ asyncUtilTimeout: 5000 });
+// Lazy route chunks are transformed on first use. That is about 2 s alone but passed the old 5 s
+// when every package ran at once (turbo, plus typecheck and build). Kept below the 20 s testTimeout.
+configure({ asyncUtilTimeout: 15_000 });
 
 // jsdom's AbortSignal is not Node's, and Node's Request (undici) rejects it. React Router passes
 // a signal to every navigation, so drop it in tests (nothing here needs to abort a request).

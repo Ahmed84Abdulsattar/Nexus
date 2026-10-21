@@ -23,7 +23,8 @@ const who = (groupIds: string[] = []): SignedInIdentity => ({
   groupIds,
 });
 const waitFor = async (cond: () => boolean | Promise<boolean>, what: string): Promise<void> => {
-  for (let i = 0; i < 120; i++) {
+  // Polls until ready, so a long limit costs nothing when idle; 15 s survives a fully loaded turbo run (was 3 s).
+  for (let i = 0; i < 600; i++) {
     if (await cond()) return;
     await new Promise((r) => setTimeout(r, 25));
   }

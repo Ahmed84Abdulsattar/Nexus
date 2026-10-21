@@ -1,9 +1,16 @@
 import { fileURLToPath } from 'node:url';
 import { ESLint } from 'eslint';
-import { describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it } from 'vitest';
 
 const root = fileURLToPath(new URL('../../../', import.meta.url));
 const eslint = new ESLint({ cwd: root });
+
+// The first lintText loads the whole repo config and every plugin (about 11 s on an idle machine,
+// several times that when all packages run at once). Later calls take 10 to 100 ms. Pay the cold
+// start in the hook (hookTimeout 120 s) so the per-test limit only measures linting.
+beforeAll(async () => {
+  await eslint.lintText('export {};\n', { filePath: `${root}apps/web/src/warmup.ts` });
+});
 
 async function ruleIds(filePath: string, code: string): Promise<string[]> {
   const [result] = await eslint.lintText(code, { filePath: root + filePath });

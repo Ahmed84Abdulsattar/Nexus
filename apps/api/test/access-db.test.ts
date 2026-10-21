@@ -43,7 +43,8 @@ describe.skipIf(testDatabaseAdminUrl === undefined)('access directory on Postgre
     condition: () => boolean | Promise<boolean>,
     what: string,
   ): Promise<void> => {
-    for (let i = 0; i < 100; i++) {
+    // Polls until ready, so a long limit costs nothing when idle; 15 s survives a fully loaded turbo run (was 2.5 s).
+    for (let i = 0; i < 600; i++) {
       if (await condition()) return;
       await new Promise((r) => setTimeout(r, 25));
     }
