@@ -47,6 +47,28 @@ describe('M5: catalogue rows are validated and capped', () => {
     expect(out.complete).toBe(true);
   });
 
+  it('accepts and ignores unknown extra fields (site_id, site_name, latitude, longitude, status)', async () => {
+    const rows = [
+      {
+        id: '1',
+        name: 'A',
+        category_name: 'DG Set',
+        site_id: 's1',
+        site_name: 'Site',
+        latitude: 25.2,
+        longitude: 55.3,
+        status: 'running',
+        something_new: { a: 1 },
+      },
+    ];
+    const { impl } = fakeFetch(() => page(rows, 1));
+    const out = await rig(impl).api.collectAssets();
+    expect(out.invalidRows).toBe(0);
+    expect(out.complete).toBe(true);
+    expect(out.assets[0]).toMatchObject({ externalId: '1', sourceTypeName: 'DG Set' });
+    expect(out.assets[0]).not.toHaveProperty('status');
+  });
+
   it('caps rows per page at the limit: capped, not complete', async () => {
     const { impl } = fakeFetch(() => page(syntheticAssets(10), 5, 5));
     const out = await rig(impl).api.collectAssets(5);

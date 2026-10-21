@@ -18,6 +18,7 @@ Settings added in S1-01: `audit.sign_in_gap_minutes` (default 60, see `08` §2 s
 
 Columns added in S3-01 (the `catalogue_sync_details` migration; both nullable, both the last column of their table):
 - `integration.sync_run.details jsonb`: the typed summary of one run, one shape per `job` (`SyncRunDetails` in `packages/shared`, a zod union the health API reads). `error` stays for failures only. For `catalogue_sync`: `seen`, `total`, `complete`, `inserted`, `updated`, `unchanged`, `reappeared`, `missed`, `retired`, `linkTodos` and `warnings[]`. A warning is a Nexus operational notice with a typed code (`incomplete_walk { seen, total }`, `retire_blocked { wouldRetire, active, fraction, maxFraction }`); a run with a warning has `status = 'partial'`. Warnings are **not** DATOMS alerts: they never go to `events.event` or `integration.link_todo`.
+- **Advisory locks (L4, S8-02):** the worker can call `pg_advisory_lock` on any key, and any role can; revoking or alerting on a foreign holder of the leader lock is S8-02, not done here.
 - `core.asset.source_lifecycle_status text`: the source's lifecycle label exactly as reported (DATOMS `lifecycle_status`; the field name stays in `mapping.ts`). **Display only:** never used for status colours, counts, poll scope or retirement. Using it for any of those needs an ADR and the answer to Q40.
 
 ## 2. Entity relationships
