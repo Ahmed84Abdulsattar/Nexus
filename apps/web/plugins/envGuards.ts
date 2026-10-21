@@ -9,6 +9,12 @@ export const ALLOWED_VITE_VARS = [
   'VITE_ENTRA_WEB_CLIENT_ID',
 ] as const;
 
+/**
+ * Set by Vite itself, not by us: when a .env file contains NODE_ENV, Vite exposes it as
+ * VITE_USER_NODE_ENV ("development" / "production"). It carries no secret, so it is always allowed.
+ */
+export const VITE_INTERNAL_VARS = ['VITE_USER_NODE_ENV'] as const;
+
 /** Allowed in serve mode only: read by the dev-only MSW /v1/config mock, never in a build. */
 export const DEV_ONLY_VITE_VARS = ['VITE_DEV_ARCGIS_API_KEY'] as const;
 
@@ -29,7 +35,7 @@ export function assertWebEnv({ command, nodeEnv, env }: EnvGuardInput): void {
       'A build must not run with NODE_ENV=development (it would bundle the dev mocks).',
     );
   }
-  const allowed = new Set<string>(ALLOWED_VITE_VARS);
+  const allowed = new Set<string>([...ALLOWED_VITE_VARS, ...VITE_INTERNAL_VARS]);
   for (const name of Object.keys(env)) {
     if (allowed.has(name)) continue;
     if (command === 'serve' && (DEV_ONLY_VITE_VARS as readonly string[]).includes(name)) continue;
