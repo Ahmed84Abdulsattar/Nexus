@@ -1,5 +1,7 @@
 import { afterAll, describe, expect, it } from 'vitest';
 import { FixedWindowLimiter } from '../src/common/rate-limit/fixed-window-limiter.js';
+import { isInternalPeer, describeTrustProxy } from '../src/common/http/security.js';
+import { sanitizeClientIp } from '../src/common/rate-limit/rate-limit.js';
 import { ConfigError, loadConfig } from '../src/config/env.js';
 import { createTestApp, type TestApp, TEST_ENV } from './helpers/auth.js';
 
@@ -243,12 +245,12 @@ describe('per-address flood guard and trustProxy', () => {
 describe('TRUST_PROXY as a hop count', () => {
   // Fastify 5 ignores a plain number (trusts nobody); we pass a function, so the count really works.
   // The per-address limit is 1 a minute, so a second request with the same client key gets 429.
-  const hit = (t: TestApp, xff: string, peer = '10.0.0.1') =>
+  const hit = (t: TestApp, xff: string | undefined, peer = '10.0.0.1') =>
     t.app.inject({
       method: 'GET',
       url: '/health/live',
       remoteAddress: peer,
-      headers: { 'x-forwarded-for': xff },
+      ...(xff === undefined ? {} : { headers: { 'x-forwarded-for': xff } }),
     });
 
   it('1 trusts the connecting ingress only: the client is the last X-Forwarded-For entry', async () => {
@@ -270,6 +272,104 @@ describe('TRUST_PROXY as a hop count', () => {
     expect((await hit(t, '8.8.8.2, 10.9.9.9')).statusCode).toBe(200);
     // Extra leading entries are ignored.
     expect((await hit(t, '1.2.3.4, 8.8.8.1, 10.9.9.9')).statusCode).toBe(429);
+  });
+});
+
+describe('TRUST_PROXY hop count: peer check, odd entries', () => {
+  const hit = (t: TestApp, xff: string | undefined, peer = '10.0.0.1') =>
+    t.app.inject({
+      method: 'GET',
+      url: '/health/live',
+      remoteAddress: peer,
+      ...(xff === undefined ? {} : { headers: { 'x-forwarded-for': xff } }),
+    });
+  const one = () => app({ RATE_LIMIT_IP_PER_MINUTE: '1', TRUST_PROXY: '1' });
+
+  it('a public peer cannot choose its address: it is keyed as itself (M1)', async () => {
+    const t = await one();
+    expect((await hit(t, '1.2.3.4', '8.8.8.8')).statusCode).toBe(200);
+    // Same peer with another claimed address is the same key. If the header were trusted this
+    // would be a new client.
+    expect((await hit(t, '5.6.7.8', '8.8.8.8')).statusCode).toBe(429);
+    expect((await hit(t, '1.2.3.4', '8.8.4.4')).statusCode).toBe(200);
+  });
+
+  it('an internal peer written IPv4-mapped is still the proxy', async () => {
+    const t = await one();
+    expect((await hit(t, '8.8.8.1', '::ffff:10.0.0.1')).statusCode).toBe(200);
+    expect((await hit(t, '8.8.8.2', '::ffff:10.0.0.1')).statusCode).toBe(200);
+    expect((await hit(t, '8.8.8.1', '::ffff:10.0.0.1')).statusCode).toBe(429);
+  });
+
+  it('without X-Forwarded-For the key is the peer', async () => {
+    const t = await one();
+    expect((await hit(t, undefined, '10.0.0.1')).statusCode).toBe(200);
+    expect((await hit(t, undefined, '10.0.0.1')).statusCode).toBe(429);
+    expect((await hit(t, undefined, '10.0.0.2')).statusCode).toBe(200);
+  });
+
+  it('keys an IPv6 client by its /64', async () => {
+    const t = await one();
+    expect((await hit(t, '2001:db8:0:1::1')).statusCode).toBe(200);
+    expect((await hit(t, '2001:db8:0:1:ffff::9')).statusCode).toBe(429);
+    expect((await hit(t, '2001:db8:0:2::1')).statusCode).toBe(200);
+  });
+
+  it('strips a port: IP:port and [v6]:port are the same client as the bare address (L1)', async () => {
+    const t = await one();
+    expect((await hit(t, '8.8.8.1:5000')).statusCode).toBe(200);
+    expect((await hit(t, '8.8.8.1:6000')).statusCode).toBe(429);
+    expect((await hit(t, '8.8.8.1')).statusCode).toBe(429);
+    expect((await hit(t, '[2001:db8:0:7::1]:443')).statusCode).toBe(200);
+    expect((await hit(t, '2001:db8:0:7::5')).statusCode).toBe(429);
+  });
+
+  it('a garbage entry falls back to the socket peer (L1)', async () => {
+    const t = await one();
+    expect((await hit(t, 'banana')).statusCode).toBe(200);
+    expect((await hit(t, 'not-an-ip:99')).statusCode).toBe(429); // same key: the peer
+    expect((await hit(t, 'banana', '10.0.0.9')).statusCode).toBe(200);
+  });
+
+  it('sanitizeClientIp and isInternalPeer', () => {
+    expect(sanitizeClientIp('1.2.3.4:80', '10.0.0.1')).toBe('1.2.3.4');
+    expect(sanitizeClientIp('[2001:db8::1]:80', '10.0.0.1')).toBe('2001:db8::1');
+    expect(sanitizeClientIp('[2001:db8::1]', '10.0.0.1')).toBe('2001:db8::1');
+    expect(sanitizeClientIp('2001:db8::1', '10.0.0.1')).toBe('2001:db8::1');
+    expect(sanitizeClientIp('999.1.1.1:80', '10.0.0.1')).toBe('10.0.0.1');
+    expect(sanitizeClientIp('x', undefined)).toBeUndefined();
+    expect(sanitizeClientIp(undefined, '10.0.0.1')).toBe('10.0.0.1');
+    for (const ok of [
+      '10.1.1.1',
+      '172.16.0.1',
+      '172.31.255.255',
+      '192.168.1.1',
+      '100.64.0.1',
+      '100.127.255.255',
+      '127.0.0.1',
+      'fc00::1',
+      'fd12::1',
+      '::1',
+      '::ffff:10.0.0.1',
+    ])
+      expect(isInternalPeer(ok), ok).toBe(true);
+    for (const no of [
+      '8.8.8.8',
+      '172.32.0.1',
+      '100.128.0.1',
+      '192.169.0.1',
+      '2001:db8::1',
+      'fe80::1',
+      'x',
+      '::ffff:8.8.8.8',
+    ])
+      expect(isInternalPeer(no), no).toBe(false);
+  });
+
+  it('describes the mode for the startup log without addresses', () => {
+    expect(describeTrustProxy(false)).toBe('trust_proxy=off');
+    expect(describeTrustProxy(1)).toBe('trust_proxy=hops:1');
+    expect(describeTrustProxy(['10.0.0.0/8'])).toBe('trust_proxy=list:1');
   });
 });
 

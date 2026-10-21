@@ -23,7 +23,7 @@
 | API p95 > 300 ms or CPU > 70% | Raise Container Apps max replicas (already autoscaling) | config |
 | DB CPU > 60% sustained | Scale up the Postgres SKU (General Purpose → Memory Optimised) | config |
 | Mostly read load on the DB | Add a **read replica**; route history and explorer queries to it | small (a second Kysely pool) |
-| Front Door or App Gateway added in front of the API | Change `TRUST_PROXY` from `1` to `2` (one more proxy hop), or the audit IP and the per-address limit would see the Front Door address (docs/08 section 6) | config |
+| Front Door or App Gateway added in front of the API | Change `TRUST_PROXY` from `1` to `2`, **only with the conditions in docs/08 section 6**: the ingress must accept traffic from the front proxy alone (Front Door: `AzureFrontDoor.Backend` service tag restriction plus an `X-Azure-FDID` check; App Gateway: internal-only Container Apps environment). It is a network-exposure change and needs its own security review (Q20, ADR 0008). Otherwise the audit IP and the per-address limit see the front proxy's address | config + review |
 | More than 3 API replicas, or auth/lookup cache misses | Add **Azure Cache for Redis** for AccessContext, `latest_packet` and summaries | small |
 | More than ~800 concurrent live connections (1 Standard unit = 1,000) | Raise Web PubSub units (1 unit per 1,000 connections) | config |
 | Web PubSub outbound message units above the included daily quota | Check the messages are still slim (`10-api-design.md`); join project groups only while a project page is open | small |

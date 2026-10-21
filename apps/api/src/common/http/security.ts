@@ -1,7 +1,8 @@
+import { BlockList, isIP } from 'node:net';
 import helmet from '@fastify/helmet';
 import { FastifyAdapter, type NestFastifyApplication } from '@nestjs/platform-fastify';
 import type { AppConfig } from '../../config/env.js';
-import { IpRateLimiter } from '../rate-limit/rate-limit.js';
+import { IpRateLimiter, sanitizeClientIp } from '../rate-limit/rate-limit.js';
 import { DOCS_PATH } from '../../openapi/setup.js';
 
 /**
@@ -16,15 +17,53 @@ export function createHttpAdapter(config: AppConfig): FastifyAdapter {
 }
 
 /**
- * Fastify 5 treats a numeric trustProxy as "trust nobody", so a hop count becomes a function.
- * proxy-addr calls it with the hop index: 0 is the connecting socket, 1 the last X-Forwarded-For
- * entry, and so on. Trusting indexes below N means the first address after N proxies is the client.
+ * Addresses a platform proxy connects from: private ranges, carrier-grade NAT (Container Apps
+ * infrastructure uses 100.64/10 in some regions) and loopback. A direct client from the internet is
+ * not in this list, so it can never make us believe its own X-Forwarded-For.
+ */
+const INTERNAL_PEERS = new BlockList();
+for (const [net, bits] of [
+  ['10.0.0.0', 8],
+  ['172.16.0.0', 12],
+  ['192.168.0.0', 16],
+  ['100.64.0.0', 10],
+  ['127.0.0.0', 8],
+] as const)
+  INTERNAL_PEERS.addSubnet(net, bits, 'ipv4');
+INTERNAL_PEERS.addSubnet('fc00::', 7, 'ipv6');
+INTERNAL_PEERS.addAddress('::1', 'ipv6');
+
+/** Exported for the tests. */
+export function isInternalPeer(address: string): boolean {
+  const plain = address.replace(/^::ffff:/i, ''); // IPv4-mapped
+  const family = isIP(plain);
+  if (family === 0) return false;
+  return INTERNAL_PEERS.check(plain, family === 4 ? 'ipv4' : 'ipv6');
+}
+
+/**
+ * Fastify 5 treats a numeric trustProxy as "trust nobody" because a bare count never checks who
+ * connected, so a hop count becomes a function. proxy-addr calls it with the hop index: 0 is the
+ * connecting socket, 1 the last X-Forwarded-For entry, and so on.
+ * - Hop 0 is trusted only when the peer is a platform-internal address (INTERNAL_PEERS). Anyone
+ *   reaching the container directly from outside is not, so their header is ignored and they are
+ *   keyed by their own address. Forwarded host and proto get the same protection.
+ * - Hops 1 to N-1 are further proxies; the first address beyond them is the client.
  */
 export function toFastifyTrustProxy(
   value: AppConfig['http']['trustProxy'],
 ): boolean | string[] | ((address: string, hop: number) => boolean) {
-  if (typeof value === 'number') return (_address, hop) => hop < value;
+  if (typeof value === 'number')
+    return (address, hop) => (hop === 0 ? isInternalPeer(address) : hop < value);
   return value;
+}
+
+/** For the startup log: trust_proxy=off, hops:1 or list:2 entries (never the addresses). */
+export function describeTrustProxy(value: AppConfig['http']['trustProxy']): string {
+  if (value === false) return 'trust_proxy=off';
+  return typeof value === 'number'
+    ? `trust_proxy=hops:${value}`
+    : `trust_proxy=list:${value.length}`;
 }
 
 /** Swagger UI needs its own scripts, styles and images from this origin. Nothing else. */
@@ -56,7 +95,11 @@ export async function applySecurity(app: NestFastifyApplication, config: AppConf
     .getHttpAdapter()
     .getInstance()
     .addHook('onRequest', async (request) => {
-      ipLimiter.check(request.ip);
+      // Replace request.ip by the cleaned address (port removed, garbage -> socket peer), so the
+      // limiter, the sign-in audit row and every log see the same value.
+      const ip = sanitizeClientIp(request.ip, request.raw.socket.remoteAddress);
+      Object.defineProperty(request, 'ip', { value: ip, configurable: true, enumerable: true });
+      ipLimiter.check(ip);
     });
 
   if (config.appEnv === 'local' || config.appEnv === 'dev') {
