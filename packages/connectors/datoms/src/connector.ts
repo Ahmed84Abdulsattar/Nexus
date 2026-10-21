@@ -1,4 +1,5 @@
 import type {
+  ListAssetsOptions,
   ReadScope,
   SourceAsset,
   SourceCatalogue,
@@ -28,9 +29,12 @@ export class DatomsConnector implements SourceConnector {
 
   constructor(private readonly api: DatomsApi) {}
 
-  async listAssets(): Promise<SourceCatalogue> {
-    const { assets, total, complete } = await this.api.collectAssets(CATALOGUE_PAGE_LIMIT);
-    return { assets, total, complete };
+  async listAssets(options: ListAssetsOptions = {}): Promise<SourceCatalogue> {
+    const { assets, total, complete, invalidRows, capped } = await this.api.collectAssets(
+      CATALOGUE_PAGE_LIMIT,
+      options.signal,
+    );
+    return { assets, total, complete, invalidRows, capped };
   }
 
   async *readLatest(scope: ReadScope): AsyncGenerator<SourceReadingBatch> {

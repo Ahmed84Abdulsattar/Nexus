@@ -4,12 +4,17 @@ import type { ReadScope, SourceCatalogue, SourceReadingBatch, SourceSite } from 
  * A data source. The worker runs each registered connector on its own schedule and uses only this
  * interface (docs/03 section 5). All source-specific knowledge stays inside the implementation.
  */
+/** `signal` aborts the walk between pages (the leader lock was lost, or shutdown). */
+export interface ListAssetsOptions {
+  signal?: AbortSignal;
+}
+
 export interface SourceConnector {
   /** `core.source_system.code`, for example 'datoms'. */
   readonly sourceSystem: string;
 
   /** The complete catalogue walk: names and nameplate. Spends no telemetry credits. */
-  listAssets(): Promise<SourceCatalogue>;
+  listAssets(options?: ListAssetsOptions): Promise<SourceCatalogue>;
 
   /**
    * Latest readings, one batch per page or chunk, so the caller can process and release each.

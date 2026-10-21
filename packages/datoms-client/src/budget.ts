@@ -120,6 +120,18 @@ export class BudgetTracker {
   private readonly f: number;
   private server: ServerView | undefined;
 
+  /** `budget.max_share` can change while the worker runs (ADR 0005): the caps follow it. */
+  setMaxShare(maxShare: number): void {
+    if (!Number.isFinite(maxShare) || maxShare <= 0 || maxShare > 1) {
+      throw new RangeError('budget: maxShare must be in (0, 1]');
+    }
+    this.opts.maxShare = maxShare;
+  }
+
+  get maxShare(): number {
+    return this.opts.maxShare;
+  }
+
   constructor(private readonly opts: BudgetOptions) {
     // Fail closed: bad numbers would silently disable the caps.
     if (!Number.isFinite(opts.fleetSize) || opts.fleetSize < 0) {
@@ -134,6 +146,7 @@ export class BudgetTracker {
     ) {
       throw new RangeError('budget: monthlyAllowance must be undefined or a finite number > 0');
     }
+    this.opts = { ...opts }; // setMaxShare must not change the caller's object
     this.now = opts.now ?? Date.now;
     this.f = fleetUnit(opts.fleetSize);
   }

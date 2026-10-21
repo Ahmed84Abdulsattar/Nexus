@@ -28,9 +28,27 @@ export const incompleteWalkWarningSchema = z.object({
   total: z.number().int().min(0).nullable(),
 });
 
+/** The walk contained the same id more than once. A duplicate never stands in for a missing asset. Count only. */
+export const duplicateIdsWarningSchema = z.object({
+  code: z.literal('duplicate_ids'),
+  count: z.number().int().min(1),
+});
+
+/** Rows that failed validation (bad id, text or nameplate too large) and were dropped. Count only. */
+export const invalidRowsWarningSchema = z.object({
+  code: z.literal('invalid_rows'),
+  count: z.number().int().min(1),
+});
+
+/** A row, page or total cap was hit (the response is not trusted): the walk is incomplete. */
+export const cappedWarningSchema = z.object({ code: z.literal('capped') });
+
 export const catalogueWarningSchema = z.discriminatedUnion('code', [
   retireBlockedWarningSchema,
   incompleteWalkWarningSchema,
+  duplicateIdsWarningSchema,
+  invalidRowsWarningSchema,
+  cappedWarningSchema,
 ]);
 export type CatalogueWarning = z.infer<typeof catalogueWarningSchema>;
 export type CatalogueWarningCode = CatalogueWarning['code'];
@@ -60,6 +78,8 @@ export const catalogueSyncDetailsSchema = z.object({
   /** Link to-do rows created or confirmed by this run. */
   linkTodos: z.number().int().min(0),
   warnings: z.array(catalogueWarningSchema),
+  /** Where the data came from. Absent on runs written before this field existed. */
+  mode: z.enum(['live', 'fixtures']).optional(),
 });
 export type CatalogueSyncDetails = z.infer<typeof catalogueSyncDetailsSchema>;
 
