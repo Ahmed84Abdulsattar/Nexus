@@ -240,9 +240,44 @@ describe('per-address flood guard and trustProxy', () => {
   });
 });
 
+describe('TRUST_PROXY as a hop count', () => {
+  // Fastify 5 ignores a plain number (trusts nobody); we pass a function, so the count really works.
+  // The per-address limit is 1 a minute, so a second request with the same client key gets 429.
+  const hit = (t: TestApp, xff: string, peer = '10.0.0.1') =>
+    t.app.inject({
+      method: 'GET',
+      url: '/health/live',
+      remoteAddress: peer,
+      headers: { 'x-forwarded-for': xff },
+    });
+
+  it('1 trusts the connecting ingress only: the client is the last X-Forwarded-For entry', async () => {
+    const t = await app({ RATE_LIMIT_IP_PER_MINUTE: '1', TRUST_PROXY: '1' });
+    expect((await hit(t, '8.8.8.1')).statusCode).toBe(200);
+    expect((await hit(t, '8.8.8.1')).statusCode).toBe(429);
+    expect((await hit(t, '8.8.8.2')).statusCode).toBe(200);
+    // A client-supplied leading entry cannot choose its address.
+    expect((await hit(t, '1.2.3.4, 8.8.8.1')).statusCode).toBe(429);
+    // With one hop the second entry is already "the client", so a second proxy shows up as one address.
+    expect((await hit(t, '8.8.8.9, 10.9.9.9')).statusCode).toBe(200);
+    expect((await hit(t, '8.8.8.10, 10.9.9.9')).statusCode).toBe(429);
+  });
+
+  it('2 also trusts the next proxy (Front Door / App Gateway): the client is one entry further left', async () => {
+    const t = await app({ RATE_LIMIT_IP_PER_MINUTE: '1', TRUST_PROXY: '2' });
+    expect((await hit(t, '8.8.8.1, 10.9.9.9')).statusCode).toBe(200);
+    expect((await hit(t, '8.8.8.1, 10.9.9.9')).statusCode).toBe(429);
+    expect((await hit(t, '8.8.8.2, 10.9.9.9')).statusCode).toBe(200);
+    // Extra leading entries are ignored.
+    expect((await hit(t, '1.2.3.4, 8.8.8.1, 10.9.9.9')).statusCode).toBe(429);
+  });
+});
+
 describe('TRUST_PROXY validation', () => {
   const load = (TRUST_PROXY: string) => loadConfig({ ...TEST_ENV, TRUST_PROXY });
-  it('accepts off and address lists', () => {
+  it('accepts off, a hop count of 1 or 2, and address lists', () => {
+    expect(load('1').http.trustProxy).toBe(1);
+    expect(load(' 2 ').http.trustProxy).toBe(2);
     expect(load('').http.trustProxy).toBe(false);
     expect(load('false').http.trustProxy).toBe(false);
     expect(load('2001:db8::/32').http.trustProxy).toEqual(['2001:db8::/32']);
@@ -253,8 +288,12 @@ describe('TRUST_PROXY validation', () => {
     '0.0.0.0/0',
     '::/0',
     '0',
-    '1',
-    '2',
+    '3',
+    '01',
+    '1.5',
+    '-1',
+    '1,2',
+    '1/8',
     'banana',
     '10.0.0.0/33',
     '10.0.0.0/7',

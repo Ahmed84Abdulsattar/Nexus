@@ -23,17 +23,19 @@ describe('TRUST_PROXY is required outside local (M1)', () => {
   const without = (APP_ENV: string) => loadConfig({ ...TEST_ENV, APP_ENV, TRUST_PROXY: undefined });
 
   it.each(['dev', 'prod'])('refuses to start in %s when it is unset, naming the subnet', (env) => {
-    expect(() => without(env)).toThrow(/TRUST_PROXY.*infrastructure subnet CIDR/s);
+    expect(() => without(env)).toThrow(/TRUST_PROXY.*set it to 1/s);
     expect(() => loadConfig({ ...TEST_ENV, APP_ENV: env, TRUST_PROXY: '' })).toThrow(/TRUST_PROXY/);
   });
 
-  it('accepts an explicit "false", or a subnet, in prod; unset is fine in local', () => {
+  it('accepts an explicit "false", a hop count of 1 or 2, or a subnet, in prod; unset is fine in local', () => {
     expect(loadConfig({ ...TEST_ENV, APP_ENV: 'prod', TRUST_PROXY: 'false' }).http.trustProxy).toBe(
       false,
     );
     expect(
       loadConfig({ ...TEST_ENV, APP_ENV: 'prod', TRUST_PROXY: '100.100.0.0/16' }).http.trustProxy,
     ).toEqual(['100.100.0.0/16']);
+    expect(loadConfig({ ...TEST_ENV, APP_ENV: 'prod', TRUST_PROXY: '1' }).http.trustProxy).toBe(1);
+    expect(loadConfig({ ...TEST_ENV, APP_ENV: 'dev', TRUST_PROXY: '2' }).http.trustProxy).toBe(2);
     expect(without('local').http.trustProxy).toBe(false);
   });
 });

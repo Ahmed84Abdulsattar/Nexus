@@ -11,8 +11,20 @@ import { DOCS_PATH } from '../../openapi/setup.js';
 export function createHttpAdapter(config: AppConfig): FastifyAdapter {
   return new FastifyAdapter({
     bodyLimit: config.http.bodyLimitBytes,
-    trustProxy: config.http.trustProxy,
+    trustProxy: toFastifyTrustProxy(config.http.trustProxy),
   });
+}
+
+/**
+ * Fastify 5 treats a numeric trustProxy as "trust nobody", so a hop count becomes a function.
+ * proxy-addr calls it with the hop index: 0 is the connecting socket, 1 the last X-Forwarded-For
+ * entry, and so on. Trusting indexes below N means the first address after N proxies is the client.
+ */
+export function toFastifyTrustProxy(
+  value: AppConfig['http']['trustProxy'],
+): boolean | string[] | ((address: string, hop: number) => boolean) {
+  if (typeof value === 'number') return (_address, hop) => hop < value;
+  return value;
 }
 
 /** Swagger UI needs its own scripts, styles and images from this origin. Nothing else. */

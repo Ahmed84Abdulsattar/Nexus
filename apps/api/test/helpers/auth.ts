@@ -3,7 +3,8 @@ import { Body, Controller, Get, Module, Param, Post, Query, SetMetadata } from '
 import { type NestFastifyApplication } from '@nestjs/platform-fastify';
 import { Test } from '@nestjs/testing';
 import { cursorPageQuerySchema } from '@nexus/shared';
-import { createZodDto } from 'nestjs-zod';
+import { ZodResponse, createZodDto } from 'nestjs-zod';
+import { createDto } from '../../src/common/http/dto.js';
 import { z } from 'zod';
 import {
   createLocalJWKSet,
@@ -141,6 +142,19 @@ class EchoBodyDto extends createZodDto(
   z.object({ name: z.string().min(1), count: z.number().int() }),
 ) {}
 class ManyBodyDto extends createZodDto(z.object({ items: z.array(z.number()) })) {}
+/** One nullable field of each scalar kind, with constraints, for the OpenAPI nullable test. */
+export const nullableKindsSchema = z.object({
+  text: z.string().nullable(),
+  id: z.uuid().nullable(),
+  bounded: z.string().min(1).max(5).nullable(),
+  count: z.number().int().min(0).nullable(),
+  ratio: z.number().min(-90).max(90).nullable(),
+  flag: z.boolean().nullable(),
+  kind: z.enum(['a', 'b']).nullable(),
+  list: z.array(z.string()),
+  maybeList: z.array(z.string()).nullable(),
+});
+class NullableKindsDto extends createDto(nullableKindsSchema) {}
 class PageQueryDto extends createZodDto(cursorPageQuerySchema) {}
 
 /** Routes that exist only in tests, one per access mode. */
@@ -174,6 +188,23 @@ export class TestAuthController {
   @Post('echo')
   echo(@Body() body: EchoBodyDto): EchoBodyDto {
     return body;
+  }
+
+  @AnySignedIn()
+  @Get('nullable')
+  @ZodResponse({ status: 200, type: NullableKindsDto })
+  nullable(): NullableKindsDto {
+    return {
+      text: null,
+      id: null,
+      bounded: null,
+      count: null,
+      ratio: null,
+      flag: null,
+      kind: null,
+      list: [],
+      maybeList: null,
+    };
   }
 
   @AnySignedIn()
