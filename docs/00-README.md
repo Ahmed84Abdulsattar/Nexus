@@ -21,7 +21,7 @@ These docs are the single source of truth for people **and** for Claude Code age
 | 14 | `14-testing-quality.md` | Definition of done, test pyramid, review checklist |
 | — | `adr/` | Decisions and their reasons (list below) |
 | — | `source/` | Client brief, structure sheet, DATOMS API PDF, DATOMS parameter list, sprint sheet (inputs; read-only). Agents read the markdown copies: `brief.md`, `structure.md`, `datoms-parameters.md`, `backlog.md`. |
-| — | `open-questions.md` | Questions waiting on Innovo or DATOMS (Q1–Q36, including items DATOMS has promised). Never guess these into code. |
+| — | `open-questions.md` | Questions waiting on Innovo or DATOMS (Q1–Q52, including items DATOMS has promised). Never guess these into code. |
 
 ## Decision records (`adr/`)
 | ADR | Decision |
@@ -37,6 +37,8 @@ These docs are the single source of truth for people **and** for Claude Code age
 | 0009 | `core.asset.kind`: physical equipment vs site-level metrics |
 | 0010 | The DATOMS bulk endpoint is the only telemetry source |
 | 0011 | Parameter dictionary per source asset type (names and units per source type, not per key) |
+| 0012 | Project source identity: a link table (`core.project_source`) |
+| 0013 | Stale and offline: data-freshness display rules (5 min / 24 h settings; labels, never statuses) |
 
 ## Which docs each agent must read
 | Agent | Must read |

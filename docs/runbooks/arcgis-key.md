@@ -40,12 +40,12 @@ Rules that apply to every step:
 4. The API reads it as `ARCGIS_API_KEY` and serves it in `GET /v1/config`. Nothing else uses it.
 5. Clear your clipboard.
 
-## 4. Local development (until S1-02 serves `/v1/config`)
+## 4. Local development (until S1-11 moves the web app to the typed `/v1/config` client)
 
 1. Create a separate key for yourself with the same privileges, restricted to `http://localhost:5173/*` only.
 2. Put it in your git-ignored `.env` as `VITE_DEV_ARCGIS_API_KEY`. Never set it in CI or Azure: `pnpm build` fails when it is set.
 3. The MSW mock reads it in Vite dev mode only. Without it the map shows "Map key not configured".
-4. Remove the variable and this section when S1-02 is live.
+4. Remove the variable and this section in S1-11. After that, local development gets the key from the API's `GET /v1/config` (S1-10), read from `ARCGIS_API_KEY` in the API's local `.env`.
 
 ## 5. Rotate every 90 days
 

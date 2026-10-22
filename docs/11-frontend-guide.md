@@ -3,7 +3,7 @@
 ## Data display rules (most important)
 1. **Show exactly what the API returns.** Never calculate a status, threshold, alarm or colour from values. Colours come only from `status.display` (asset) or `state` (project).
 2. **Render parameters generically.** Loop over `latestValues` (from `GET /assets/{id}`; lists and live messages don't carry values) using the display name and unit that come with each value. They are per source type (ADR 0011): the same key can have a different name on a DG and on a solar inverter, so never look a name up by key alone or reuse one asset type's name for another. If there is no entry, show the raw key and no unit. In the explorer, label each series with its own asset's name for the key. Never write a hard-coded list of parameters, except as an optional "pinned first" order from config.
-3. **Always show freshness.** Every live value or box shows "updated hh:mm" (Asia/Dubai). Values with `stale: true` from the API show as stale (greyed, with a clock icon). The frontend never works out staleness itself. "No data" is shown as "—", never as 0. A field the DATOMS bulk response doesn't carry yet (`null` from the API) shows "no data yet" (ADR 0010).
+3. **Always show freshness.** Every live value or box shows "updated hh:mm" (Asia/Dubai). Values with `stale: true` from the API show as stale (greyed, with a clock icon). The frontend never works out staleness itself. An asset the API flags as offline (no packet for 24 h, ADR 0013) shows the text "Offline" with its last packet time, next to its DATOMS status, never instead of it: it is a data-freshness label, not a status, and never changes a colour or a count. "No data" is shown as "—", never as 0. A field the DATOMS bulk response doesn't carry yet (`null` from the API) shows "no data yet" (ADR 0010).
 4. **Never colour alone.** Status always shows text or an icon next to the colour (accessibility).
 5. **Units and numbers.** Format with `Intl.NumberFormat('en-AE')`. Keep the source precision up to 2 decimals for display. Use the unit from the API exactly as given.
 6. **Label what Nexus observed.** The status timeline is labelled **"observed by Nexus"** (status changes seen in polls, accurate to about one poll interval; ADR 0007).
@@ -23,11 +23,14 @@
 | `--status-unknown` | Unknown or unmapped | neutral outline |
 Check contrast in both light and dark themes (WCAG AA).
 
+**Project states are a fixed Nexus list (decided by Ahmed, 2026-10-22).** `active`, `central_store`, `finished` and `in_bid` (plus `unknown`) are Innovo's own project states from the structure sheet, not DATOMS data. They live in one place on each side: the `CHECK` list on `core.project.state` (`db/schema.sql`) and `PROJECT_STATE_KEYS` in `apps/api/src/modules/config/client-config.ts`, which a test compares with the database. The web reads the keys and labels from `GET /v1/config` (`enums.projectStates`) and never types them itself. Adding a state is a migration plus that constant. Asset statuses are different: they come from DATOMS through `telemetry.status_map` and are never a constant (hard rule 3).
+
 ## Innovo brand (S0-06, Brand Guidelines 1.9)
 - **Palette** (all in `tokens.css` as `--brand-*`; the components page shows names and hex): primary Slate `#122023`, Aqua `#9EF3EE`, White `#FFFFFF`; secondary grey `#A2ACAB`, steel `#6F8695`, sky `#8BA8C8`; support (data only, never backgrounds or large text) `#FF6666`, `#157A6E`, `#91A6FF`, `#208AAE`, `#BAB1A0`, `#F5F2B8`.
 - **Themes.** Light: near-white surfaces, Slate text, primary action and focus ring Slate. Dark: Slate surfaces, Aqua primary action and focus ring. `.surface-slate` re-scopes the tokens for a Slate panel in either theme (header, branded empty states).
 - **Type:** Poppins 300/400/500/600, self-hosted by `@fontsource/poppins` (no CDN; CSP stays `'self'`), Calibri as fallback.
 - **Logo:** `components/brand/InnovoLogo` (uses `currentColor`; white on Slate, Slate on white), files in `assets/brand/`. At least 80 px wide; clear space of one "i" height. Graphic device: `BrandRings` (Aqua rings and dot on Slate).
+- **Header (decided by Ahmed, 2026-10-22):** the product name stays a **text wordmark** ("Nexus" set in text beside the Innovo logo; there is no separate Nexus logo artwork). The **"UAE" label is static text**, not a region switch or a data value.
 - **State and status mapping** (names unchanged; the text label is always shown):
 
 | Token | Light | Dark |
@@ -42,6 +45,8 @@ Check contrast in both light and dark themes (WCAG AA).
 | status-unknown | `#44585C` (hollow dot) | grey `#A2ACAB` |
 
 Support colours are darkened in light where the original fails 3:1 on white. `--error` is a UI colour for errors, not a status.
+
+**These colours are provisional (accepted by Ahmed, 2026-10-22).** Use them as they are. The darkened light-theme values above (added in PR #39 to pass WCAG AA) wait for confirmation by Innovo's brand owner (Q52). A change is a `tokens.css` edit only.
 
 ## Layout and responsiveness
 - Breakpoints: `sm` 640 (phone), `md` 768 (tablet portrait), `lg` 1024 (tablet landscape / small laptop), `xl` 1280+.
