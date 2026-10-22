@@ -8,6 +8,7 @@ import { apiAuthMiddleware, resolveApiBase } from '../client';
  */
 interface PendingPaths {
   '/config': { get: { responses: { 200: { content: { 'application/json': unknown } } } } };
+  '/me': { get: { responses: { 200: { content: { 'application/json': unknown } } } } };
   '/projects': { get: { responses: { 200: { content: { 'application/json': unknown } } } } };
 }
 

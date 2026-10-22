@@ -12,7 +12,8 @@ if (!root) throw new Error('Missing #root element');
 async function start(rootElement: HTMLElement) {
   // Dev only: MSW answers /v1/config and /v1/projects until the API serves them (S1-02, S1-04).
   // `import.meta.env.DEV` is false in a build, so this branch, MSW and the sample data are dropped.
-  if (import.meta.env.DEV) {
+  // VITE_USE_MOCKS=false (dev only, docs/04) turns the mocks off so the real local API answers.
+  if (import.meta.env.DEV && import.meta.env.VITE_USE_MOCKS !== 'false') {
     try {
       const { startMockWorker } = await import('./test/browser');
       await startMockWorker();

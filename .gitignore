@@ -30,3 +30,4 @@ test-results/
 # vite / turbo
 *.local
 .vite/
+apps/web/e2e-api/results/

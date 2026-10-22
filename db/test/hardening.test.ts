@@ -58,6 +58,16 @@ describe('L1: the local-only seed', () => {
     ['postgres://nexus@db.example.com:5432/n', false],
     ['postgres://nexus@10.0.0.4:5432/n', false],
     ['postgres://nexus@localhost.evil.example/n', false],
+    // M2: pg uses the LAST host= parameter, a host list, and hostaddr overrides the name.
+    ['postgres://nexus@localhost/n?host=db.example.com', false],
+    ['postgres://nexus@db.example.com/n?host=localhost', true],
+    ['postgres://nexus@localhost/n?host=localhost&host=db.example.com', false],
+    ['postgres://nexus@/n?host=/var/run/postgresql&host=/tmp', false],
+    ['postgres://nexus@localhost,db.example.com/n', false],
+    ['postgres://nexus@localhost/n?host=localhost,db.example.com', false],
+    ['postgres://nexus@localhost/n?hostaddr=10.0.0.4', false],
+    ['postgres://nexus@localhost/n?hostaddr=127.0.0.1', false],
+    ['postgres://nexus@%2Fvar%2Frun%2Fpostgresql/n', true],
   ])('%s is local: %s', (url, expected) => {
     expect(isLocalHost(url, {})).toBe(expected);
   });
@@ -66,6 +76,8 @@ describe('L1: the local-only seed', () => {
     expect(isLocalHost('postgres://nexus@/n', { PGHOST: 'db.example.com' })).toBe(false);
     expect(isLocalHost('postgres://nexus@/n', { PGHOST: 'localhost' })).toBe(true);
     expect(isLocalHost('postgres://nexus@/n', {})).toBe(true);
+    expect(isLocalHost('postgres://nexus@/n', { PGHOST: 'localhost,db.example.com' })).toBe(false);
+    expect(isLocalHost('postgres://nexus@/n', { PGHOSTADDR: '10.0.0.4' })).toBe(false);
   });
 
 });

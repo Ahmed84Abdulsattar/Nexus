@@ -14,16 +14,16 @@ describe('assertWebEnv', () => {
       ).toThrow(/VITE_SECRET_THING is not an allowed/);
     }
   });
-  it("allows Vite's own VITE_USER_NODE_ENV (set when .env contains NODE_ENV)", () => {
-    for (const command of ['build', 'serve'] as const) {
-      expect(() =>
-        assertWebEnv({
-          command,
-          nodeEnv: 'production',
-          env: { ...ok, VITE_USER_NODE_ENV: 'development' },
-        }),
-      ).not.toThrow();
-    }
+  it("allows Vite's own VITE_USER_NODE_ENV (set when .env contains NODE_ENV), but a build refuses 'development'", () => {
+    const dev = { ...ok, VITE_USER_NODE_ENV: 'development' };
+    expect(() => assertWebEnv({ command: 'serve', nodeEnv: 'production', env: dev })).not.toThrow();
+    expect(() => assertWebEnv({ command: 'build', nodeEnv: 'production', env: dev })).toThrow(
+      /VITE_USER_NODE_ENV=development/,
+    );
+    const prod = { ...ok, VITE_USER_NODE_ENV: 'production' };
+    expect(() =>
+      assertWebEnv({ command: 'build', nodeEnv: 'production', env: prod }),
+    ).not.toThrow();
   });
   it('allows the dev ArcGIS key in serve mode only', () => {
     const env = { ...ok, VITE_DEV_ARCGIS_API_KEY: 'set' };
@@ -55,5 +55,15 @@ describe('assertWebEnv', () => {
       /NODE_ENV=development/,
     );
     expect(() => assertWebEnv({ command: 'serve', nodeEnv: 'development', env: ok })).not.toThrow();
+  });
+});
+
+describe('L4: dev switches in a build', () => {
+  it("a build throws for VITE_AUTH_MODE='dev' and VITE_USE_MOCKS='false', and passes for ''", () => {
+    const build = (env: Record<string, string>) =>
+      assertWebEnv({ command: 'build', nodeEnv: 'production', env: { ...ok, ...env } });
+    expect(() => build({ VITE_AUTH_MODE: 'dev' })).toThrow(/VITE_AUTH_MODE/);
+    expect(() => build({ VITE_USE_MOCKS: 'false' })).toThrow(/VITE_USE_MOCKS/);
+    expect(() => build({ VITE_AUTH_MODE: '', VITE_USE_MOCKS: '' })).not.toThrow();
   });
 });

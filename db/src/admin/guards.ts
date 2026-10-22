@@ -1,4 +1,5 @@
 import { isIP } from 'node:net';
+import { parse } from 'pg-connection-string';
 
 /** The database name in a connection string. */
 export function databaseName(url: string): string {
@@ -44,25 +45,29 @@ const isLoopbackName = (host: string): boolean => {
 };
 
 /**
- * Hosts that count as "this machine" for the local-only seeds and for unconfirmed reverts: localhost,
- * loopback addresses and unix sockets (a host starting with "/" or given as ?host=/...). A URL with no
- * host at all makes libpq use PGHOST, so it counts as local only when PGHOST is unset or itself local.
+ * Hosts that count as "this machine" for the local-only seeds, unconfirmed reverts and AUTH_MODE=dev:
+ * localhost, loopback addresses and unix sockets (a host starting with "/"). The URL is read with
+ * pg-connection-string, the parser `pg` itself uses, so this tests the host the driver will really
+ * connect to (a repeated `host=` parameter: the last one wins there). Not local: more than one
+ * `host` parameter, a host list (comma), any `hostaddr` (it overrides the name), an unparsable URL.
+ * A URL with no host makes libpq use PGHOST, so it counts as local only when PGHOST is unset or itself
+ * local (and PGHOSTADDR is unset). A loopback or socket TUNNEL to a shared database still counts as
+ * local: the host name cannot tell (docs/08 section 7).
  */
 export function isLocalHost(url: string, env: Env = process.env): boolean {
-  let queryHost: string | null;
-  let hostname: string;
+  if ((url.match(/[?&]host=/g) ?? []).length > 1) return false;
+  if (/[?&]hostaddr=/i.test(url)) return false;
+  let host: string | null | undefined;
   try {
-    const u = new URL(url);
-    queryHost = u.searchParams.get('host');
-    hostname = u.hostname;
+    host = parse(url).host;
   } catch {
-    // "postgres://user@/db?host=/var/run/postgresql": no host part, WHATWG URL rejects it.
-    queryHost = /[?&]host=([^&]*)/.exec(url)?.[1] ?? null;
-    hostname = '';
+    return false;
   }
-  const explicit = queryHost !== null ? decodeURIComponent(queryHost) : hostname;
-  if (explicit !== '') return isLoopbackName(explicit);
+  if (host && host.includes(',')) return false;
+  if (host) return isLoopbackName(host);
   // No host in the URL: the default socket, or whatever PGHOST says.
+  if ((env['PGHOSTADDR'] ?? '').trim() !== '') return false;
   const pgHost = env['PGHOST']?.trim();
-  return pgHost === undefined || pgHost === '' ? true : isLoopbackName(pgHost);
+  if (pgHost === undefined || pgHost === '') return true;
+  return !pgHost.includes(',') && isLoopbackName(pgHost);
 }

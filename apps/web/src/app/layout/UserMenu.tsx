@@ -15,7 +15,7 @@ const itemClass =
   'flex min-h-11 cursor-default items-center rounded-sm px-3 text-sm outline-none data-[highlighted]:bg-surface data-[disabled]:cursor-not-allowed data-[disabled]:text-fg-muted';
 
 /** Name and sign-out. With no user it shows "Not signed in" and sign-out is disabled. */
-export function UserMenu({ user, signOut }: CurrentSession) {
+export function UserMenu({ user, signOut, devMenu }: CurrentSession) {
   const name = user?.name ?? null;
   return (
     <Menu.Root>
@@ -56,6 +56,7 @@ export function UserMenu({ user, signOut }: CurrentSession) {
             {name ?? 'Not signed in'}
           </Menu.Label>
           <Menu.Separator className="my-1 h-px bg-border" />
+          {devMenu}
           <Menu.Item className={itemClass} disabled={!signOut} onSelect={() => signOut?.()}>
             Sign out
           </Menu.Item>
