@@ -366,6 +366,6 @@ describe('catalogue sync: safe retire', () => {
         settings,
       }),
     ).rejects.toThrow('boom');
-    expect(repo.runs[0]).toMatchObject({ status: 'failed', error: { message: 'boom' } });
+    expect(repo.runs[0]).toMatchObject({ status: 'failed', error: { message: 'Error: boom' } });
   });
 });

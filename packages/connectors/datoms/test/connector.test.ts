@@ -128,7 +128,10 @@ describe('DatomsConnector', () => {
   });
 
   it('fixture mode: the factory serves the catalogue and the fleet from fixtures, no token, no network', async () => {
-    const { connector, mode } = createDatomsConnector({ env: { DATOMS_LIVE: 'false' } });
+    const { connector, mode } = createDatomsConnector({
+      env: { DATOMS_LIVE: 'false' },
+      maxShare: 1,
+    });
     expect(mode).toBe('fixtures');
     const cat = await connector.listAssets();
     expect(cat).toMatchObject({ total: 22, complete: true });
@@ -138,7 +141,7 @@ describe('DatomsConnector', () => {
   });
 
   it('passes seenKeys through: nulls are dropped from values but every key is listed', async () => {
-    const { connector } = createDatomsConnector({ env: {} });
+    const { connector } = createDatomsConnector({ env: {}, maxShare: 1 });
     const out = [];
     for await (const b of connector.readLatest({ mode: 'fleet' })) out.push(...b.readings);
     const withNull = out.find((r) => r.seenKeys.length > Object.keys(r.values).length);
@@ -149,6 +152,8 @@ describe('DatomsConnector', () => {
   });
 
   it('live mode refuses to start without an org id and token', () => {
-    expect(() => createDatomsConnector({ env: { DATOMS_LIVE: 'true' } })).toThrow(/DATOMS_ORG_ID/);
+    expect(() => createDatomsConnector({ env: { DATOMS_LIVE: 'true' }, maxShare: 0.1 })).toThrow(
+      /DATOMS_ORG_ID/,
+    );
   });
 });

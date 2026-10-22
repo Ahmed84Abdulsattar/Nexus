@@ -8,6 +8,7 @@ import {
 import { DB } from '../db/database.module.js';
 import {
   msUntilNextDubaiHour,
+  needsEarlyRetry,
   runMaintenance,
   writeMaintenanceRun,
 } from '../maintenance/run-maintenance.js';
@@ -17,6 +18,8 @@ import { SchedulerService } from '../scheduler/scheduler.service.js';
 export const MAINTENANCE_JOB_NAME = 'maintenance';
 /** Local hour (Asia/Dubai) of the daily run (docs/07 section 5). */
 export const MAINTENANCE_HOUR_DUBAI = 2;
+/** After a failed create step (or a missing next partition) the next run is this soon, not tomorrow. */
+export const MAINTENANCE_RETRY_MS = 15 * 60_000;
 
 /**
  * The maintenance job (S3-08): once at start-up, then daily at 02:00 Asia/Dubai, leader only and
@@ -27,6 +30,7 @@ export const MAINTENANCE_HOUR_DUBAI = 2;
 @Injectable()
 export class MaintenanceJob implements OnModuleInit {
   private readonly logger = new Logger('Maintenance');
+  private retrySoon = false;
 
   constructor(
     @Inject(DB) private readonly db: Database,
@@ -38,23 +42,33 @@ export class MaintenanceJob implements OnModuleInit {
     this.scheduler.register({
       name: MAINTENANCE_JOB_NAME,
       runOnStart: true,
-      intervalMs: () => msUntilNextDubaiHour(new Date(), MAINTENANCE_HOUR_DUBAI),
+      intervalMs: () => {
+        const daily = msUntilNextDubaiHour(new Date(), MAINTENANCE_HOUR_DUBAI);
+        return this.retrySoon ? Math.min(daily, MAINTENANCE_RETRY_MS) : daily;
+      },
       run: async () => {
         await this.run();
       },
     });
   }
 
-  async run(now?: () => Date): Promise<MaintenanceDetails> {
-    const result = await runMaintenance({
-      db: this.db,
-      ...(now ? { now } : {}),
-      onWarning: (w) => this.onWarning(w),
-      onClamp: (c) =>
-        this.logger.warn(JSON.stringify({ event: 'nexus.maintenance.retention_clamped', ...c })),
-    });
-    await writeMaintenanceRun(this.db, result);
+  async run(now?: () => Date, signal?: AbortSignal): Promise<MaintenanceDetails> {
+    let result;
+    try {
+      result = await runMaintenance({
+        db: this.db,
+        ...(now ? { now } : {}),
+        ...(signal ? { signal } : {}),
+        onWarning: (w) => this.onWarning(w),
+        onClamp: (c) => this.onClamp(c),
+      });
+      await writeMaintenanceRun(this.db, result);
+    } catch (error) {
+      this.retrySoon = true;
+      throw error;
+    }
     const { details } = result;
+    this.retrySoon = needsEarlyRetry(details);
     this.logger.log(
       `maintenance done: created ${details.created.reduce((n, c) => n + c.count, 0)} partitions, ` +
         `dropped ${details.dropped.reduce((n, d) => n + d.partitions.length, 0)}, ` +
@@ -62,6 +76,15 @@ export class MaintenanceJob implements OnModuleInit {
         `warnings ${details.warnings.length}`,
     );
     return details;
+  }
+
+  /**
+   * A retention setting was unsafe and was replaced. The run stays `ok` (nothing failed), but the
+   * metric lets S8-02 alert on it (security review L4).
+   */
+  private onClamp(c: MaintenanceDetails['clamped'][number]): void {
+    this.logger.warn(JSON.stringify({ event: 'nexus.maintenance.retention_clamped', ...c }));
+    this.metrics.increment(SYNC_WARNING_METRIC, { code: 'retention_clamped', job: 'maintenance' });
   }
 
   /** Nexus operational warning (not a DATOMS alert): a named log event and a metric (S8-02 alert rules). */
