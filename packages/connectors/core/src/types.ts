@@ -38,6 +38,12 @@ export interface SourceAsset {
   nameplate?: Record<string, unknown>;
   /** Absent until the source gives the asset-to-site link (DATOMS: Q21/Q22). */
   siteExternalId?: string;
+  /** The source's own site for this asset, or null. Nexus does not create projects from it (ADR 0012). */
+  sourceSite?: { externalId: string; name: string | null } | null;
+  /** Position from the catalogue, or null when missing or invalid. Stored by S3-03, not by the catalogue sync. */
+  location?: { lat: number; lon: number } | null;
+  /** The source's status label exactly as reported (never translated), or null. */
+  sourceStatus?: string | null;
   /** Absent means "not stated"; the database default (`physical`) applies only on insert. */
   kind?: AssetKind;
 }

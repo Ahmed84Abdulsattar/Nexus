@@ -73,7 +73,7 @@ function connectorFor(listBody: unknown, status = 200) {
 
 describe('DatomsConnector', () => {
   it('implements SourceConnector and calls only GET /assets for the catalogue', async () => {
-    const { connector, calls } = connectorFor(fixture('assets-list-page1.json').body);
+    const { connector, calls } = connectorFor(fixture('assets-list-legacy-22.json').body);
     const c: SourceConnector = connector;
     const cat = await c.listAssets();
     expect(c.sourceSystem).toBe('datoms');
@@ -87,7 +87,7 @@ describe('DatomsConnector', () => {
   });
 
   it('reports an incomplete walk when the total does not match', async () => {
-    const body = structuredClone(fixture('assets-list-page1.json').body) as {
+    const body = structuredClone(fixture('assets-list-legacy-22.json').body) as {
       pagination: { total: number };
     };
     body.pagination.total = 23;
@@ -101,7 +101,7 @@ describe('DatomsConnector', () => {
       expect.arrayContaining(['diesel_generator', 'fuel_tank', 'mains', 'solar', 'generic']),
     );
     const repo = new InMemoryCatalogueRepository(types);
-    const { connector } = connectorFor(fixture('assets-list-page1.json').body);
+    const { connector } = connectorFor(fixture('assets-list-legacy-22.json').body);
     const { details } = await runCatalogueSync({
       connector,
       repo,

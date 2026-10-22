@@ -35,6 +35,13 @@ export interface RawAsset {
   category_id?: number | string | null;
   category_name?: string | null;
   asset_info?: Record<string, unknown> | null;
+  /** Seen as a string ("1270") on 2026-10-22; null when the asset has no site. */
+  site_id?: string | number | null;
+  site_name?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+  /** DATOMS's own label ("connected", "running", ...); null when none. Passed through as is. */
+  status?: string | null;
   [key: string]: unknown;
 }
 
@@ -43,6 +50,9 @@ export const MAX_TEXT_CHARS = 512;
 export const MAX_ASSET_INFO_BYTES = 64 * 1024;
 
 const text = z.string().max(MAX_TEXT_CHARS);
+// The site, location and status fields never fail a row: a value of the wrong type or size
+// becomes "absent" (catch), the rest of the row is kept. Range checks are in `mapAsset`.
+const optionalText = text.nullish().catch(undefined);
 /**
  * One row of GET /assets. A row that fails is counted and dropped, never stored as a guess.
  * Fields the code does not read are allowed (DATOMS may add some).
@@ -60,6 +70,14 @@ export const rawAssetRowSchema = z.looseObject({
     .refine((v) => v == null || JSON.stringify(v).length <= MAX_ASSET_INFO_BYTES, {
       message: 'asset_info too large',
     }),
+  site_id: z
+    .union([z.string().min(1).max(128), z.number().int()])
+    .nullish()
+    .catch(undefined),
+  site_name: optionalText,
+  latitude: z.number().nullish().catch(undefined),
+  longitude: z.number().nullish().catch(undefined),
+  status: optionalText,
 });
 
 export interface RawAssetList {
@@ -133,14 +151,40 @@ export interface MappedAsset {
   lifecycleStatus: string | undefined;
   /** `asset_info`, unchanged (make, model, kva, capacity, ... and nulls as sent). */
   nameplate: Record<string, unknown> | undefined;
-  // Absent until DATOMS gives the field list (Q21, Q22). Never defaulted. The asset list rows
-  // carry no site, so the asset-to-site link is not mapped (docs/07 section 3.2).
-  siteExternalId?: never;
+  /** `site_id` as a string; absent when the asset has no site. */
+  siteExternalId: string | undefined;
+  /** The source's site (`site_id`, `site_name`) or null. Nexus creates no project from it (ADR 0012). */
+  sourceSite: { externalId: string; name: string | null } | null;
+  /** `latitude` / `longitude`, or null when missing, out of range or exactly 0,0. */
+  location: { lat: number; lon: number } | null;
+  /** DATOMS's `status` string exactly as sent (never translated or defaulted), or null. */
+  sourceStatus: string | null;
   kind?: never;
+}
+
+function cleanText(v: unknown): string | null {
+  return typeof v === 'string' && v.trim() !== '' && v.length <= MAX_TEXT_CHARS ? v : null;
+}
+
+/**
+ * A coordinate pair is usable only when both are finite numbers in range and the pair is not
+ * exactly 0,0. DATOMS sends 0,0 (or nothing) for a device that never reported a position, and
+ * "null island" is not a construction site, so 0,0 is treated as missing. Never defaulted.
+ */
+export function mapLocation(lat: unknown, lon: unknown): { lat: number; lon: number } | null {
+  if (typeof lat !== 'number' || typeof lon !== 'number') return null;
+  if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+  if (lat < -90 || lat > 90 || lon < -180 || lon > 180) return null;
+  if (lat === 0 && lon === 0) return null;
+  return { lat, lon };
 }
 
 export function mapAsset(raw: RawAsset): MappedAsset {
   const created = raw.created_at ? new Date(raw.created_at) : undefined;
+  const siteId =
+    typeof raw.site_id === 'number' || (typeof raw.site_id === 'string' && raw.site_id !== '')
+      ? String(raw.site_id)
+      : undefined;
   return {
     externalId: String(raw.id),
     name: raw.name ?? undefined,
@@ -152,6 +196,11 @@ export function mapAsset(raw: RawAsset): MappedAsset {
         : String(raw.category_id),
     lifecycleStatus: raw.lifecycle_status ?? undefined,
     nameplate: raw.asset_info ?? undefined,
+    siteExternalId: siteId,
+    sourceSite:
+      siteId === undefined ? null : { externalId: siteId, name: cleanText(raw.site_name) },
+    location: mapLocation(raw.latitude, raw.longitude),
+    sourceStatus: cleanText(raw.status),
   };
 }
 

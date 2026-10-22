@@ -12,7 +12,7 @@ import {
 } from '../src/index.js';
 import { fixture } from './helpers.js';
 
-const list = fixture<RawAssetList>('assets-list-page1.json').body;
+const list = fixture<RawAssetList>('assets-list-legacy-22.json').body;
 const bulk = fixture<RawBulkResponse>('bulk-latest-id-mode.json').body;
 
 describe('asset list mapping', () => {

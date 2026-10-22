@@ -43,8 +43,14 @@ export interface FixtureNames {
   fleet: string;
 }
 
+/**
+ * The default asset list is the legacy 22-asset recording (2026-10-12): the bulk fixtures cover
+ * exactly those 22 ids, and the catalogue, safe-retire (asset 33850) and dev-seed tests rely on it.
+ * `assets-list-page1.json` is the 2026-10-22 recording (74 assets, with site/location/status) and
+ * is used by the mapping contract tests.
+ */
 export const DEFAULT_FIXTURES: FixtureNames = {
-  assetList: 'assets-list-page1.json',
+  assetList: 'assets-list-legacy-22.json',
   fleet: 'bulk-fleet-page1-run1.json',
 };
 

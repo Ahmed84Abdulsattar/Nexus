@@ -81,7 +81,7 @@ export function memoryLogger() {
 }
 
 export function syntheticAssets(n: number): RawAsset[] {
-  const base = fixture<{ data: RawAsset[] }>('assets-list-page1.json').body.data;
+  const base = fixture<{ data: RawAsset[] }>('assets-list-legacy-22.json').body.data;
   return Array.from({ length: n }, (_, i) => ({ ...base[i % base.length]!, id: String(1000 + i) }));
 }
 
