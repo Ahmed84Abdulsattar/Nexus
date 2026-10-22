@@ -25,7 +25,7 @@ export function GlobalSearch({ label = 'Global search' }: { label?: string }) {
       aria-label={label}
       className="flex min-w-0 flex-1 justify-end md:justify-center"
     >
-      <label className="hidden w-full max-w-md items-center gap-2 rounded-md border border-border bg-surface px-3 text-fg-muted md:flex">
+      <label className="hidden w-full max-w-md items-center gap-2 rounded-full border border-border bg-surface px-4 text-fg-muted focus-within:border-primary md:flex">
         {icon}
         <span className="sr-only">Search</span>
         <input

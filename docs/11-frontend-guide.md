@@ -23,6 +23,26 @@
 | `--status-unknown` | Unknown or unmapped | neutral outline |
 Check contrast in both light and dark themes (WCAG AA).
 
+## Innovo brand (S0-06, Brand Guidelines 1.9)
+- **Palette** (all in `tokens.css` as `--brand-*`; the components page shows names and hex): primary Slate `#122023`, Aqua `#9EF3EE`, White `#FFFFFF`; secondary grey `#A2ACAB`, steel `#6F8695`, sky `#8BA8C8`; support (data only, never backgrounds or large text) `#FF6666`, `#157A6E`, `#91A6FF`, `#208AAE`, `#BAB1A0`, `#F5F2B8`.
+- **Themes.** Light: near-white surfaces, Slate text, primary action and focus ring Slate. Dark: Slate surfaces, Aqua primary action and focus ring. `.surface-slate` re-scopes the tokens for a Slate panel in either theme (header, branded empty states).
+- **Type:** Poppins 300/400/500/600, self-hosted by `@fontsource/poppins` (no CDN; CSP stays `'self'`), Calibri as fallback.
+- **Logo:** `components/brand/InnovoLogo` (uses `currentColor`; white on Slate, Slate on white), files in `assets/brand/`. At least 80 px wide; clear space of one "i" height. Graphic device: `BrandRings` (Aqua rings and dot on Slate).
+- **State and status mapping** (names unchanged; the text label is always shown):
+
+| Token | Light | Dark |
+|---|---|---|
+| active, running | teal `#157A6E` | aqua `#9EF3EE` |
+| state-central-store | blue `#208AAE` | periwinkle `#91A6FF` |
+| state-finished | steel `#6F8695` | sky `#8BA8C8` |
+| state-in-bid | sand darkened `#857A5E` | sand `#BAB1A0` |
+| status-idle | amber `#A15C00` (not in the palette; needed for AA) | yellow `#F5F2B8` |
+| status-maintenance | red darkened `#D03E3E` | red `#FF6666` |
+| status-off | grey `#75807F` | `#8497A3` |
+| status-unknown | `#44585C` (hollow dot) | grey `#A2ACAB` |
+
+Support colours are darkened in light where the original fails 3:1 on white. `--error` is a UI colour for errors, not a status.
+
 ## Layout and responsiveness
 - Breakpoints: `sm` 640 (phone), `md` 768 (tablet portrait), `lg` 1024 (tablet landscape / small laptop), `xl` 1280+.
 - **Layout modes** (`app/layout/PageLayout`, S1-06): desktop from `xl` (1280), tablet from `md` to below `xl` (768–1279, so 1024 is tablet), phone below `md` (768).

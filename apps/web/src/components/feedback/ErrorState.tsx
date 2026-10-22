@@ -24,29 +24,34 @@ export function ErrorState({
   return (
     <div
       role="alert"
-      className="rounded-md border border-border-strong bg-surface p-4"
+      className="flex items-start gap-3 rounded-lg border border-l-4 border-border border-l-error bg-surface-raised p-4 shadow-card"
       data-state="error"
     >
-      <p className="font-semibold">
-        <span aria-hidden="true">! </span>
-        {view.title}
-      </p>
-      <p className="mt-1 text-sm">{view.message}</p>
-      {view.problemTitle || view.problemDetail ? (
-        <p className="mt-1 text-sm text-fg-muted">
-          {[view.problemTitle, view.problemDetail].filter(Boolean).join(': ')}
-        </p>
-      ) : null}
-      {view.correlationId ? (
-        <p className="mt-1 text-xs text-fg-muted">Reference: {view.correlationId}</p>
-      ) : null}
-      {showRetry ? (
-        <div className="mt-3">
-          <Button variant="secondary" onClick={onRetry} disabled={retrying}>
-            {retrying ? 'Retrying…' : 'Try again'}
-          </Button>
-        </div>
-      ) : null}
+      <span
+        aria-hidden="true"
+        className="inline-flex size-7 shrink-0 items-center justify-center rounded-full bg-error text-sm font-semibold text-primary-fg"
+      >
+        !
+      </span>
+      <div className="min-w-0">
+        <p className="font-semibold">{view.title}</p>
+        <p className="mt-1 text-sm">{view.message}</p>
+        {view.problemTitle || view.problemDetail ? (
+          <p className="mt-1 text-sm text-fg-muted">
+            {[view.problemTitle, view.problemDetail].filter(Boolean).join(': ')}
+          </p>
+        ) : null}
+        {view.correlationId ? (
+          <p className="mt-1 text-xs text-fg-muted">Reference: {view.correlationId}</p>
+        ) : null}
+        {showRetry ? (
+          <div className="mt-3">
+            <Button variant="secondary" onClick={onRetry} disabled={retrying}>
+              {retrying ? 'Retrying…' : 'Try again'}
+            </Button>
+          </div>
+        ) : null}
+      </div>
     </div>
   );
 }

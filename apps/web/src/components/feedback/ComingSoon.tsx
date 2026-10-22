@@ -3,11 +3,14 @@ export function ComingSoon({ title }: { title: string }) {
   return (
     <section
       aria-label={title}
-      className="rounded-md border border-dashed border-border-strong p-4"
+      className="rounded-lg border border-dashed border-border-strong bg-surface-raised p-5"
       data-state="coming-soon"
     >
-      <h2 className="font-medium">{title}</h2>
-      <p className="mt-1 text-sm text-fg-muted">Coming later.</p>
+      <h2 className="font-semibold tracking-tight">{title}</h2>
+      <p className="mt-2 inline-flex items-center gap-2 rounded-full border border-border bg-surface px-3 py-0.5 text-xs font-medium text-fg-muted">
+        <span aria-hidden="true" className="size-1.5 rounded-full bg-accent" />
+        Coming later.
+      </p>
     </section>
   );
 }

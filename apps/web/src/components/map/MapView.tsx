@@ -1,5 +1,6 @@
 import { lazy, Suspense, useMemo } from 'react';
 import { useConfig } from '../../api/queries';
+import { BrandRings } from '../brand';
 import type { MapAdapterProps } from './adapter';
 import type { MapLayerSpec, MapViewProps } from './types';
 
@@ -8,22 +9,39 @@ const ArcgisMap = lazy(() => import('./arcgis/ArcgisMap')) as React.LazyExoticCo
   React.ComponentType<MapAdapterProps>
 >;
 
+/**
+ * Message panel shown instead of the map. `brand` is the deliberate Slate empty state with the Aqua
+ * ring device (loading, no key yet); `plain` is for a real failure and uses the neutral surface.
+ */
 function MapMessage({
   role,
   title,
+  tone = 'brand',
   children,
 }: {
   role: 'status' | 'alert';
   title: string;
+  tone?: 'brand' | 'plain';
   children?: React.ReactNode;
 }) {
+  const brand = tone === 'brand';
   return (
     <div
       role={role}
-      className="flex size-full flex-col items-center justify-center gap-1 bg-surface p-6 text-center text-fg"
+      className={
+        brand
+          ? 'surface-slate relative flex size-full min-h-80 items-end overflow-hidden p-6 md:items-center md:p-12'
+          : 'flex size-full min-h-80 items-center justify-center bg-surface p-6 text-center text-fg'
+      }
     >
-      <p className="font-semibold">{title}</p>
-      {children ? <p className="max-w-md text-sm text-fg-muted">{children}</p> : null}
+      {brand ? <BrandRings /> : null}
+      <div className={brand ? 'relative max-w-md' : 'max-w-md'}>
+        {brand ? (
+          <span aria-hidden="true" className="mb-4 block size-3 rounded-full bg-brand-aqua" />
+        ) : null}
+        <p className={brand ? 'text-xl font-semibold tracking-tight' : 'font-semibold'}>{title}</p>
+        {children ? <p className="mt-2 text-sm text-fg-muted">{children}</p> : null}
+      </div>
     </div>
   );
 }
@@ -55,7 +73,7 @@ export function MapView({
     body = <MapMessage role="status" title="Loading map…" />;
   } else if (config.isError) {
     body = (
-      <MapMessage role="alert" title="Map settings could not be loaded">
+      <MapMessage role="alert" tone="plain" title="Map settings could not be loaded">
         Reload the page to try again. If it keeps failing, tell the Nexus team.
       </MapMessage>
     );
@@ -86,7 +104,7 @@ export function MapView({
       role="region"
       aria-label={label}
       data-map-mode={mode}
-      className={`relative min-h-80 overflow-hidden rounded-lg border border-border ${className ?? ''}`}
+      className={`relative min-h-80 overflow-hidden rounded-lg border border-border shadow-card ${className ?? ''}`}
     >
       {body}
       {overlays ? <div className="absolute inset-0 pointer-events-none">{overlays}</div> : null}

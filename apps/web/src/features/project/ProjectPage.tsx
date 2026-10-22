@@ -1,6 +1,7 @@
 import { useParams } from 'react-router';
 import { PageLayout } from '../../app/layout';
 import { EmptyState } from '../../components/feedback';
+import { Card, PageHeading } from '../../components/ui';
 
 /**
  * Placeholder until the project endpoints exist. Its panels show the "no data yet" state rather
@@ -23,10 +24,25 @@ export function ProjectPage() {
         <EmptyState title="No data yet" message="Info boxes (equipment, energy) arrive later." />
       }
     >
-      <h1 className="text-2xl font-semibold">Project</h1>
-      <p className="break-words">
-        Project placeholder for project <code>{projectId}</code>.
-      </p>
+      <PageHeading
+        eyebrow="Innovo Nexus"
+        title="Project"
+        description={
+          <>
+            Project placeholder for project{' '}
+            <code className="rounded bg-surface px-1.5 py-0.5 font-mono text-xs break-all text-fg">
+              {projectId}
+            </code>
+            .
+          </>
+        }
+      />
+      <Card className="mt-6" aria-label="Project overview">
+        <EmptyState
+          title="Site map and live boxes arrive later"
+          message="The site map, equipment and energy boxes appear here once the project endpoints exist."
+        />
+      </Card>
     </PageLayout>
   );
 }

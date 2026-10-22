@@ -16,6 +16,7 @@
   },
   "dependencies": {
     "@arcgis/core": "catalog:",
+    "@fontsource/poppins": "catalog:",
     "@nexus/shared": "workspace:*",
     "@radix-ui/react-dialog": "catalog:",
     "@radix-ui/react-dropdown-menu": "catalog:",

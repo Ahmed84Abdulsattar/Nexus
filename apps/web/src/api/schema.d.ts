@@ -4,229 +4,245 @@
  */
 
 export interface paths {
-    "/health/live": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["HealthController_live"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+  '/health/live': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/v1/me": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["MeController_me"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    get: operations['HealthController_live'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/v1/me': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/v1/config": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["ClientConfigController_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    get: operations['MeController_me'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/v1/config': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
+    get: operations['ClientConfigController_get'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
 }
 export type webhooks = Record<string, never>;
 export interface components {
-    schemas: {
-        HealthLiveDto_Output: {
-            /** @constant */
-            status: "ok";
-        };
-        MeResponseDto_Output: {
-            /** Format: uuid */
-            id: string;
-            name: string | null;
-            email: string | null;
-            roles: ("admin" | "leadership" | "project_manager" | "site_user" | "viewer")[];
-            permissions: ("portfolio.read" | "project.read" | "asset.read" | "telemetry.history" | "events.read" | "explorer.use" | "explorer.export" | "admin.users.manage" | "admin.projects.manage" | "admin.integrations" | "admin.settings" | "audit.read" | "cctv.view" | "media.read" | "bim.view")[];
-            projectScope: {
-                all: boolean;
-                projectIds: string[];
-            };
-        };
-        ConfigResponseDto_Output: {
-            arcgis: {
-                apiKey: string;
-                basemaps: {
-                    map2d: string;
-                    satellite: string;
-                    scene3d: string;
-                };
-                extent: {
-                    xmin: number;
-                    ymin: number;
-                    xmax: number;
-                    ymax: number;
-                };
-                initialView: {
-                    latitude: number;
-                    longitude: number;
-                    zoom: number;
-                };
-            };
-            enums: {
-                projectStates: {
-                    key: string;
-                    label: string;
-                }[];
-                displayStatuses: {
-                    key: string;
-                    label: string;
-                }[];
-            };
-            featureFlags: {
-                [key: string]: boolean;
-            };
-        };
-        ProblemFieldError: {
-            path: string;
-            message: string;
-        };
-        ProblemDetails: {
-            /** @description URI reference for the problem type; about:blank for plain HTTP errors. */
-            type: string;
-            /** @description Short summary; the HTTP status phrase. */
-            title: string;
-            /** @description HTTP status code. */
-            status: number;
-            /** @description Human-readable explanation of this occurrence. */
-            detail: string;
-            /** @description Echo of X-Correlation-Id, or the request id. Quote it when reporting a problem. */
-            correlationId?: string;
-            /** @description Field-level failures. Present on 422 only. */
-            errors?: components["schemas"]["ProblemFieldError"][];
-        };
+  schemas: {
+    HealthLiveDto_Output: {
+      /** @constant */
+      status: 'ok';
     };
-    responses: never;
-    parameters: never;
-    requestBodies: never;
-    headers: never;
-    pathItems: never;
+    MeResponseDto_Output: {
+      /** Format: uuid */
+      id: string;
+      name: string | null;
+      email: string | null;
+      roles: ('admin' | 'leadership' | 'project_manager' | 'site_user' | 'viewer')[];
+      permissions: (
+        | 'portfolio.read'
+        | 'project.read'
+        | 'asset.read'
+        | 'telemetry.history'
+        | 'events.read'
+        | 'explorer.use'
+        | 'explorer.export'
+        | 'admin.users.manage'
+        | 'admin.projects.manage'
+        | 'admin.integrations'
+        | 'admin.settings'
+        | 'audit.read'
+        | 'cctv.view'
+        | 'media.read'
+        | 'bim.view'
+      )[];
+      projectScope: {
+        all: boolean;
+        projectIds: string[];
+      };
+    };
+    ConfigResponseDto_Output: {
+      arcgis: {
+        apiKey: string;
+        basemaps: {
+          map2d: string;
+          satellite: string;
+          scene3d: string;
+        };
+        extent: {
+          xmin: number;
+          ymin: number;
+          xmax: number;
+          ymax: number;
+        };
+        initialView: {
+          latitude: number;
+          longitude: number;
+          zoom: number;
+        };
+      };
+      enums: {
+        projectStates: {
+          key: string;
+          label: string;
+        }[];
+        displayStatuses: {
+          key: string;
+          label: string;
+        }[];
+      };
+      featureFlags: {
+        [key: string]: boolean;
+      };
+    };
+    ProblemFieldError: {
+      path: string;
+      message: string;
+    };
+    ProblemDetails: {
+      /** @description URI reference for the problem type; about:blank for plain HTTP errors. */
+      type: string;
+      /** @description Short summary; the HTTP status phrase. */
+      title: string;
+      /** @description HTTP status code. */
+      status: number;
+      /** @description Human-readable explanation of this occurrence. */
+      detail: string;
+      /** @description Echo of X-Correlation-Id, or the request id. Quote it when reporting a problem. */
+      correlationId?: string;
+      /** @description Field-level failures. Present on 422 only. */
+      errors?: components['schemas']['ProblemFieldError'][];
+    };
+  };
+  responses: never;
+  parameters: never;
+  requestBodies: never;
+  headers: never;
+  pathItems: never;
 }
 export type $defs = Record<string, never>;
 export interface operations {
-    HealthController_live: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description The process is up. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HealthLiveDto_Output"];
-                };
-            };
-        };
+  HealthController_live: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    MeController_me: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
+    requestBody?: never;
+    responses: {
+      /** @description The process is up. */
+      200: {
+        headers: {
+          [name: string]: unknown;
         };
-        requestBody?: never;
-        responses: {
-            /** @description The signed-in user. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["MeResponseDto_Output"];
-                };
-            };
-            /** @description Missing, expired or invalid token. */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ProblemDetails"];
-                };
-            };
-            /** @description Valid token, but missing the access_as_user scope or the required permission. */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ProblemDetails"];
-                };
-            };
+        content: {
+          'application/json': components['schemas']['HealthLiveDto_Output'];
         };
+      };
     };
-    ClientConfigController_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Client configuration. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ConfigResponseDto_Output"];
-                };
-            };
-            /** @description Missing, expired or invalid token. */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ProblemDetails"];
-                };
-            };
-            /** @description Valid token, but missing the access_as_user scope or the required permission. */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/problem+json": components["schemas"]["ProblemDetails"];
-                };
-            };
-        };
+  };
+  MeController_me: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
+    requestBody?: never;
+    responses: {
+      /** @description The signed-in user. */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['MeResponseDto_Output'];
+        };
+      };
+      /** @description Missing, expired or invalid token. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Valid token, but missing the access_as_user scope or the required permission. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
+  ClientConfigController_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Client configuration. */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ConfigResponseDto_Output'];
+        };
+      };
+      /** @description Missing, expired or invalid token. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+      /** @description Valid token, but missing the access_as_user scope or the required permission. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/problem+json': components['schemas']['ProblemDetails'];
+        };
+      };
+    };
+  };
 }

@@ -17,8 +17,8 @@ export function TabsTrigger({ className, ...p }: ComponentProps<typeof RadixTabs
   return (
     <RadixTabs.Trigger
       className={cn(
-        'min-h-11 border-b-2 border-transparent px-4 text-sm font-medium text-fg-muted',
-        'data-[state=active]:border-primary data-[state=active]:text-fg',
+        'min-h-11 -mb-px border-b-2 border-transparent px-4 text-sm font-medium text-fg-muted transition-colors hover:text-fg',
+        'data-[state=active]:border-primary data-[state=active]:font-semibold data-[state=active]:text-fg',
         className,
       )}
       {...p}

@@ -40,9 +40,14 @@ describe('token names match docs/11 exactly', () => {
   });
 
   it('every colour token set in light is also set in dark (no silent fallback)', () => {
+    // --brand-* are theme-independent constants (the palette); .surface-slate is its own scope.
     const names = (s: string) =>
-      [...s.matchAll(/(--[a-z0-9-]+)\s*:\s*#[0-9a-fA-F]{3,8}\b/g)].map((m) => m[1]!).sort();
-    expect(names(tokensCss.slice(darkAt))).toEqual(names(tokensCss.slice(0, darkAt)));
+      [...s.matchAll(/(--[a-z0-9-]+)\s*:\s*#[0-9a-fA-F]{3,8}\b/g)]
+        .map((m) => m[1]!)
+        .filter((n) => !n.startsWith('--brand-'))
+        .sort();
+    const slateAt = tokensCss.indexOf('.surface-slate');
+    expect(names(tokensCss.slice(darkAt, slateAt))).toEqual(names(tokensCss.slice(0, darkAt)));
   });
 
   it('tailwind.css exposes each of the nine tokens as a colour utility', () => {
