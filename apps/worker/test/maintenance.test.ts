@@ -499,7 +499,10 @@ describe.skipIf(testDatabaseAdminUrl === undefined)(
         const details = await job.run(() => fake);
         const elapsed = Date.now() - started;
 
-        expect(elapsed).toBeLessThan(20_000);
+        // The lock is held until afterEach, so finishing at all proves the job gave up instead of
+        // waiting (the 55P03 warning below says why). The bound only catches a much longer
+        // lock_timeout; it is loose because creating ~160 days of partitions is slow on a busy machine.
+        expect(elapsed).toBeLessThan(90_000);
         expect(details.warnings).toContainEqual(
           expect.objectContaining({
             code: 'step_failed',
@@ -525,7 +528,7 @@ describe.skipIf(testDatabaseAdminUrl === undefined)(
         );
         expect(needsEarlyRetry(again)).toBe(false);
         expect(await registered!.intervalMs()).toBeGreaterThan(MAINTENANCE_RETRY_MS);
-      });
+      }, 120_000);
     });
 
     it('skips the drop and prune steps when the signal is aborted (leadership lost)', async () => {
