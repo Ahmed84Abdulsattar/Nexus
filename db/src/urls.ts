@@ -92,7 +92,7 @@ export function requireTlsUnlessLocal(url: string, variable: string, appEnv: str
 }
 
 /**
- * The API's LISTEN connection must be direct. Refuses the PgBouncer port 6432 as the node-postgres driver
+ * The API's LISTEN connection and the worker's leader-lock connection must be direct. Refuses the PgBouncer port 6432 as the node-postgres driver
  * will actually use it: a "?port=" query parameter overrides the port in the URL, so that parameter is
  * refused outright, and the effective port is read with the driver's own parser (pg-connection-string).
  */
@@ -110,7 +110,7 @@ export function assertDirectConnection(url: string, variable = 'DATABASE_URL'): 
   }
   if (String(port ?? '') === '6432') {
     throw new DatabaseConfigError(
-      `${variable} uses port 6432 (the PgBouncer pooler): LISTEN does not work there. Use the direct port 5432.`,
+      `${variable} uses port 6432 (the PgBouncer pooler): LISTEN and session advisory locks (the worker leader lock) do not work there, and a pooler could give two workers the lock. Use the direct port 5432.`,
     );
   }
 }

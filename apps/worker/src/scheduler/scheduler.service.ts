@@ -21,6 +21,7 @@ export class SchedulerService implements OnApplicationBootstrap, BeforeApplicati
     const logger = new Logger('Scheduler');
     this.scheduler = new Scheduler({
       ensureLeader: () => this.leader.ensureLeader(),
+      leaderSignal: () => this.leader.signal,
       logger: {
         log: (m) => logger.log(m),
         warn: (m) => logger.warn(m),

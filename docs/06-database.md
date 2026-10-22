@@ -18,6 +18,7 @@ Settings added in S1-01: `audit.sign_in_gap_minutes` (default 60, see `08` §2 s
 
 Columns added in S3-01 (the `catalogue_sync_details` migration; both nullable, both the last column of their table):
 - `integration.sync_run.details jsonb`: the typed summary of one run, one shape per `job` (`SyncRunDetails` in `packages/shared`, a zod union the health API reads). `error` stays for failures only. For `catalogue_sync`: `seen`, `total`, `complete`, `inserted`, `updated`, `unchanged`, `reappeared`, `missed`, `retired`, `linkTodos` and `warnings[]`. A warning is a Nexus operational notice with a typed code (`incomplete_walk { seen, total }`, `retire_blocked { wouldRetire, active, fraction, maxFraction }`); a run with a warning has `status = 'partial'`. Warnings are **not** DATOMS alerts: they never go to `events.event` or `integration.link_todo`.
+- **Advisory locks (L4, S8-02):** the worker can call `pg_advisory_lock` on any key, and any role can; revoking or alerting on a foreign holder of the leader lock is S8-02, not done here.
 - `core.asset.source_lifecycle_status text`: the source's lifecycle label exactly as reported (DATOMS `lifecycle_status`; the field name stays in `mapping.ts`). **Display only:** never used for status colours, counts, poll scope or retirement. Using it for any of those needs an ADR and the answer to Q40.
 
 ## 2. Entity relationships
@@ -221,13 +222,17 @@ Add indexes (~10–20%), and remember that zone-redundant HA keeps a second copy
 | `retention.packet_days` | 90 | 7 |
 | `retention.rollup_5m_days` | 60 | 7 |
 | `retention.rollup_1h_days` | 1830 | 90 |
-| `retention.api_call_days` | 30 | 7 |
+| `retention.api_call_days` | 30 | 30 (`BUDGET_RESTORE_DAYS`: the budget tracker reads 30 days of the usage log after a restart) |
 | `retention.status_history_days` | 730 | 30 |
 | `retention.location_history_days` | 400 | 30 |
 | `retention.sync_run_days` | 90 | 7 (and the newest `catalogue.retire_after_misses` complete catalogue runs per source are never pruned) |
 | `retention.audit_days`, `retention.event_days` | 730 | 730 (the database floor) |
 
-A drop date is always now minus the retention in days, so it can never be in the future. Raising a minimum later is a code change; lowering the audit or event floor needs a migration of the database functions.
+A drop date is always now minus the retention in days, so it can never be in the future. `now` comes from the database (`clock_timestamp()`), not the worker clock.
+
+**How the maintenance job runs DDL (security review M2, L5, L2).** Each `create_range_partitions` / `drop_partitions_before` call runs in its own transaction with `lock_timeout = 3s`: a long query on a parent table makes the call fail fast (SQLSTATE `55P03`, a `step_failed` warning) instead of queueing behind it and blocking inserts. When a create step failed, the next run is about 15 minutes away, not about 24 h. Daily creation starts at `max(now - retention, min(end of the newest existing partition, today - 7))`, so a long worker outage is filled, and goes to today + 7 (at most 400 periods per call). Warnings and logs carry the error name and SQLSTATE with a fixed short text, never the database message. `integration.sync_run` is deleted in batches of 10,000.
+
+**Rollups and retention (I6).** `telemetry.refresh_rollup_combine` must never run for an hour whose 5-minute rows were already dropped (older than `retention.rollup_5m_days`): it would overwrite a good hourly row with an empty one. The rollups job (S4-01) must skip, or refuse, hours older than the 5-minute retention. Raising a minimum later is a code change; lowering the audit or event floor needs a migration of the database functions.
 
 ## 7. Indexes (already in the schema)
 - `asset(project_id)` (partial, active only), `asset(asset_type_id)`.

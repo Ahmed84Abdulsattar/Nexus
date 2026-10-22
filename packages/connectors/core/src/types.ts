@@ -100,6 +100,10 @@ export interface SourceCatalogue {
    * Safe retire (docs/07 section 6) depends on this and on nothing else.
    */
   complete: boolean;
+  /** Rows that failed validation and were dropped (count only). */
+  invalidRows?: number;
+  /** True when a row, page or total cap was hit. */
+  capped?: boolean;
 }
 
 /** `fleet` = every asset in scope; `ids` = exactly these (DATOMS: id mode, max 500 per call). */
