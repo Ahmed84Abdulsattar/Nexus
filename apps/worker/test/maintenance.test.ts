@@ -4,7 +4,7 @@ import { createDatabase, type Database } from '@nexus/db';
 import { createTestDatabase, testDatabaseAdminUrl, type TestDatabase } from '@nexus/db/testing';
 import { SYNC_WARNING_METRIC, syncRunDetailsSchema } from '@nexus/shared';
 import pg from 'pg';
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   MAINTENANCE_ESCALATE_AFTER,
   MAINTENANCE_RETRY_MS,
@@ -48,6 +48,20 @@ describe('maintenance schedule helpers', () => {
       120 * min,
       120 * min,
     ]);
+  });
+
+  it('passes the leader-term signal from the scheduler into the run', async () => {
+    let registered: ScheduledJob | undefined;
+    const scheduler = {
+      register: (j: ScheduledJob) => void (registered = j),
+    } as unknown as SchedulerService;
+    const metrics: Metrics = { increment: () => undefined };
+    const job = new MaintenanceJob({} as Database, metrics, scheduler);
+    job.onModuleInit();
+    const spy = vi.spyOn(job, 'run').mockResolvedValue({} as never);
+    const controller = new AbortController();
+    await registered!.run(controller.signal);
+    expect(spy).toHaveBeenCalledWith(undefined, controller.signal);
   });
 
   it('escalates after repeated failures and backs off between them', async () => {

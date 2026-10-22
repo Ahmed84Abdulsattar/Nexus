@@ -206,8 +206,7 @@ export async function runMaintenance(options: MaintenanceOptions): Promise<Maint
       }
     }
   } catch (error) {
-    // Reported as `create` until the shared schema has a `health` step.
-    warn({ code: 'step_failed', step: 'create', message: `health check: ${safeError(error)}` });
+    warn({ code: 'step_failed', step: 'health', message: safeError(error) });
   }
 
   return { details, startedAt, finishedAt: clock ? clock() : await databaseNow(db) };
