@@ -20,6 +20,15 @@ export const MAINTENANCE_JOB_NAME = 'maintenance';
 export const MAINTENANCE_HOUR_DUBAI = 2;
 /** After a failed create step (or a missing next partition) the next run is this soon, not tomorrow. */
 export const MAINTENANCE_RETRY_MS = 15 * 60_000;
+/** Each further failure in a row doubles the wait, up to this (never later than the daily slot). */
+export const MAINTENANCE_RETRY_MAX_MS = 120 * 60_000;
+/** After this many failed runs in a row the job logs an error and emits `maintenance_retry_exhausted`. */
+export const MAINTENANCE_ESCALATE_AFTER = 4;
+
+/** Wait before the next run after `failures` failed runs in a row: 15, 30, 60, then 120 minutes. */
+export function maintenanceRetryDelay(failures: number): number {
+  return Math.min(MAINTENANCE_RETRY_MAX_MS, MAINTENANCE_RETRY_MS * 2 ** Math.max(0, failures - 1));
+}
 
 /**
  * The maintenance job (S3-08): once at start-up, then daily at 02:00 Asia/Dubai, leader only and
@@ -30,7 +39,8 @@ export const MAINTENANCE_RETRY_MS = 15 * 60_000;
 @Injectable()
 export class MaintenanceJob implements OnModuleInit {
   private readonly logger = new Logger('Maintenance');
-  private retrySoon = false;
+  /** Runs in a row that needed an early retry (a failed create step, a missing partition or a throw). */
+  private consecutiveFailures = 0;
 
   constructor(
     @Inject(DB) private readonly db: Database,
@@ -44,10 +54,13 @@ export class MaintenanceJob implements OnModuleInit {
       runOnStart: true,
       intervalMs: () => {
         const daily = msUntilNextDubaiHour(new Date(), MAINTENANCE_HOUR_DUBAI);
-        return this.retrySoon ? Math.min(daily, MAINTENANCE_RETRY_MS) : daily;
+        return this.consecutiveFailures > 0
+          ? Math.min(daily, maintenanceRetryDelay(this.consecutiveFailures))
+          : daily;
       },
-      run: async () => {
-        await this.run();
+      // The scheduler aborts the signal when the leader lock is lost; maintenance checks it between steps.
+      run: async (signal) => {
+        await this.run(undefined, signal);
       },
     });
   }
@@ -64,11 +77,11 @@ export class MaintenanceJob implements OnModuleInit {
       });
       await writeMaintenanceRun(this.db, result);
     } catch (error) {
-      this.retrySoon = true;
+      this.recordOutcome(true);
       throw error;
     }
     const { details } = result;
-    this.retrySoon = needsEarlyRetry(details);
+    this.recordOutcome(needsEarlyRetry(details));
     this.logger.log(
       `maintenance done: created ${details.created.reduce((n, c) => n + c.count, 0)} partitions, ` +
         `dropped ${details.dropped.reduce((n, d) => n + d.partitions.length, 0)}, ` +
@@ -76,6 +89,30 @@ export class MaintenanceJob implements OnModuleInit {
         `warnings ${details.warnings.length}`,
     );
     return details;
+  }
+
+  /**
+   * Tracks failed runs in a row for the backoff. After MAINTENANCE_ESCALATE_AFTER of them the problem
+   * is no longer a short lock wait: log an error and emit a distinct metric S8-02 can page on.
+   */
+  private recordOutcome(failed: boolean): void {
+    if (!failed) {
+      this.consecutiveFailures = 0;
+      return;
+    }
+    this.consecutiveFailures += 1;
+    if (this.consecutiveFailures >= MAINTENANCE_ESCALATE_AFTER) {
+      this.logger.error(
+        JSON.stringify({
+          event: 'nexus.maintenance.retry_exhausted',
+          consecutiveFailures: this.consecutiveFailures,
+        }),
+      );
+      this.metrics.increment(SYNC_WARNING_METRIC, {
+        code: 'maintenance_retry_exhausted',
+        job: 'maintenance',
+      });
+    }
   }
 
   /**

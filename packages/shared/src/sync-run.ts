@@ -99,8 +99,8 @@ export const maintenanceStepFailedWarningSchema = z.object({
   code: z.literal('step_failed'),
   step: z.enum(['create', 'drop', 'prune_sync_run', 'settings', 'health']),
   table: z.string().optional(),
-  /** Error name and message only. */
-  message: z.string(),
+  /** Error name and SQLSTATE (or a redacted, capped message); never connection details. */
+  message: z.string().max(200),
 });
 
 export const maintenanceWarningSchema = z.discriminatedUnion('code', [

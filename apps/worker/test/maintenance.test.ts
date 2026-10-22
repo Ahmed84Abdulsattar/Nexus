@@ -5,7 +5,12 @@ import { createTestDatabase, testDatabaseAdminUrl, type TestDatabase } from '@ne
 import { SYNC_WARNING_METRIC, syncRunDetailsSchema } from '@nexus/shared';
 import pg from 'pg';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { MAINTENANCE_RETRY_MS, MaintenanceJob } from '../src/jobs/maintenance.job.js';
+import {
+  MAINTENANCE_ESCALATE_AFTER,
+  MAINTENANCE_RETRY_MS,
+  MaintenanceJob,
+  maintenanceRetryDelay,
+} from '../src/jobs/maintenance.job.js';
 import {
   PARTITIONED_TABLES,
   RETENTION_LIMITS,
@@ -33,6 +38,37 @@ const monthStart = (d: Date, plus = 0): Date =>
 const ym = (d: Date): string => iso(d).slice(0, 7).replace('-', '');
 
 describe('maintenance schedule helpers', () => {
+  it('backs off 15, 30, 60, then 120 minutes after failed runs in a row', () => {
+    const min = 60_000;
+    expect([1, 2, 3, 4, 5, 10].map(maintenanceRetryDelay)).toEqual([
+      15 * min,
+      30 * min,
+      60 * min,
+      120 * min,
+      120 * min,
+      120 * min,
+    ]);
+  });
+
+  it('escalates after repeated failures and backs off between them', async () => {
+    let registered: ScheduledJob | undefined;
+    const scheduler = {
+      register: (j: ScheduledJob) => void (registered = j),
+    } as unknown as SchedulerService;
+    const counted: string[] = [];
+    const metrics: Metrics = { increment: (_n, a) => void counted.push(String(a?.['code'])) };
+    // A database that cannot be used: every run throws before it does anything.
+    const job = new MaintenanceJob({} as Database, metrics, scheduler);
+    job.onModuleInit();
+    for (let n = 1; n <= MAINTENANCE_ESCALATE_AFTER; n++) {
+      await expect(job.run()).rejects.toThrow();
+      const daily = msUntilNextDubaiHour(new Date(), 2);
+      expect(await registered!.intervalMs()).toBe(Math.min(daily, maintenanceRetryDelay(n)));
+      const exhausted = counted.filter((c) => c === 'maintenance_retry_exhausted').length;
+      expect(exhausted).toBe(n >= MAINTENANCE_ESCALATE_AFTER ? 1 : 0);
+    }
+  });
+
   describe('clampRetention', () => {
     const run = (configured: unknown) => {
       const details = { clamped: [] } as unknown as Parameters<typeof clampRetention>[2];
@@ -536,6 +572,23 @@ describe.skipIf(testDatabaseAdminUrl === undefined)(
         expect(long.length).toBeLessThanOrEqual(200);
         expect(safeError('nope')).toBe('unknown error');
       });
+
+      it('keeps only the code for Node network errors (no host or IP)', () => {
+        const e = Object.assign(new Error('connect ECONNREFUSED 10.1.2.3:5432'), {
+          code: 'ECONNREFUSED',
+        });
+        expect(safeError(e)).toBe('Error ECONNREFUSED');
+        const dns = Object.assign(new Error('getaddrinfo ENOTFOUND db.internal.example'), {
+          code: 'ENOTFOUND',
+        });
+        expect(safeError(dns)).toBe('Error ENOTFOUND');
+      });
+
+      it('redacts quoted key/value secrets', () => {
+        const out = safeError(new Error('bad config {"password":"hunter2","token": \'abc123\'}'));
+        expect(out).not.toContain('hunter2');
+        expect(out).not.toContain('abc123');
+      });
     });
 
     describe('sync_run pruning', () => {
@@ -588,6 +641,23 @@ describe.skipIf(testDatabaseAdminUrl === undefined)(
           { job: 'catalogue_sync', age: 160 },
           { job: 'catalogue_sync', age: 1 },
         ]);
+      });
+
+      it('keeps exactly N complete runs when several share the same start time (batched)', async () => {
+        for (let i = 0; i < 3; i++) {
+          await admin.query(
+            `INSERT INTO integration.sync_run (source_system, job, status, started_at, details)
+             VALUES ('datoms', 'catalogue_sync', 'ok', timestamptz '2025-01-01T00:00:00Z', $1::jsonb)`,
+            [JSON.stringify({ job: 'catalogue_sync', complete: true })],
+          );
+        }
+        await pruneSyncRuns(db, new Date(), 2, { batchSize: 1 });
+        const n = (
+          await admin.query(
+            `SELECT count(*)::int AS n FROM integration.sync_run WHERE job = 'catalogue_sync'`,
+          )
+        ).rows[0].n;
+        expect(n).toBe(2);
       });
 
       it('keeps fewer than N complete runs when that is all there is', async () => {
