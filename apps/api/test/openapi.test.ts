@@ -169,6 +169,29 @@ describe('the OpenAPI document', () => {
     }
   });
 
+  it('fails when a DTO has a nullable property below the top level (createDto only rewrites top-level ones)', () => {
+    // Nested properties are not passed through swagger's array-type handling, so they keep the
+    // zod form type: ["x","null"], which is valid OpenAPI 3.1. If a DTO gets one, check how it is
+    // rendered, then extend nullableTypesToAnyOf (common/http/dto.ts) and update this test.
+    const nested: string[] = [];
+    const walk = (node: unknown, path: string, depth: number): void => {
+      if (Array.isArray(node)) return node.forEach((n, i) => walk(n, `${path}[${i}]`, depth));
+      if (typeof node !== 'object' || node === null) return;
+      const o = node as Record<string, unknown>;
+      if (depth > 1 && Array.isArray(o['type']) && o['type'].includes('null')) nested.push(path);
+      for (const [k, v] of Object.entries(o)) {
+        if (k === 'properties' && typeof v === 'object' && v !== null) {
+          for (const [pk, pv] of Object.entries(v)) walk(pv, `${path}.${pk}`, depth + 1);
+        } else if (k === 'items' || k === 'anyOf' || k === 'allOf' || k === 'oneOf') {
+          walk(v, `${path}.${k}`, depth + 1);
+        }
+      }
+    };
+    for (const schema of registeredSchemas)
+      walk(z.toJSONSchema(schema, { io: 'output' }), 'root', 0);
+    expect(nested).toEqual([]);
+  });
+
   it('matches the committed apps/api/openapi.json (run pnpm build to refresh it)', async () => {
     const t = await appFor('local');
     const live: unknown = (await t.get('/openapi.json')).json();
