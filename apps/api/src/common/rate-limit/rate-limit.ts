@@ -11,6 +11,26 @@ export class TooManyRequestsException extends HttpException {
 }
 
 /**
+ * Cleans the client address Fastify derived from X-Forwarded-For before anything keys or stores it.
+ * Some proxies (Application Gateway v2) append a port: "1.2.3.4:5000" or "[2001:db8::1]:5000". The
+ * port is removed. When what is left is still not an IP address, the entry is garbage and the
+ * connecting socket's address is used instead (or undefined when that is not an IP either).
+ */
+export function sanitizeClientIp(
+  raw: string | undefined,
+  peer: string | undefined,
+): string | undefined {
+  const fallback = peer !== undefined && isIP(peer) !== 0 ? peer : undefined;
+  if (raw === undefined) return fallback;
+  const s = raw.trim();
+  if (isIP(s) !== 0) return s;
+  const v6 = /^\[([^\]]+)\](?::\d{1,5})?$/.exec(s)?.[1];
+  const v4 = /^(\d{1,3}(?:\.\d{1,3}){3}):\d{1,5}$/.exec(s)?.[1];
+  const candidate = v6 ?? v4;
+  return candidate !== undefined && isIP(candidate) !== 0 ? candidate : fallback;
+}
+
+/**
  * The key a client address is counted under. An IPv4-mapped IPv6 address (::ffff:1.2.3.4) is the
  * same client as the IPv4 address. IPv6 clients are keyed by their /64, because one device or site
  * owns a whole /64 and could otherwise rotate addresses to dodge the limit.

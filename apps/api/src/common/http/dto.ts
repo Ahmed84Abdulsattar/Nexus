@@ -10,6 +10,10 @@ import { z } from 'zod';
  * Here every top-level property with such a type is rewritten to `anyOf: [{ type: X }, { type:
  * "null" }]` before swagger sees it, with the value constraints (format, minimum, ...) kept on the
  * non-null branch. See apps/api/test/openapi.test.ts.
+ *
+ * Only top-level properties are rewritten, because only those go through swagger's array-type
+ * handling; nested ones keep zod's `type: ["x", "null"]`, which is valid OpenAPI 3.1. A test fails
+ * if a DTO gets a nested nullable, so whoever adds one checks how it is rendered first.
  */
 
 type Props = Record<string, Record<string, unknown>>;

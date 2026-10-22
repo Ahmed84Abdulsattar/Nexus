@@ -25,6 +25,10 @@ describe('TRUST_PROXY is required outside local (M1)', () => {
   it.each(['dev', 'prod'])('refuses to start in %s when it is unset, naming the subnet', (env) => {
     expect(() => without(env)).toThrow(/TRUST_PROXY.*set it to 1/s);
     expect(() => loadConfig({ ...TEST_ENV, APP_ENV: env, TRUST_PROXY: '' })).toThrow(/TRUST_PROXY/);
+    // Whitespace-only counts as unset (L2).
+    expect(() => loadConfig({ ...TEST_ENV, APP_ENV: env, TRUST_PROXY: ' ' })).toThrow(
+      /TRUST_PROXY/,
+    );
   });
 
   it('accepts an explicit "false", a hop count of 1 or 2, or a subnet, in prod; unset is fine in local', () => {

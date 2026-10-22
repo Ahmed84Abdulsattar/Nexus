@@ -129,7 +129,11 @@ const envSchema = z
       blankToUndefined,
       z.coerce.number().int().min(1024).max(50_000_000).default(1_048_576),
     ),
-    TRUST_PROXY: z.preprocess(blankToUndefined, z.string().optional()),
+    // Whitespace-only counts as unset, so it cannot satisfy the required-outside-local check.
+    TRUST_PROXY: z.preprocess(
+      (v) => (typeof v === 'string' && v.trim() === '' ? undefined : v),
+      z.string().optional(),
+    ),
     /**
      * The referrer-restricted ArcGIS browser key (docs/09 section 1), served to signed-in users by
      * GET /v1/config. Optional: unset means the web shows "Map key not configured". The only
