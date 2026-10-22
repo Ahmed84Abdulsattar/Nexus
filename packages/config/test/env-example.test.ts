@@ -36,9 +36,12 @@ describe('.env.example', () => {
     expect(documented.filter((n) => !listed.includes(n))).toEqual([]);
   });
 
-  it('has no values', () => {
+  // Safe, non-secret defaults that are meant to be copied as they are (a safety limit, not a credential).
+  const SAFE_DEFAULTS: Record<string, string> = { DATOMS_MAX_SHARE_CEILING: '0.1' };
+
+  it('has no values except the listed safe defaults', () => {
     for (const [name, ...rest] of assignments) {
-      expect(rest.join('='), name).toBe('');
+      expect(rest.join('='), name).toBe(SAFE_DEFAULTS[name] ?? '');
     }
   });
 });

@@ -31,6 +31,7 @@ describe.skipIf(testDatabaseAdminUrl === undefined)(
         APP_ENV: 'local',
         WORKER_DATABASE_URL: testDb.adminUrl,
         DATOMS_LIVE: 'false',
+        DATOMS_MAX_SHARE_CEILING: '0.1',
       });
       delete process.env['DATOMS_TOKEN'];
 

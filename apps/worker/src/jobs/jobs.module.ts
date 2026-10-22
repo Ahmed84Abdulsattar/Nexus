@@ -1,6 +1,8 @@
 import { Logger, Module } from '@nestjs/common';
 import { createDatomsConnector, datomsMode } from '@nexus/connectors-datoms';
 import type { Database } from '@nexus/db';
+import { SYNC_WARNING_METRIC } from '@nexus/shared';
+import { WORKER_CONFIG, type WorkerConfig } from '../config/env.js';
 import { DB } from '../db/database.module.js';
 import { LoggingMetrics, Metrics } from '../observability/metrics.js';
 import { SchedulerService } from '../scheduler/scheduler.service.js';
@@ -18,8 +20,8 @@ const connectorLogger = new Logger('DatomsClient');
     { provide: SOURCE_MODE, useFactory: () => datomsMode(process.env) },
     {
       provide: SOURCE_CONNECTOR,
-      inject: [DB],
-      useFactory: (db: Database): WorkerConnector =>
+      inject: [DB, Metrics, WORKER_CONFIG],
+      useFactory: (db: Database, metrics: Metrics, config: WorkerConfig): WorkerConnector =>
         // Built on first use, with the share read from core.setting at the start of each job (ADR 0005).
         new WorkerConnector(
           async () =>
@@ -44,6 +46,13 @@ const connectorLogger = new Logger('DatomsClient');
             return handle;
           },
           new Logger('Connector'),
+          config.maxShareCeiling,
+          (setting, ceiling) => {
+            new Logger('Connector').warn(
+              JSON.stringify({ event: 'nexus.datoms.budget_share_clamped', setting, ceiling }),
+            );
+            metrics.increment(SYNC_WARNING_METRIC, { code: 'budget_share_clamped', job: 'poll' });
+          },
         ),
     },
     CatalogueSyncJob,

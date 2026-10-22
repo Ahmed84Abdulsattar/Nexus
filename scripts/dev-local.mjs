@@ -31,6 +31,8 @@ const env = {
   DATABASE_URL: 'postgres://nexus_api_local@localhost:5432/nexus',
   WORKER_DATABASE_URL: 'postgres://nexus_worker_local@localhost:5432/nexus',
   DATOMS_LIVE: 'false',
+  // ADR 0005: a local worker may never use more than a tenth of the shared DATOMS quota.
+  DATOMS_MAX_SHARE_CEILING: process.env.DATOMS_MAX_SHARE_CEILING || '0.1',
   LIVE_MODE: 'poll',
   VITE_AUTH_MODE: 'dev',
   VITE_USE_MOCKS: 'false',

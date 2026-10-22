@@ -99,6 +99,7 @@ Versions: use the current stable major at project start and pin exact versions i
 | `KEY_VAULT_URI` | api, worker | `https://kv-nexus-dev.vault.azure.net/` (secrets below are read from here in Azure) |
 | `DATOMS_BASE_URL` / `DATOMS_ORG_ID` / `DATOMS_TOKEN` | worker, CLI | `DATOMS_ORG_ID` = `20283` (Innovo's org; public). Token comes from Key Vault in Azure. The provisional read-only **test key** (valid until 10 Nov 2026) is set **only** in a developer's local git-ignored `.env` as `DATOMS_TOKEN`: never in Key Vault, CI, code, docs, fixtures or logs (`07` §3.1). |
 | `DATOMS_LIVE` | worker, CLI | `false` = use fixtures (default locally) |
+| `DATOMS_MAX_SHARE_CEILING` | worker | Hard ceiling on `budget.max_share` (ADR 0005): a number above 0 and at most 1. The worker uses `min(budget.max_share, ceiling)`. **Required when `APP_ENV` is `local` or `dev`** (the worker refuses to start without it, so `DATOMS_LIVE=true` cannot run unbounded); optional in `prod`, where it is 1 when absent. It is an environment variable on purpose: `core.setting` is writable through the API login. Use `0.1` outside prod. |
 | `DATOMS_MONTHLY_CREDIT_ALLOWANCE` | worker | From the contract (Q5) |
 | `WEB_PUBSUB_ENDPOINT` / `WEB_PUBSUB_HUB` | api, worker | `https://wps-nexus-dev.webpubsub.azure.com` / `nexus` |
 | `LIVE_MODE` | api, worker, web | `pubsub` (default) or `poll`. Locally, `poll` turns off push and the web app refetches every 60 s. |
