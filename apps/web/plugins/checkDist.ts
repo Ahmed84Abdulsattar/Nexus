@@ -21,6 +21,8 @@ const FORBIDDEN: [RegExp, string][] = [
   [/VITE_DEV_ARCGIS_API_KEY/, 'the dev key variable name'],
   [/mockServiceWorker|setupWorker|Mock Service Worker/, 'MSW'],
   [/Sample project \d\d|sample-0\d/, 'sample markers'],
+  // Local dev sign-in (docs/08): none of it may reach a deployed bundle.
+  [/dev\/token|nexus\.devAuth|VITE_AUTH_MODE|VITE_USE_MOCKS/, 'local dev sign-in code'],
 ];
 const BINARY = /\.(png|jpe?g|gif|woff2?|ttf|ico|wasm)$/;
 const STATIC_IMPORT = /(?:\bfrom|\bimport)\s*["'](\.{1,2}\/[^"']+\.js)["']/g;

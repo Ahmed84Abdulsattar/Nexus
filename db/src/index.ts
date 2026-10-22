@@ -10,5 +10,6 @@ export {
   type DatabaseRole,
   type ResolvedDatabaseUrl,
 } from './urls.js';
+export { isLocalHost } from './admin/guards.js';
 export { createDatabase, type CreateDatabaseOptions, type Database } from './kysely.js';
 export type * from './types.js';

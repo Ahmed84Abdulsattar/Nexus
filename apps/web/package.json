@@ -5,14 +5,15 @@
   "description": "React 19 + Vite SPA. Routing shell with lazy placeholder pages.",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "pnpm --workspace-root exec turbo run build \"--filter=@nexus/web^...\" && vite",
     "build": "node --max-old-space-size=6144 ./node_modules/vite/bin/vite.js build",
     "measure:map": "node scripts/measure-map-load.mjs",
     "api:generate": "openapi-typescript ../api/openapi.json -o src/api/schema.d.ts",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "test:e2e:api": "playwright test -c playwright.api.config.ts"
   },
   "dependencies": {
     "@arcgis/core": "catalog:",

@@ -1,5 +1,10 @@
 import { isIP } from 'node:net';
-import { assertDirectConnection, DatabaseConfigError, requireTlsUnlessLocal } from '@nexus/db';
+import {
+  assertDirectConnection,
+  DatabaseConfigError,
+  isLocalHost,
+  requireTlsUnlessLocal,
+} from '@nexus/db';
 import { z } from 'zod';
 
 /**
@@ -175,6 +180,14 @@ const envSchema = z
         message: 'AUTH_MODE=dev is allowed only when APP_ENV=local (docs/04)',
       });
     }
+    // Local sign-in mints its own tokens: it must never be pointed at a shared database (docs/08).
+    if (env.AUTH_MODE === 'dev' && !isLocalHost(env.DATABASE_URL)) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['AUTH_MODE'],
+        message: 'AUTH_MODE=dev is allowed only with a database on this machine (localhost)',
+      });
+    }
     if (
       env.ENTRA_JWKS_URL !== undefined &&
       env.APP_ENV !== 'local' &&
@@ -229,7 +242,24 @@ export interface AppConfig {
 
 export class ConfigError extends Error {}
 
-export function loadConfig(env: NodeJS.ProcessEnv): AppConfig {
+/**
+ * Fake identifiers for AUTH_MODE=dev with APP_ENV=local, used when the real ENTRA_* values are not
+ * set, so a developer needs no Entra tenant. Only dev tokens are checked against them.
+ */
+export const DEV_ENTRA_DEFAULTS = {
+  ENTRA_TENANT_ID: '00000000-0000-4000-8000-0000000000e1',
+  ENTRA_API_CLIENT_ID: '00000000-0000-4000-8000-0000000000e2',
+  ENTRA_WEB_CLIENT_ID: '00000000-0000-4000-8000-0000000000e3',
+  ENTRA_API_AUDIENCE: 'api://nexus-api',
+} as const;
+
+export function loadConfig(rawEnv: NodeJS.ProcessEnv): AppConfig {
+  const env: NodeJS.ProcessEnv = { ...rawEnv };
+  if (env['AUTH_MODE'] === 'dev' && env['APP_ENV'] === 'local') {
+    for (const [name, value] of Object.entries(DEV_ENTRA_DEFAULTS)) {
+      if (env[name] === undefined || env[name] === '') env[name] = value;
+    }
+  }
   const parsed = envSchema.safeParse(env);
   if (!parsed.success) {
     const problems = parsed.error.issues.map((i) => `${i.path.join('.') || '(env)'}: ${i.message}`);

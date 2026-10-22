@@ -15,8 +15,16 @@ export const ALLOWED_VITE_VARS = [
  */
 export const VITE_INTERNAL_VARS = ['VITE_USER_NODE_ENV'] as const;
 
-/** Allowed in serve mode only: read by the dev-only MSW /v1/config mock, never in a build. */
-export const DEV_ONLY_VITE_VARS = ['VITE_DEV_ARCGIS_API_KEY'] as const;
+/**
+ * Allowed in serve mode only, never in a build (a build fails when one is set, empty placeholders
+ * excepted): the dev ArcGIS key for the MSW /v1/config mock, the local sign-in switch
+ * (VITE_AUTH_MODE=dev) and the mock switch (VITE_USE_MOCKS=false).
+ */
+export const DEV_ONLY_VITE_VARS = [
+  'VITE_DEV_ARCGIS_API_KEY',
+  'VITE_AUTH_MODE',
+  'VITE_USE_MOCKS',
+] as const;
 
 export interface EnvGuardInput {
   command: 'build' | 'serve';
@@ -39,7 +47,7 @@ export function assertWebEnv({ command, nodeEnv, env }: EnvGuardInput): void {
   for (const name of Object.keys(env)) {
     if (allowed.has(name)) continue;
     if (command === 'serve' && (DEV_ONLY_VITE_VARS as readonly string[]).includes(name)) continue;
-    if (name === 'VITE_DEV_ARCGIS_API_KEY' && !env[name]) continue; // empty placeholder from .env.example
+    if ((DEV_ONLY_VITE_VARS as readonly string[]).includes(name) && !env[name]) continue; // empty placeholder from .env.example
     throw new Error(
       `${name} is not an allowed VITE_ variable. VITE_ values are public in the browser bundle; ` +
         `allowed: ${[...ALLOWED_VITE_VARS].join(', ')}` +

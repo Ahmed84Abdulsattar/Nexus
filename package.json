@@ -12,6 +12,7 @@
     "dev": "turbo run dev",
     "build": "turbo run build",
     "openapi:generate": "pnpm --filter @nexus/shared build && pnpm --filter @nexus/db build && pnpm --filter @nexus/api build && pnpm --filter @nexus/web api:generate",
+    "dev:local": "node scripts/dev-local.mjs",
     "db:migrate": "pnpm --filter @nexus/db migrate",
     "db:check": "pnpm --filter @nexus/db check",
     "db:seed": "pnpm --filter @nexus/db seed",

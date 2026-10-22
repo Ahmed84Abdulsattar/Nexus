@@ -12,6 +12,29 @@ Internal, read-only monitoring platform for construction sites across the UAE. S
 
 ## Run locally
 
+**One command, no Azure and no Entra** (local sign-in as a demo user, real local API, worker on fixtures):
+
+Command Prompt (`cmd.exe`), from the repository folder:
+
+```
+cd C:\path\to\Nexus
+pnpm install
+powershell -ExecutionPolicy Bypass -File scripts\pg-local.ps1 start
+pnpm dev:local
+```
+
+(`docker compose up -d` replaces the second command if you use Docker.) Then open http://localhost:5173, open the
+user menu (top right) and choose "Sign in as Admin" (or Leadership, Project manager, Site user, Viewer). Ctrl+C stops
+everything. `pnpm dev:local` checks PostgreSQL, builds the workspace packages, runs `db:migrate` and `db:seed` (demo group
+roles and passwordless local logins), then starts the API (`AUTH_MODE=dev APP_ENV=local`, http://localhost:3000), the worker
+(`DATOMS_LIVE=false`, fixtures) and the web app (`VITE_AUTH_MODE=dev VITE_USE_MOCKS=false`). It uses only the passwordless
+local database URLs of `docs/04`. The portfolio map lists projects once the API serves them (S2-01 / the catalogue sync); until
+then that call returns 404. Local sign-in is described in `docs/08` section 7 and exists in no deployed environment.
+
+Without an API, `pnpm dev` runs the web app on the MSW mocks only.
+
+Manual steps (what `dev:local` does):
+
 ```
 pnpm install
 pnpm db:migrate # create the schema, then the passwordless local login users:
