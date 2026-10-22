@@ -206,8 +206,7 @@ export async function runMaintenance(options: MaintenanceOptions): Promise<Maint
       }
     }
   } catch (error) {
-    // Reported as `create` until the shared schema has a `health` step.
-    warn({ code: 'step_failed', step: 'create', message: `health check: ${safeError(error)}` });
+    warn({ code: 'step_failed', step: 'health', message: safeError(error) });
   }
 
   return { details, startedAt, finishedAt: clock ? clock() : await databaseNow(db) };
@@ -379,7 +378,7 @@ export async function pruneSyncRuns(
         WHERE started_at < ${cutoff.toISOString()}::timestamptz
           AND id NOT IN (
             SELECT id FROM (
-              SELECT id, row_number() OVER (PARTITION BY source_system ORDER BY started_at DESC) AS rn
+              SELECT id, row_number() OVER (PARTITION BY source_system ORDER BY started_at DESC, id DESC) AS rn
               FROM integration.sync_run
               WHERE job = 'catalogue_sync' AND status IN ('ok', 'partial') AND details->>'complete' = 'true'
             ) newest
@@ -490,10 +489,12 @@ export function safeError(error: unknown): string {
     const known = KNOWN_SQLSTATE[code];
     return `${error.name} ${code}${known ? `: ${known}` : ''}`;
   }
+  // Node network errors (ECONNREFUSED, ENOTFOUND, ETIMEDOUT...) carry hosts and IPs in the message.
+  if (typeof code === 'string' && /^E[A-Z]+$/.test(code)) return `${error.name} ${code}`;
   const redacted = error.message
     .replace(/\b[a-z][a-z0-9+.-]*:\/\/\S+/gi, '[url]')
     .replace(
-      /\b(password|passwd|pwd|token|secret|key|authorization)\s*[=:]\s*\S+/gi,
+      /\b(password|passwd|pwd|token|secret|key|authorization)["']?\s*[=:]\s*["']?[^\s"',;]+/gi,
       '$1=[redacted]',
     )
     .replace(/\s+/g, ' ');

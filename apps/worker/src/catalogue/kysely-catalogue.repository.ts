@@ -184,6 +184,7 @@ export class KyselyCatalogueRepository implements CatalogueRepository {
       .where('status', 'in', ['ok', 'partial'])
       .where(sql<boolean>`details->>'complete' = 'true'`)
       .orderBy('started_at', 'desc')
+      .orderBy('id', 'desc')
       .limit(count)
       .execute();
     if (rows.length < count) return undefined;
