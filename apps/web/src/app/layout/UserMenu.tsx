@@ -21,7 +21,7 @@ export function UserMenu({ user, signOut }: CurrentSession) {
     <Menu.Root>
       <Menu.Trigger
         aria-label="User menu"
-        className="inline-flex min-h-11 items-center gap-2 rounded-full pr-1 text-sm font-medium hover:bg-surface lg:pr-3"
+        className="inline-flex min-h-11 min-w-11 items-center justify-center gap-2 rounded-full pr-0 text-sm font-medium hover:bg-surface lg:justify-start lg:pr-3"
       >
         <span
           aria-hidden="true"
