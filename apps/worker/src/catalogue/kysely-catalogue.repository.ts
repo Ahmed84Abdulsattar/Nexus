@@ -8,8 +8,8 @@ import type {
   StoredAsset,
   SyncRunRecord,
 } from '@nexus/connectors-core';
-import type { Database } from '@nexus/db';
-import { sql } from 'kysely';
+import type { Database, DB } from '@nexus/db';
+import { sql, type Transaction } from 'kysely';
 
 /** Rows per statement. Keeps each statement far below the 65,535-parameter limit and its payload small. */
 export const WRITE_BATCH = 1_000;
@@ -30,7 +30,38 @@ function chunks<T>(items: readonly T[], size = WRITE_BATCH): T[][] {
  * - Runs as the `nexus_worker` role: INSERT/UPDATE on core.asset, integration.*; SELECT on core.
  */
 export class KyselyCatalogueRepository implements CatalogueRepository {
-  constructor(private readonly db: Database) {}
+  /**
+   * `signal` aborts between batches (the leader lock was lost, or shutdown): a batch that has
+   * committed stays, the next one is not started.
+   */
+  constructor(
+    private readonly db: Database,
+    private readonly signal?: AbortSignal,
+  ) {}
+
+  /** The same repository bound to a leader-term signal. */
+  withSignal(signal: AbortSignal): KyselyCatalogueRepository {
+    return new KyselyCatalogueRepository(this.db, signal);
+  }
+
+  private *batches<T>(items: readonly T[]): Generator<T[]> {
+    for (const batch of chunks(items)) {
+      this.signal?.throwIfAborted();
+      yield batch;
+    }
+  }
+
+  /**
+   * One batch = one short transaction with its own limits, so a stuck lock or a slow statement
+   * fails the batch instead of holding a connection (and blocking the API) for good.
+   */
+  private tx<T>(fn: (trx: Transaction<DB>) => Promise<T>): Promise<T> {
+    return this.db.transaction().execute(async (trx) => {
+      await sql`SET LOCAL lock_timeout = '5s'`.execute(trx);
+      await sql`SET LOCAL statement_timeout = '60s'`.execute(trx);
+      return fn(trx);
+    });
+  }
 
   async loadAssetTypes(): Promise<AssetTypeRef[]> {
     const rows = await this.db
@@ -76,34 +107,36 @@ export class KyselyCatalogueRepository implements CatalogueRepository {
   }
 
   async insertAssets(sourceSystem: string, rows: NewAssetRow[]): Promise<void> {
-    for (const batch of chunks(rows)) {
-      await this.db
-        .insertInto('core.asset')
-        .values(
-          batch.map((r) => ({
-            source_system: sourceSystem,
-            external_id: r.externalId,
-            name: r.name,
-            source_type_name: r.sourceTypeName,
-            asset_type_id: r.assetTypeId,
-            project_id: r.projectId,
-            asset_info: JSON.stringify(r.nameplate),
-            source_created_at: r.sourceCreatedAt,
-            source_lifecycle_status: r.sourceLifecycleStatus,
-            first_seen_at: r.seenAt,
-            last_seen_at: r.seenAt,
-            // Absent means "not stated": the column default ('physical') applies.
-            ...(r.kind !== null ? { kind: r.kind } : {}),
-          })),
-        )
-        // The leader lock means no second writer, but an insert must never fail a whole sync.
-        .onConflict((oc) => oc.columns(['source_system', 'external_id']).doNothing())
-        .execute();
+    for (const batch of this.batches(rows)) {
+      await this.tx(async (trx) => {
+        await trx
+          .insertInto('core.asset')
+          .values(
+            batch.map((r) => ({
+              source_system: sourceSystem,
+              external_id: r.externalId,
+              name: r.name,
+              source_type_name: r.sourceTypeName,
+              asset_type_id: r.assetTypeId,
+              project_id: r.projectId,
+              asset_info: JSON.stringify(r.nameplate),
+              source_created_at: r.sourceCreatedAt,
+              source_lifecycle_status: r.sourceLifecycleStatus,
+              first_seen_at: r.seenAt,
+              last_seen_at: r.seenAt,
+              // Absent means "not stated": the column default ('physical') applies.
+              ...(r.kind !== null ? { kind: r.kind } : {}),
+            })),
+          )
+          // The leader lock means no second writer, but an insert must never fail a whole sync.
+          .onConflict((oc) => oc.columns(['source_system', 'external_id']).doNothing())
+          .execute();
+      });
     }
   }
 
   async updateAssets(patches: AssetPatch[]): Promise<void> {
-    for (const batch of chunks(patches)) {
+    for (const batch of this.batches(patches)) {
       // One UPDATE per batch. A key that is absent in a patch leaves the column alone; a key that is
       // present (even null, for the type) sets it. That cannot be said with COALESCE, hence jsonb_exists().
       const payload = JSON.stringify(
@@ -122,7 +155,8 @@ export class KyselyCatalogueRepository implements CatalogueRepository {
             : {}),
         })),
       );
-      await sql`
+      await this.tx((trx) =>
+        sql`
         UPDATE core.asset AS a SET
           name                    = CASE WHEN jsonb_exists(p, 'name') THEN p->>'name' ELSE a.name END,
           source_type_name        = CASE WHEN jsonb_exists(p, 'sourceTypeName') THEN p->>'sourceTypeName' ELSE a.source_type_name END,
@@ -133,7 +167,8 @@ export class KyselyCatalogueRepository implements CatalogueRepository {
           source_lifecycle_status = CASE WHEN jsonb_exists(p, 'sourceLifecycleStatus') THEN p->>'sourceLifecycleStatus' ELSE a.source_lifecycle_status END
         FROM jsonb_array_elements(${payload}::jsonb) AS p
         WHERE a.id = (p->>'id')::uuid
-      `.execute(this.db);
+      `.execute(trx),
+      );
     }
   }
 
@@ -156,43 +191,51 @@ export class KyselyCatalogueRepository implements CatalogueRepository {
   }
 
   async markSeen(sourceSystem: string, externalIds: string[], at: Date): Promise<void> {
-    for (const batch of chunks(externalIds)) {
-      await this.db
-        .updateTable('core.asset')
-        .set({ last_seen_at: at, retired_at: null })
-        .where('source_system', '=', sourceSystem)
-        .where('external_id', 'in', batch)
-        .execute();
+    for (const batch of this.batches(externalIds)) {
+      await this.tx(async (trx) => {
+        await trx
+          .updateTable('core.asset')
+          .set({ last_seen_at: at, retired_at: null })
+          .where('source_system', '=', sourceSystem)
+          .where('external_id', 'in', batch)
+          .execute();
+      });
     }
   }
 
   async retire(sourceSystem: string, externalIds: string[], at: Date): Promise<void> {
-    for (const batch of chunks(externalIds)) {
-      await this.db
-        .updateTable('core.asset')
-        .set({ retired_at: at })
-        .where('source_system', '=', sourceSystem)
-        .where('external_id', 'in', batch)
-        .where('retired_at', 'is', null)
-        .execute();
+    for (const batch of this.batches(externalIds)) {
+      await this.tx(async (trx) => {
+        await trx
+          .updateTable('core.asset')
+          .set({ retired_at: at })
+          .where('source_system', '=', sourceSystem)
+          .where('external_id', 'in', batch)
+          .where('retired_at', 'is', null)
+          .execute();
+      });
     }
   }
 
   async addLinkTodos(sourceSystem: string, rows: LinkTodoRow[]): Promise<void> {
-    for (const batch of chunks(rows)) {
-      await this.db
-        .insertInto('integration.link_todo')
-        .values(
-          batch.map((r) => ({
-            source_system: sourceSystem,
-            entity_type: r.entityType,
-            external_id: r.externalId,
-            payload: JSON.stringify(r.payload),
-          })),
-        )
-        // Never reopens a resolved or ignored row.
-        .onConflict((oc) => oc.columns(['source_system', 'entity_type', 'external_id']).doNothing())
-        .execute();
+    for (const batch of this.batches(rows)) {
+      await this.tx(async (trx) => {
+        await trx
+          .insertInto('integration.link_todo')
+          .values(
+            batch.map((r) => ({
+              source_system: sourceSystem,
+              entity_type: r.entityType,
+              external_id: r.externalId,
+              payload: JSON.stringify(r.payload),
+            })),
+          )
+          // Never reopens a resolved or ignored row.
+          .onConflict((oc) =>
+            oc.columns(['source_system', 'entity_type', 'external_id']).doNothing(),
+          )
+          .execute();
+      });
     }
   }
 

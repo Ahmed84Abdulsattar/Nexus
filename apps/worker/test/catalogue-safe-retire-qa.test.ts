@@ -77,7 +77,7 @@ describe.skipIf(testDatabaseAdminUrl === undefined)(
         poolMax: 4,
       });
       repo = new KyselyCatalogueRepository(db);
-      const { connector } = createDatomsConnector({ env: { DATOMS_LIVE: 'false' } });
+      const { connector } = createDatomsConnector({ env: { DATOMS_LIVE: 'false' }, maxShare: 0.1 });
       fixtureAssets = (await connector.listAssets()).assets;
     }, 120_000);
 

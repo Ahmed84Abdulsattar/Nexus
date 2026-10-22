@@ -254,12 +254,14 @@ export class DatomsApi {
   /** Walks `GET /assets` page by page; the caller processes and releases each page. */
   async *walkAssets(
     limit = 1000,
-    state: { capped?: boolean; incomplete?: boolean } = {},
+    state: { capped?: boolean; incomplete?: boolean; invalidRows?: number } = {},
+    signal?: AbortSignal,
   ): AsyncGenerator<AssetListPage> {
     let page = 1;
     // Hard stop for a server that reports absurd pagination: the fleet is at most 20,000 assets.
     const maxPages = Math.ceil(MAX_CATALOGUE_ASSETS / limit) + 2;
     for (;;) {
+      signal?.throwIfAborted();
       if (page > maxPages) {
         state.capped = true;
         this.log.error('catalogue walk hit the page cap', { maxPages });
@@ -273,7 +275,13 @@ export class DatomsApi {
         () => 0,
       );
       if (!res.ok || !res.body) this.fail(res, info);
-      const mapped = mapAssetListPage(res.body);
+      const mapped = mapAssetListPage(res.body, limit);
+      state.invalidRows = (state.invalidRows ?? 0) + mapped.invalidRows;
+      if (mapped.droppedRows > 0) {
+        // More rows than the page size we asked for: not trusted, the walk is capped.
+        state.capped = true;
+        this.log.error('catalogue page has more rows than the limit', { page, limit });
+      }
       if (!mapped.pagination) {
         state.incomplete = true;
         this.log.error('catalogue page has no pagination: walk is not complete', { page });
@@ -291,19 +299,46 @@ export class DatomsApi {
    */
   async collectAssets(
     limit = 1000,
-  ): Promise<{ assets: MappedAsset[]; total: number | undefined; complete: boolean }> {
+    signal?: AbortSignal,
+  ): Promise<{
+    assets: MappedAsset[];
+    total: number | undefined;
+    complete: boolean;
+    /** Rows that failed validation (count only). */
+    invalidRows: number;
+    /** True when the page, row or total cap was hit. */
+    capped: boolean;
+  }> {
     const assets: MappedAsset[] = [];
     let total: number | undefined;
-    const state: { capped?: boolean; incomplete?: boolean } = {};
-    for await (const p of this.walkAssets(limit, state)) {
+    let invalidRows = 0;
+    const state: { capped?: boolean; incomplete?: boolean; invalidRows?: number } = {};
+    for await (const p of this.walkAssets(limit, state, signal)) {
       assets.push(...p.assets);
       total = p.pagination?.total ?? total;
+      if (assets.length > MAX_CATALOGUE_ASSETS) {
+        assets.length = MAX_CATALOGUE_ASSETS;
+        state.capped = true;
+        this.log.error('catalogue walk hit the asset cap', { max: MAX_CATALOGUE_ASSETS });
+        break;
+      }
     }
+    invalidRows = state.invalidRows ?? 0;
+    // Complete needs the UNIQUE ids to equal the total (a duplicate must not stand in for a
+    // missing asset), no invalid row (its id is unknown), and no cap.
+    const unique = new Set(assets.map((a) => a.externalId)).size;
     return {
       assets,
       total,
+      invalidRows,
+      capped: state.capped === true,
       complete:
-        !state.capped && !state.incomplete && total !== undefined && assets.length === total,
+        !state.capped &&
+        !state.incomplete &&
+        invalidRows === 0 &&
+        total !== undefined &&
+        assets.length === total &&
+        unique === total,
     };
   }
 

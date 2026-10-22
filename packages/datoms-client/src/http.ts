@@ -2,6 +2,36 @@ import { inspect } from 'node:util';
 import { assertLive, type DatomsConfig } from './config.js';
 
 export const REQUEST_TIMEOUT_MS = 30_000;
+/** A DATOMS response bigger than this is refused (content-length first, then counted while streaming). */
+export const MAX_RESPONSE_BYTES = 50 * 1024 * 1024;
+
+/** Reads a body as text, refusing more than `max` bytes. Throws DatomsNetworkError. */
+export async function readCappedText(
+  res: Response,
+  max: number = MAX_RESPONSE_BYTES,
+): Promise<string> {
+  const declared = Number(res.headers.get('content-length'));
+  if (Number.isFinite(declared) && declared > max) {
+    await res.body?.cancel().catch(() => undefined);
+    throw new DatomsNetworkError('response too large (content-length)');
+  }
+  if (!res.body) return '';
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let bytes = 0;
+  let text = '';
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    bytes += value.byteLength;
+    if (bytes > max) {
+      await reader.cancel().catch(() => undefined);
+      throw new DatomsNetworkError('response too large (streamed)');
+    }
+    text += decoder.decode(value, { stream: true });
+  }
+  return text + decoder.decode();
+}
 
 /** Rate-limit response headers, exactly as the server sent them (strings; absent when not sent). */
 export interface RateLimitHeaders {
@@ -60,6 +90,8 @@ const PER_ASSET_LATEST = /\/data\/latest(\?|$)/;
 export interface HttpOptions {
   /** Only the CLI sets this. The product can never reach the per-asset latest endpoint. */
   allowPerAssetLatest?: boolean;
+  /** Test hook; default MAX_RESPONSE_BYTES. */
+  maxResponseBytes?: number;
 }
 
 /** Name and `cause.code` only: fetch error messages can carry URLs or header text. */
@@ -130,7 +162,7 @@ export class DatomsHttp {
       if (json !== undefined) init.body = JSON.stringify(json);
       res = await this.fetchImpl(url, init);
       // The body phase is inside the try: a timeout or stream error here is a network error too.
-      text = await res.text();
+      text = await readCappedText(res, this.options.maxResponseBytes);
     } catch (err) {
       if (isRedirectError(err)) {
         // Unexpected redirect: not retryable, surfaces as an unexpected DatomsApiError.

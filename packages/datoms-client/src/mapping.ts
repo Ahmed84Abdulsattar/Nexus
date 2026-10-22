@@ -1,3 +1,5 @@
+import { z } from 'zod';
+
 /**
  * THE ONLY FILE WITH DATOMS FIELD NAMES (docs/07 section 4 item 7).
  *
@@ -26,8 +28,8 @@ export interface RawPagination {
 }
 
 export interface RawAsset {
-  id: string;
-  name?: string;
+  id: string | number;
+  name?: string | null;
   created_at?: string;
   lifecycle_status?: string;
   category_id?: number | string | null;
@@ -35,6 +37,30 @@ export interface RawAsset {
   asset_info?: Record<string, unknown> | null;
   [key: string]: unknown;
 }
+
+/** Limits for one catalogue row (M5): a hostile or broken response cannot fill the database. */
+export const MAX_TEXT_CHARS = 512;
+export const MAX_ASSET_INFO_BYTES = 64 * 1024;
+
+const text = z.string().max(MAX_TEXT_CHARS);
+/**
+ * One row of GET /assets. A row that fails is counted and dropped, never stored as a guess.
+ * Fields the code does not read are allowed (DATOMS may add some).
+ */
+export const rawAssetRowSchema = z.looseObject({
+  id: z.union([z.string().min(1).max(128), z.number().int()]),
+  name: text.nullish(),
+  created_at: z.string().max(64).nullish(),
+  lifecycle_status: text.nullish(),
+  category_id: z.union([z.number(), text]).nullish(),
+  category_name: text.nullish(),
+  asset_info: z
+    .record(z.string(), z.unknown())
+    .nullish()
+    .refine((v) => v == null || JSON.stringify(v).length <= MAX_ASSET_INFO_BYTES, {
+      message: 'asset_info too large',
+    }),
+});
 
 export interface RawAssetList {
   success?: boolean;
@@ -134,8 +160,29 @@ export interface AssetListPage {
   pagination: Pagination | undefined;
 }
 
-export function mapAssetListPage(body: RawAssetList): AssetListPage {
-  return { assets: (body.data ?? []).map(mapAsset), pagination: mapPagination(body.pagination) };
+/** `invalidRows` counts rows that failed validation (count only; nothing of them is kept). */
+export interface ValidatedAssetListPage extends AssetListPage {
+  invalidRows: number;
+  /** Rows beyond `maxRows` that were ignored. */
+  droppedRows: number;
+}
+
+export function mapAssetListPage(body: RawAssetList, maxRows?: number): ValidatedAssetListPage {
+  const rows: unknown[] = Array.isArray(body.data) ? body.data : [];
+  const kept = maxRows === undefined ? rows : rows.slice(0, maxRows);
+  const assets: MappedAsset[] = [];
+  let invalidRows = 0;
+  for (const row of kept) {
+    const parsed = rawAssetRowSchema.safeParse(row);
+    if (parsed.success) assets.push(mapAsset(parsed.data as RawAsset));
+    else invalidRows++;
+  }
+  return {
+    assets,
+    pagination: mapPagination(body.pagination),
+    invalidRows,
+    droppedRows: rows.length - kept.length,
+  };
 }
 
 /**
