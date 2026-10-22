@@ -85,7 +85,8 @@ describe.skipIf(testDatabaseAdminUrl === undefined)(
       await db?.destroy();
       await admin?.end();
       await testDb?.drop();
-    }, 60_000);
+      // Dropping the test database waits for the pool's backends to exit; slow when turbo runs everything at once.
+    }, 180_000);
 
     beforeEach(async () => {
       clock = Date.parse('2026-10-19T08:00:00Z');
