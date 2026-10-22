@@ -1,5 +1,6 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { MapAdapterProps } from '../adapter';
+import type { BasemapStatus } from './basemapStatus';
 import { configureArcgis, createArcgisFactory, type SurfaceHandlers } from './factory';
 import { ViewManager } from './viewManager';
 
@@ -19,9 +20,10 @@ export default function ArcgisMap({
   const containerRef = useRef<HTMLDivElement>(null);
   const managerRef = useRef<ViewManager | undefined>(undefined);
   const handlers = useRef<SurfaceHandlers>({});
+  const [basemap, setBasemap] = useState<BasemapStatus>('loading');
 
   useEffect(() => {
-    handlers.current = { onMarkerClick, onViewChange };
+    handlers.current = { onMarkerClick, onViewChange, onBasemapStatus: setBasemap };
   }, [onMarkerClick, onViewChange]);
 
   useEffect(() => {
@@ -51,5 +53,19 @@ export default function ArcgisMap({
     managerRef.current?.setFocus(focus);
   }, [focus, apiKey]);
 
-  return <div ref={containerRef} className="size-full" />;
+  // data-basemap-status is the e2e hook: tests wait for "loaded". Pins and the list keep working
+  // when the tiles fail; only a quiet notice is added.
+  return (
+    <div className="relative size-full" data-basemap-status={basemap}>
+      <div ref={containerRef} className="size-full" />
+      {basemap === 'failed' ? (
+        <p
+          role="status"
+          className="pointer-events-none absolute bottom-8 left-1/2 -translate-x-1/2 rounded-md border border-border bg-surface-raised px-3 py-1.5 text-sm text-fg-muted shadow-card"
+        >
+          Map tiles could not be loaded
+        </p>
+      ) : null}
+    </div>
+  );
 }

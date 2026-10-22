@@ -25,3 +25,10 @@ export const BUILDINGS_3D_URL =
 export const TILT_3D = 60;
 
 export const CLUSTER_RADIUS = '60px';
+
+/** Corner for the zoom, navigation and compass widgets. The mode switch owns the top-left. */
+export const WIDGET_CORNER = 'top-right';
+
+/** Pin label halo: a brand surface token and width, so labels stay readable over basemap text. */
+export const LABEL_HALO_TOKEN = 'surface-raised';
+export const LABEL_HALO_SIZE = 2;

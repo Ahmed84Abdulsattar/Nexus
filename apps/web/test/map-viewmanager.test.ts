@@ -111,4 +111,22 @@ describe('ViewManager', () => {
     await pending;
     expect(f.alive.size).toBe(0);
   });
+
+  it('tells the factory a request is stale once it is superseded or destroyed', async () => {
+    const stale: boolean[] = [];
+    let probe: (() => boolean) | undefined;
+    const factory = {
+      async create(_mode: MapMode, _el: HTMLElement, isStale?: () => boolean): Promise<MapSurface> {
+        probe = isStale;
+        stale.push(isStale?.() ?? false);
+        return { setLayers: () => undefined, setFocus: () => undefined, destroy: () => undefined };
+      },
+    };
+    const manager = new ViewManager(factory, container());
+    await manager.setMode('2d');
+    expect(stale).toEqual([false]);
+    expect(probe?.()).toBe(false);
+    manager.destroy();
+    expect(probe?.()).toBe(true);
+  });
 });
