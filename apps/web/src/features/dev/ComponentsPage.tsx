@@ -1,11 +1,13 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Header, PageLayout } from '../../app/layout';
 import { applyTheme, initialTheme, type Theme } from '../../app/theme';
+import { InnovoLogo } from '../../components/brand';
 import {
   Button,
   Card,
   CardTitle,
   InfoBox,
+  PageHeading,
   SidePanel,
   Table,
   TBody,
@@ -19,12 +21,25 @@ import {
   Tag,
   Tr,
 } from '../../components/ui';
-import { SWATCHES } from './swatches';
+import { BRAND_COLOURS, SWATCHES } from './swatches';
+
+/** The value of a brand token as written in tokens.css, read at run time. */
+function useTokenValues(tokens: readonly string[]): Record<string, string> {
+  const [values, setValues] = useState<Record<string, string>>({});
+  useEffect(() => {
+    const style = getComputedStyle(document.documentElement);
+    setValues(Object.fromEntries(tokens.map((t) => [t, style.getPropertyValue(`--${t}`).trim()])));
+  }, [tokens]);
+  return values;
+}
+
+const BRAND_TOKENS = BRAND_COLOURS.map((c) => c.token);
 
 /** Dev-only. Shows every base component and every state/status token with its text label. */
 export function ComponentsPage() {
   const [theme, setTheme] = useState<Theme>(initialTheme);
   const [panel, setPanel] = useState(false);
+  const brandHex = useTokenValues(BRAND_TOKENS);
 
   const toggleTheme = () => {
     const next = theme === 'dark' ? 'light' : 'dark';
@@ -35,11 +50,61 @@ export function ComponentsPage() {
   return (
     <main className="mx-auto w-full max-w-5xl min-w-0 space-y-6 p-4 md:p-6">
       <header className="flex flex-wrap items-center justify-between gap-2">
-        <h1 className="text-2xl font-semibold">Components</h1>
+        <PageHeading
+          eyebrow="Dev"
+          title="Components"
+          description="Innovo brand, tokens and base components."
+        />
         <Button variant="secondary" onClick={toggleTheme}>
           Theme: {theme}. Switch to {theme === 'dark' ? 'light' : 'dark'}
         </Button>
       </header>
+
+      <Card aria-labelledby="br">
+        <CardTitle id="br">Innovo brand palette</CardTitle>
+        <p className="mb-4 text-sm text-fg-muted">
+          Primary colours lead. Secondary colours in small amounts. Support colours are for charts
+          and data only, never backgrounds, headlines or large text.
+        </p>
+        {(['Primary', 'Secondary', 'Support'] as const).map((group) => (
+          <div key={group} className="mb-4 last:mb-0">
+            <h3 className="mb-2 text-xs font-medium tracking-wide text-fg-muted uppercase">
+              {group}
+            </h3>
+            <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {BRAND_COLOURS.filter((c) => c.group === group).map((c) => (
+                <li key={c.token} className="flex items-center gap-3">
+                  <span
+                    aria-hidden="true"
+                    className="inline-block size-12 shrink-0 rounded-lg border border-border"
+                    style={{ background: `var(--${c.token})` }}
+                  />
+                  <span className="min-w-0">
+                    <span className="block font-medium">{c.name}</span>
+                    <code className="block text-xs text-fg-muted">
+                      {brandHex[c.token]?.toUpperCase() ?? ''}
+                    </code>
+                    <span className="block truncate text-xs text-fg-muted">{c.use}</span>
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ))}
+        <h3 className="mt-5 mb-2 text-xs font-medium tracking-wide text-fg-muted uppercase">
+          Logo
+        </h3>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div className="surface-slate flex items-center justify-center rounded-lg p-8">
+            <InnovoLogo className="h-8 w-auto" />
+            <span className="sr-only">Innovo logo, white on Slate</span>
+          </div>
+          <div className="flex items-center justify-center rounded-lg border border-border bg-surface-raised p-8 text-fg">
+            <InnovoLogo className="h-8 w-auto" />
+            <span className="sr-only">Innovo logo, Slate on white</span>
+          </div>
+        </div>
+      </Card>
 
       <Card aria-labelledby="sw">
         <CardTitle id="sw">State and status tokens</CardTitle>

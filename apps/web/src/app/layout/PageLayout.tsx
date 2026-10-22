@@ -50,7 +50,7 @@ export function PageLayout({
   return (
     <div className="flex min-w-0 flex-1 flex-col">
       {showToolbar && (
-        <div className="flex gap-2 border-b border-border bg-surface p-2">
+        <div className="flex gap-2 border-b border-border bg-surface-raised p-2 shadow-card">
           {list && listInDrawer && (
             <Button variant="secondary" aria-haspopup="dialog" onClick={() => setListOpen(true)}>
               {listLabel}
@@ -68,18 +68,20 @@ export function PageLayout({
         {list && !listInDrawer && (
           <section
             aria-label={listLabel}
-            className="w-72 shrink-0 overflow-y-auto border-r border-border bg-surface p-4"
+            className="w-72 shrink-0 overflow-y-auto border-r border-border bg-surface-raised p-4"
           >
             {list}
           </section>
         )}
 
-        <Content className="min-w-0 flex-1 p-4 md:p-6">{children}</Content>
+        <Content className="mx-auto w-full min-w-0 max-w-[110rem] flex-1 p-4 md:p-6">
+          {children}
+        </Content>
 
         {details && !detailsInDrawer && (
           <section
             aria-label={detailsLabel}
-            className="w-80 shrink-0 overflow-y-auto border-l border-border bg-surface p-4"
+            className="w-80 shrink-0 overflow-y-auto border-l border-border bg-surface-raised p-4"
           >
             {details}
           </section>

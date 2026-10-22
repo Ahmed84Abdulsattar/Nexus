@@ -21,13 +21,13 @@ export function ModeSwitch({
 }) {
   return (
     <fieldset
-      className={`pointer-events-auto inline-flex gap-1 rounded-md border border-border bg-surface-raised p-1 ${className ?? ''}`}
+      className={`pointer-events-auto inline-flex gap-1 rounded-lg border border-border bg-surface-raised p-1 shadow-pop ${className ?? ''}`}
     >
       <legend className="sr-only">Map mode</legend>
       {MODES.map(({ value, label }) => (
         <label
           key={value}
-          className="relative inline-flex min-h-11 min-w-11 cursor-pointer items-center justify-center rounded-sm px-3 text-sm font-medium text-fg has-checked:bg-primary has-checked:text-primary-fg has-focus-visible:outline-2 has-focus-visible:outline-offset-2 has-focus-visible:outline-focus-ring"
+          className="relative inline-flex min-h-11 min-w-11 cursor-pointer items-center justify-center rounded-md px-3 text-sm font-medium text-fg transition-colors hover:bg-surface has-checked:bg-primary has-checked:font-semibold has-checked:text-primary-fg has-focus-visible:outline-2 has-focus-visible:outline-offset-2 has-focus-visible:outline-focus-ring"
         >
           <input
             type="radio"

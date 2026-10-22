@@ -1,6 +1,7 @@
 export { Button, type ButtonProps } from './Button';
 export { Card, CardTitle } from './Card';
 export { InfoBox, type InfoBoxProps } from './InfoBox';
+export { PageHeading } from './PageHeading';
 export { SidePanel, type SidePanelProps } from './SidePanel';
 export { Table, TBody, Td, Th, THead, Tr } from './Table';
 export { Tabs, TabsContent, TabsList, TabsTrigger } from './Tabs';

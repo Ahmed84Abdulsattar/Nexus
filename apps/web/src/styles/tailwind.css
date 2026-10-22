@@ -1,4 +1,9 @@
 @import 'tailwindcss';
+/* Poppins, self-hosted by @fontsource (no CDN, so the CSP can stay 'self'). Latin subset only. */
+@import '@fontsource/poppins/latin-300.css';
+@import '@fontsource/poppins/latin-400.css';
+@import '@fontsource/poppins/latin-500.css';
+@import '@fontsource/poppins/latin-600.css';
 @import './tokens.css';
 
 /* Wire the tokens into Tailwind utilities (bg-surface, text-fg, border-border, ...). */
@@ -12,7 +17,15 @@
   --color-border-strong: var(--border-strong);
   --color-primary: var(--primary);
   --color-primary-fg: var(--primary-fg);
+  --color-primary-hover: var(--primary-hover);
+  --color-accent: var(--accent);
+  --color-accent-fg: var(--accent-fg);
+  --color-selected: var(--selected);
+  --color-error: var(--error);
   --color-focus-ring: var(--focus-ring);
+  --color-brand-slate: var(--brand-slate);
+  --color-brand-aqua: var(--brand-aqua);
+  --color-brand-grey: var(--brand-grey);
   --color-state-active: var(--state-active);
   --color-state-central-store: var(--state-central-store);
   --color-state-finished: var(--state-finished);
@@ -25,13 +38,28 @@
   --radius-sm: var(--radius-sm);
   --radius-md: var(--radius-md);
   --radius-lg: var(--radius-lg);
+  --shadow-card: var(--shadow-sm);
+  --shadow-pop: var(--shadow-md);
+  --shadow-overlay: var(--shadow-lg);
+  --font-sans: var(--font-sans);
 }
 
 @layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
   body {
     background: var(--bg);
     color: var(--fg);
     font-family: var(--font-sans);
+    font-weight: 400;
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+  }
+  h1,
+  h2,
+  h3 {
+    letter-spacing: -0.01em;
   }
   :focus-visible {
     outline: 2px solid var(--focus-ring);

@@ -23,7 +23,7 @@ export function Tag({ label, token, hollow, className }: TagProps) {
   return (
     <span
       className={cn(
-        'inline-flex items-center gap-2 rounded-full border bg-surface px-3 py-1 text-xs font-medium text-fg',
+        'inline-flex items-center gap-2 rounded-full border bg-surface-raised px-3 py-1 text-xs font-medium whitespace-nowrap text-fg',
         className,
       )}
       style={{ borderColor: color }}

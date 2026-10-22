@@ -1,37 +1,62 @@
 /*
  * Design tokens. The ONLY file where colour values are written (checked by test/no-raw-colours.test.ts).
- * State and status token names come from docs/11 and must not be renamed. Colour names come from
- * docs/source/structure.md; the exact shades are provisional, from the mockup description.
- * Light is the default; dark applies with <html data-theme="dark">.
+ * Brand colours come from the Innovo Brand Guidelines 1.9 (see docs/11). State and status token names
+ * come from docs/11 and must not be renamed. Light is the default; dark applies with
+ * <html data-theme="dark">.
  */
 :root {
+  /* Brand palette (guidelines 1.9). Primary: slate, aqua, white. Secondary: grey, steel, sky.
+     Support colours are for data (charts, status, state), never backgrounds or large text. */
+  --brand-slate: #122023;
+  --brand-aqua: #9ef3ee;
+  --brand-white: #ffffff;
+  --brand-grey: #a2acab;
+  --brand-steel: #6f8695;
+  --brand-sky: #8ba8c8;
+  --brand-support-red: #ff6666;
+  --brand-support-teal: #157a6e;
+  --brand-support-periwinkle: #91a6ff;
+  --brand-support-blue: #208aae;
+  --brand-support-sand: #bab1a0;
+  --brand-support-yellow: #f5f2b8;
+
   /* Surfaces and text */
-  --bg: #ffffff;
-  --surface: #f8fafc;
+  --bg: #f4f7f7;
+  --surface: #eaf0f0;
   --surface-raised: #ffffff;
-  --fg: #0f172a;
-  --fg-muted: #475569;
-  --border: #cbd5e1;
-  --border-strong: #64748b;
-  --primary: #1d4ed8;
+  --fg: #122023;
+  --fg-muted: #44585c;
+  --border: #d3dddd;
+  --border-strong: #6f8695;
+  --primary: #122023;
   --primary-fg: #ffffff;
-  --focus-ring: #1d4ed8;
+  --primary-hover: #243d42;
+  --accent: #9ef3ee;
+  --accent-fg: #122023;
+  --selected: #dcf9f6;
+  --focus-ring: #122023;
+  --error: #c43737;
+
+  /* Elevation */
+  --shadow-sm: 0 1px 2px rgb(18 32 35 / 8%), 0 1px 1px rgb(18 32 35 / 4%);
+  --shadow-md: 0 6px 16px rgb(18 32 35 / 10%), 0 2px 4px rgb(18 32 35 / 6%);
+  --shadow-lg: 0 16px 40px rgb(18 32 35 / 18%);
 
   /* Project state (docs/11) */
-  --state-active: #15803d; /* green */
-  --state-central-store: #1d4ed8; /* blue */
-  --state-finished: #6b7280; /* grey */
-  --state-in-bid: #4d7c0f; /* yellow / light green */
+  --state-active: #157a6e; /* green: brand teal */
+  --state-central-store: #208aae; /* blue: brand blue */
+  --state-finished: #6f8695; /* grey: brand steel */
+  --state-in-bid: #857a5e; /* yellow / light green: brand sand, darkened for AA */
 
   /* Asset status (docs/11) */
-  --status-running: #15803d; /* green */
-  --status-idle: #b45309; /* amber */
-  --status-maintenance: #b91c1c; /* red */
-  --status-off: #6b7280; /* grey */
-  --status-unknown: #475569; /* neutral outline */
+  --status-running: #157a6e; /* green: brand teal */
+  --status-idle: #a15c00; /* amber: darkened for AA (no amber in the brand palette) */
+  --status-maintenance: #d03e3e; /* red: brand red, darkened for AA */
+  --status-off: #75807f; /* grey */
+  --status-unknown: #44585c; /* neutral outline */
 
-  /* Type */
-  --font-sans: ui-sans-serif, system-ui, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  /* Type: Poppins (self-hosted, @fontsource), Calibri as the brand fallback */
+  --font-sans: 'Poppins', Calibri, ui-sans-serif, system-ui, 'Segoe UI', Arial, sans-serif;
   --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   --text-xs: 0.75rem;
   --text-sm: 0.875rem;
@@ -47,9 +72,9 @@
   --space-4: 1rem;
   --space-6: 1.5rem;
   --space-8: 2rem;
-  --radius-sm: 0.25rem;
-  --radius-md: 0.5rem;
-  --radius-lg: 0.75rem;
+  --radius-sm: 0.375rem;
+  --radius-md: 0.625rem;
+  --radius-lg: 1rem;
   --radius-full: 9999px;
   --touch-target: 2.75rem; /* 44 px */
 
@@ -57,27 +82,56 @@
 }
 
 [data-theme='dark'] {
-  --bg: #0b1220;
-  --surface: #111a2e;
-  --surface-raised: #17223a;
-  --fg: #e5e7eb;
-  --fg-muted: #a8b3c5;
-  --border: #334155;
-  --border-strong: #94a3b8;
-  --primary: #60a5fa;
-  --primary-fg: #0b1220;
-  --focus-ring: #93c5fd;
+  --bg: #0d191b;
+  --surface: #122023;
+  --surface-raised: #1a2f33;
+  --fg: #f2f7f7;
+  --fg-muted: #a2acab;
+  --border: #2a4146;
+  --border-strong: #6f8695;
+  --primary: #9ef3ee;
+  --primary-fg: #122023;
+  --primary-hover: #c4f8f5;
+  --accent: #9ef3ee;
+  --accent-fg: #122023;
+  --selected: #1f4247;
+  --focus-ring: #9ef3ee;
+  --error: #ff6666;
 
-  --state-active: #4ade80;
-  --state-central-store: #60a5fa;
-  --state-finished: #9ca3af;
-  --state-in-bid: #a3e635;
+  --shadow-sm: 0 1px 2px rgb(0 0 0 / 40%);
+  --shadow-md: 0 6px 16px rgb(0 0 0 / 45%);
+  --shadow-lg: 0 16px 40px rgb(0 0 0 / 55%);
 
-  --status-running: #4ade80;
-  --status-idle: #fbbf24;
-  --status-maintenance: #f87171;
-  --status-off: #9ca3af;
-  --status-unknown: #94a3b8;
+  --state-active: #9ef3ee;
+  --state-central-store: #91a6ff;
+  --state-finished: #8ba8c8;
+  --state-in-bid: #bab1a0;
+
+  --status-running: #9ef3ee;
+  --status-idle: #f5f2b8;
+  --status-maintenance: #ff6666;
+  --status-off: #8497a3;
+  --status-unknown: #a2acab;
 
   color-scheme: dark;
+}
+
+/*
+ * A Slate surface in either theme (header, branded empty states). Everything inside reads the
+ * same tokens, so buttons, inputs and focus rings work without extra classes.
+ */
+.surface-slate {
+  --bg: #122023;
+  --surface: #1a2f33;
+  --surface-raised: #223a3f;
+  --fg: #ffffff;
+  --fg-muted: #a2acab;
+  --border: #2f484d;
+  --border-strong: #6f8695;
+  --primary: #9ef3ee;
+  --primary-fg: #122023;
+  --primary-hover: #c4f8f5;
+  --focus-ring: #9ef3ee;
+  background: var(--brand-slate);
+  color: var(--fg);
 }

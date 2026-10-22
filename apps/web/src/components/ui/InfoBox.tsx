@@ -36,13 +36,13 @@ export function InfoBox({ title, updated, stale, children, className }: InfoBoxP
       aria-label={title}
       data-stale={stale ? 'true' : undefined}
       className={cn(
-        'rounded-lg border border-border bg-surface-raised p-4',
+        'rounded-lg border border-border border-t-4 border-t-accent bg-surface-raised p-4 shadow-card',
         stale ? 'text-fg-muted' : 'text-fg',
         className,
       )}
     >
-      <h3 className="text-sm font-medium text-fg-muted">{title}</h3>
-      <div className="my-2 text-2xl font-semibold">{empty ? '—' : children}</div>
+      <h3 className="text-xs font-medium tracking-wide text-fg-muted uppercase">{title}</h3>
+      <div className="my-2 text-2xl font-semibold tracking-tight">{empty ? '—' : children}</div>
       <p className="flex items-center gap-1 text-xs text-fg-muted">
         {stale && <ClockIcon />}
         {stale && <span className="font-medium">Stale.</span>}
