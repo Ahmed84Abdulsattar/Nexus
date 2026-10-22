@@ -1,8 +1,16 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useCallback, useEffect, useState, useSyncExternalStore } from 'react';
+import {
+  createElement,
+  useCallback,
+  type ReactNode,
+  useEffect,
+  useState,
+  useSyncExternalStore,
+} from 'react';
 import { meResponseSchema } from '@nexus/shared';
 import { ApiError } from '../api/client';
 import { createPendingClient } from '../api/queries/pendingClient';
+import { DevSignInItems } from './DevSignInItems';
 import { devAuthStore, devSignOut, devUsers, restoreDevSession, signInAs } from './devAuth';
 
 /** The signed-in person, as the API reports it (`GET /v1/me`, docs/10). Display only: the UI never decides access. */
@@ -10,22 +18,12 @@ export type CurrentUser = {
   name: string;
 };
 
-/** Local development only: the "Sign in as ..." picker data (VITE_AUTH_MODE=dev). */
-export type DevSignIn = {
-  users: { key: string; label: string }[];
-  /** Key of the demo user signed in now, or null. */
-  current: string | null;
-  signIn: (userKey: string) => void;
-  /** Set when the last attempt failed (for example the API is not running). */
-  error: string | null;
-};
-
 export type CurrentSession = {
   user: CurrentUser | null;
   /** `null` while nobody is signed in. */
   signOut: (() => void) | null;
-  /** Present only in local development with VITE_AUTH_MODE=dev. */
-  devSignIn?: DevSignIn;
+  /** Extra user-menu items. Set only by the local dev sign-in (VITE_AUTH_MODE=dev), never in a build. */
+  devMenu?: ReactNode;
 };
 
 const NO_SESSION: CurrentSession = { user: null, signOut: null };
@@ -86,7 +84,9 @@ export function useDevSession(): CurrentSession {
   return {
     user: name ? { name } : null,
     signOut: state.token ? signOut : null,
-    devSignIn: { users: devUsers, current: state.userKey, signIn, error },
+    devMenu: createElement(DevSignInItems, {
+      devSignIn: { users: devUsers, current: state.userKey, signIn, error },
+    }),
   };
 }
 

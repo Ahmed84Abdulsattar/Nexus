@@ -31,7 +31,15 @@ roles and passwordless local logins), then starts the API (`AUTH_MODE=dev APP_EN
 local database URLs of `docs/04`. The portfolio map lists projects once the API serves them (S2-01 / the catalogue sync); until
 then that call returns 404. Local sign-in is described in `docs/08` section 7 and exists in no deployed environment.
 
-Without an API, `pnpm dev` runs the web app on the MSW mocks only.
+Notes:
+
+- Ports 3000 (API) and 5173 (web) must be free; `dev:local` checks and stops with a message if not.
+- The first open of http://localhost:5173 can take a minute (Vite's cold start).
+- **ArcGIS map:** set `VITE_DEV_ARCGIS_API_KEY` (or `ARCGIS_API_KEY`) in the git-ignored `.env`. `dev:local` passes it to the
+  local API, which serves it through `/v1/config`. Without a key the map says "Map key not configured". The key is never printed.
+- The Projects card showing an error ("Not found") is expected until S2-01 adds `GET /v1/projects`.
+- `pnpm dev` is the root `turbo run dev` (web, API and worker together, no local sign-in; the web app keeps its MSW mocks).
+  Use `pnpm dev:local` for the real API with local sign-in.
 
 Manual steps (what `dev:local` does):
 

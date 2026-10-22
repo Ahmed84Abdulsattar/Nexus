@@ -1,6 +1,1 @@
-export {
-  useCurrentUser,
-  type CurrentSession,
-  type CurrentUser,
-  type DevSignIn,
-} from './useCurrentUser';
+export { useCurrentUser, type CurrentSession, type CurrentUser } from './useCurrentUser';

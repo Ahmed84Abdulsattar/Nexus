@@ -62,6 +62,20 @@ const HIDE = {
   web: [/^DATOMS_/, /^DATABASE_/, /^WORKER_DATABASE_URL$/, /^ARCGIS_API_KEY$/],
 };
 
+/** True when something already listens on this port (IPv4 or IPv6 loopback). */
+async function portInUse(port) {
+  for (const host of ['127.0.0.1', '::1']) {
+    const used = await new Promise((resolve) => {
+      const socket = connect({ host, port });
+      socket.once('connect', () => (socket.destroy(), resolve(true)));
+      socket.once('error', () => resolve(false));
+      socket.setTimeout(1000, () => (socket.destroy(), resolve(false)));
+    });
+    if (used) return true;
+  }
+  return false;
+}
+
 function postgresIsUp() {
   return new Promise((resolve) => {
     const socket = connect({ host: '127.0.0.1', port: 5432 });
@@ -87,6 +101,19 @@ if (!(await postgresIsUp())) {
       '  or on Windows:  powershell -ExecutionPolicy Bypass -File scripts/pg-local.ps1 start',
   );
   process.exit(1);
+}
+
+for (const [port, what] of [
+  [3000, 'the API'],
+  [5173, 'the web app'],
+]) {
+  if (await portInUse(port)) {
+    console.error(
+      `[dev:local] Port ${port} is already in use, but ${what} needs it.\n` +
+        '  Stop the other dev server (or another dev:local) and run it again.',
+    );
+    process.exit(1);
+  }
 }
 
 run(

@@ -10,6 +10,7 @@ describe('check-dist forbidden patterns', () => {
     'sessionStorage.setItem("nexus.devAuth.user", k)',
     'import.meta.env.VITE_AUTH_MODE',
     '"VITE_USE_MOCKS"',
+    'label="Local development sign-in"',
   ])('finds local dev sign-in code in %s', (code) => {
     expect(matches(code)).toContain('local dev sign-in code');
   });
