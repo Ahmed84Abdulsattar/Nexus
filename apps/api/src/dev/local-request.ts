@@ -2,7 +2,19 @@ import type { IncomingHttpHeaders } from 'node:http';
 
 const LOOPBACK_PEERS = new Set(['127.0.0.1', '::1', '::ffff:127.0.0.1']);
 const LOCAL_HOST_HEADER = /^(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/;
-const FORWARDING_HEADERS = ['x-forwarded-for', 'forwarded', 'x-real-ip', 'x-forwarded-host'];
+const FORWARDING_HEADERS = [
+  'x-forwarded-for',
+  'forwarded',
+  'x-real-ip',
+  'x-forwarded-host',
+  'x-forwarded-proto',
+  'x-forwarded-port',
+  'via',
+  'cf-connecting-ip',
+  'true-client-ip',
+  'x-client-ip',
+  'x-original-forwarded-for',
+];
 
 /**
  * Whether a request looks like it came from a browser or tool on this machine, talking to this

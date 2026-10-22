@@ -28,6 +28,20 @@ describe('config refusals', () => {
   ])('refuses AUTH_MODE=dev when %s is set', (marker) => {
     expect(() => loadConfig(devEnv({ [marker]: 'x' }))).toThrow(new RegExp(marker));
   });
+  it.each([
+    'https://nexus.ngrok.io',
+    'http://192.168.1.5:5173',
+    'http://localhost:5173,https://evil.example.com',
+  ])('refuses AUTH_MODE=dev with CORS_ALLOWED_ORIGINS=%s', (origins) => {
+    expect(() => loadConfig(devEnv({ CORS_ALLOWED_ORIGINS: origins }))).toThrow(
+      /CORS_ALLOWED_ORIGINS/,
+    );
+  });
+  it('accepts local CORS origins with AUTH_MODE=dev', () => {
+    expect(() =>
+      loadConfig(devEnv({ CORS_ALLOWED_ORIGINS: 'http://localhost:5173,http://127.0.0.1:5173' })),
+    ).not.toThrow();
+  });
   it.each(['DEV', ' dev', 'Dev', 'dev '])('rejects AUTH_MODE=%j', (mode) => {
     expect(() => loadConfig(devEnv({ AUTH_MODE: mode }))).toThrow(ConfigError);
   });
@@ -55,6 +69,8 @@ describe('module guards', () => {
     expect(() =>
       factory({ ...dev, database: { ...dev.database, url: 'postgres://u@db.example.com/n' } }),
     ).toThrow();
+    expect(() => factory({ ...dev, http: { ...dev.http, trustProxy: 1 } })).toThrow();
+    expect(() => factory({ ...dev, http: { ...dev.http, trustProxy: ['10.0.0.0/8'] } })).toThrow();
     expect(factory(dev)).toBeInstanceOf(Promise);
   });
 
@@ -81,6 +97,22 @@ describe('a dev token on an entra-mode app', () => {
       expect((await entra.get('/v1/me', token)).statusCode).toBe(401);
     } finally {
       await dev.app.close();
+      await entra.app.close();
+    }
+  });
+});
+
+describe('the request hook is dev-only', () => {
+  it('an entra-mode app does not answer 403 to a foreign Host plus X-Forwarded-For', async () => {
+    const entra = await createTestApp();
+    try {
+      const res = await entra.app.inject({
+        method: 'GET',
+        url: '/health/live',
+        headers: { host: 'api.example', 'x-forwarded-for': '1.2.3.4' },
+      });
+      expect(res.statusCode).toBe(200);
+    } finally {
       await entra.app.close();
     }
   });
@@ -122,12 +154,21 @@ describe('request checks in dev mode', () => {
     expect((await tokenCall({ origin: 'http://localhost:9999' })).statusCode).toBe(403);
   });
 
-  it.each(['x-forwarded-for', 'forwarded', 'x-real-ip', 'x-forwarded-host'])(
-    'refuses %s from a loopback peer with 403',
-    async (header) => {
-      expect((await tokenCall({ [header]: '127.0.0.1' })).statusCode).toBe(403);
-    },
-  );
+  it.each([
+    'x-forwarded-for',
+    'forwarded',
+    'x-real-ip',
+    'x-forwarded-host',
+    'x-forwarded-proto',
+    'x-forwarded-port',
+    'via',
+    'cf-connecting-ip',
+    'true-client-ip',
+    'x-client-ip',
+    'x-original-forwarded-for',
+  ])('refuses %s from a loopback peer with 403', async (header) => {
+    expect((await tokenCall({ [header]: '127.0.0.1' })).statusCode).toBe(403);
+  });
 
   it('refuses X-Forwarded-For: 127.0.0.1 from a non-loopback peer', async () => {
     expect((await tokenCall({ 'x-forwarded-for': '127.0.0.1' }, '203.0.113.9')).statusCode).toBe(

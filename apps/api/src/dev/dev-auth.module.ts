@@ -23,7 +23,8 @@ import { DevKeyService } from './dev-key.service.js';
         if (
           config.auth.mode !== 'dev' ||
           config.appEnv !== 'local' ||
-          !isLocalHost(config.database.url)
+          !isLocalHost(config.database.url) ||
+          config.http.trustProxy !== false
         ) {
           throw new Error('Local sign-in needs AUTH_MODE=dev, APP_ENV=local and a local database.');
         }

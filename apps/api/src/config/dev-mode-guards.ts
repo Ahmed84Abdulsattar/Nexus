@@ -21,6 +21,23 @@ export function devModeProblems(env: NodeJS.ProcessEnv): string[] {
   if (proxy !== '' && proxy !== 'false') {
     problems.push('AUTH_MODE=dev cannot be used with TRUST_PROXY (leave it unset or false)');
   }
+  // Browser origins must be this machine too (a tunnel's public origin would be accepted otherwise).
+  for (const origin of (env['CORS_ALLOWED_ORIGINS'] ?? '').split(',')) {
+    const item = origin.trim();
+    if (item === '') continue;
+    let host = '';
+    try {
+      host = new URL(item).hostname;
+    } catch {
+      /* reported below */
+    }
+    if (!['localhost', '127.0.0.1', '[::1]'].includes(host)) {
+      problems.push(
+        'AUTH_MODE=dev allows only localhost, 127.0.0.1 or [::1] in CORS_ALLOWED_ORIGINS',
+      );
+      break;
+    }
+  }
   const markers = PLATFORM_MARKERS.filter((name) => (env[name] ?? '') !== '');
   if (markers.length > 0) {
     problems.push(
