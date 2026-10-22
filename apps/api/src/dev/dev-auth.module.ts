@@ -3,6 +3,7 @@ import { isLocalHost } from '@nexus/db';
 import { DEV_KEY_SOURCE } from '../common/auth/dev-key-source.js';
 import { APP_CONFIG, type AppConfig } from '../config/env.js';
 import { DevAuthController } from './dev-auth.controller.js';
+import { LocalRequestHook } from './local-request.hook.js';
 import { DevKeyService } from './dev-key.service.js';
 
 /**
@@ -14,6 +15,7 @@ import { DevKeyService } from './dev-key.service.js';
 @Module({
   controllers: [DevAuthController],
   providers: [
+    LocalRequestHook,
     {
       provide: DEV_KEY_SOURCE,
       inject: [APP_CONFIG],

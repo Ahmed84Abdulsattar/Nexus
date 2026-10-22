@@ -45,6 +45,12 @@ export function assertWebEnv({ command, nodeEnv, env }: EnvGuardInput): void {
   }
   const allowed = new Set<string>([...ALLOWED_VITE_VARS, ...VITE_INTERNAL_VARS]);
   for (const name of Object.keys(env)) {
+    // Vite sets this from NODE_ENV in .env: a build with 'development' would keep the dev branches.
+    if (command === 'build' && name === 'VITE_USER_NODE_ENV' && env[name] === 'development') {
+      throw new Error(
+        'A build must not run with VITE_USER_NODE_ENV=development (it would bundle the dev code).',
+      );
+    }
     if (allowed.has(name)) continue;
     if (command === 'serve' && (DEV_ONLY_VITE_VARS as readonly string[]).includes(name)) continue;
     if ((DEV_ONLY_VITE_VARS as readonly string[]).includes(name) && !env[name]) continue; // empty placeholder from .env.example

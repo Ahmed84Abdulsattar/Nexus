@@ -6,6 +6,7 @@ import {
   requireTlsUnlessLocal,
 } from '@nexus/db';
 import { z } from 'zod';
+import { devModeProblems } from './dev-mode-guards.js';
 
 /**
  * Environment of the API, validated once at startup (docs/04 "Environment variables").
@@ -264,6 +265,12 @@ export function loadConfig(rawEnv: NodeJS.ProcessEnv): AppConfig {
   if (!parsed.success) {
     const problems = parsed.error.issues.map((i) => `${i.path.join('.') || '(env)'}: ${i.message}`);
     throw new ConfigError(`Invalid environment:\n  ${problems.join('\n  ')}`);
+  }
+  if (parsed.data.AUTH_MODE === 'dev') {
+    const problems = devModeProblems(env);
+    if (problems.length > 0) {
+      throw new ConfigError(`Invalid environment:\n  ${problems.join('\n  ')}`);
+    }
   }
   const e = parsed.data;
   const tenant = e.ENTRA_TENANT_ID.toLowerCase();

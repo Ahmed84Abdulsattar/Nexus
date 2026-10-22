@@ -16,7 +16,7 @@ import type { Plugin } from 'vite';
  */
 const MAX_GZIP = 2 * 1024 * 1024;
 
-const FORBIDDEN: [RegExp, string][] = [
+export const FORBIDDEN: [RegExp, string][] = [
   [/AAP[KT][A-Za-z0-9_-]{30,}/, 'an ArcGIS API key'],
   [/VITE_DEV_ARCGIS_API_KEY/, 'the dev key variable name'],
   [/mockServiceWorker|setupWorker|Mock Service Worker/, 'MSW'],

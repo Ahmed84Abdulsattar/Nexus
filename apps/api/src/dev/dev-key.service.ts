@@ -23,7 +23,7 @@ export class DevKeyService implements DevKeySource {
   ) {}
 
   static async create(): Promise<DevKeyService> {
-    const { privateKey, publicKey } = await generateKeyPair('RS256', { extractable: true });
+    const { privateKey, publicKey } = await generateKeyPair('RS256', { extractable: false });
     const kid = `nexus-dev-${Date.now().toString(36)}`;
     const jwk = { ...(await exportJWK(publicKey)), kid, alg: 'RS256', use: 'sig' };
     return new DevKeyService(privateKey, kid, createLocalJWKSet({ keys: [jwk] }));

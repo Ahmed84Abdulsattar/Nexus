@@ -21,7 +21,8 @@ async function bootstrap(): Promise<void> {
   configureApp(app);
   await applySecurity(app, config);
   mountDocs(app, config.appEnv);
-  await app.listen(PORT, '0.0.0.0');
+  // Local sign-in listens on this machine only; everything else on all interfaces (container).
+  await app.listen(PORT, config.auth.mode === 'dev' ? 'localhost' : '0.0.0.0');
 }
 
 void bootstrap();

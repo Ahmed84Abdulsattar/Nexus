@@ -10,15 +10,15 @@ import {
 } from '@nestjs/common';
 import { ApiExcludeController } from '@nestjs/swagger';
 import { DEV_USERS, devTokenRequestSchema, type DevTokenResponse } from '@nexus/shared';
+import type { IncomingHttpHeaders } from 'node:http';
 import { createZodDto } from 'nestjs-zod';
 import { DEV_KEY_SOURCE } from '../common/auth/dev-key-source.js';
 import { Public } from '../common/auth/decorators.js';
 import { APP_CONFIG, type AppConfig } from '../config/env.js';
+import { remoteRequestReason } from './local-request.js';
 import { DEV_TOKEN_TTL_SECONDS, type DevKeyService } from './dev-key.service.js';
 
 class DevTokenRequestDto extends createZodDto(devTokenRequestSchema) {}
-
-const LOOPBACK = new Set(['127.0.0.1', '::1', '::ffff:127.0.0.1']);
 
 /**
  * POST /v1/dev/token (docs/08 "Local development sign-in"). Exists only when AUTH_MODE=dev and
@@ -38,9 +38,17 @@ export class DevAuthController {
   @HttpCode(200)
   async token(
     @Body() body: DevTokenRequestDto,
-    @Req() request: { ip?: string },
+    @Req() request: { headers: IncomingHttpHeaders; raw: { socket: { remoteAddress?: string } } },
   ): Promise<DevTokenResponse> {
-    if (!LOOPBACK.has(request.ip ?? '')) {
+    // Also checked by LocalRequestHook on every route; repeated here so this route is safe alone.
+    // The socket peer, never request.ip (a proxy header could set that).
+    if (
+      remoteRequestReason(
+        request.headers,
+        request.raw.socket.remoteAddress,
+        this.config.http.corsOrigins,
+      ) !== null
+    ) {
       throw new ForbiddenException('Local sign-in answers only to this machine.');
     }
     const user = DEV_USERS.find((u) => u.key === body.user);
