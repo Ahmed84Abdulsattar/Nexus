@@ -13,7 +13,7 @@ export function BrandRings({ className }: { className?: string }) {
       viewBox="0 0 300 300"
       preserveAspectRatio="xMidYMid slice"
       className={cn(
-        'pointer-events-none absolute top-0 right-0 h-1/2 w-full md:inset-y-0 md:h-full md:w-3/5',
+        'pointer-events-none absolute top-16 right-0 h-2/5 w-full [mask-image:linear-gradient(to_bottom,black_45%,transparent)] md:inset-y-0 md:h-full md:w-3/5 md:[mask-image:linear-gradient(to_right,transparent,black_35%)]',
         className,
       )}
       fill="none"

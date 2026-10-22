@@ -22,10 +22,10 @@ export function Header({
       <Link
         to="/"
         aria-label="Innovo Nexus, portfolio"
-        className="inline-flex min-h-11 shrink-0 items-center gap-3 self-center rounded-md"
+        className="mr-4 inline-flex min-h-11 shrink-0 items-center gap-2 self-center rounded-md sm:mr-0 sm:gap-3"
       >
         {/* Clear space around the logo is at least the height of the "i" (about 0.8 of its height). */}
-        <InnovoLogo className="h-5 w-auto text-fg md:h-6" />
+        <InnovoLogo className="h-[18px] w-auto text-fg sm:h-5 md:h-6" />
         <span className="sr-only">Innovo</span>
         <span aria-hidden="true" className="hidden h-6 w-px bg-border-strong sm:inline-block" />
         <span className="text-xs font-medium tracking-[0.18em] text-primary uppercase sm:text-sm sm:tracking-[0.2em]">

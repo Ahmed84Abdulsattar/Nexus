@@ -68,7 +68,7 @@ export function PortfolioPage() {
           cluster
           focus={focus}
           onMarkerClick={(marker) => select(marker.id)}
-          className="h-[60vh] min-h-96"
+          className="h-[60vh] min-h-96 lg:h-[calc(100dvh-14rem)]"
           overlays={<ModeSwitch mode={mode} onChange={setMode} className="absolute top-3 left-3" />}
         />
         <section
@@ -89,7 +89,7 @@ export function PortfolioPage() {
               {() => null}
             </QueryState>
           ) : null}
-          <ul className="mt-3 flex max-h-[50vh] flex-col gap-2 overflow-auto p-1">
+          <ul className="mt-3 flex max-h-[50vh] lg:max-h-[calc(100dvh-24rem)] flex-col gap-2 overflow-auto p-1">
             {items.map((p) => (
               <li key={p.id}>
                 <button

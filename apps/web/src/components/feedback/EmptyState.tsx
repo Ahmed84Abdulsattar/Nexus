@@ -33,10 +33,7 @@ export function EmptyState({
     >
       <RingMark />
       <div className="min-w-0">
-        <p className="font-medium">
-          <span aria-hidden="true">— </span>
-          {title}
-        </p>
+        <p className="font-medium">{title}</p>
         {message ? <p className="mt-1 text-sm text-fg-muted">{message}</p> : null}
         {action ? <div className="mt-3">{action}</div> : null}
       </div>
