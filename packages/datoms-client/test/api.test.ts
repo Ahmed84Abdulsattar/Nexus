@@ -107,7 +107,7 @@ describe('catalogue paging walker (GET /assets)', () => {
   });
 
   it('walks the recorded list in one page', async () => {
-    const recorded = fixture('assets-list-page1.json').body;
+    const recorded = fixture('assets-list-legacy-22.json').body;
     const { impl, calls } = fakeFetch(() => ({ body: recorded }));
     const out = await rig(impl).api.collectAssets();
     expect(calls).toHaveLength(1);

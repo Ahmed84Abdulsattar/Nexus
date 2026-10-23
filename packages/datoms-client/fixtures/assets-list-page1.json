@@ -2,7 +2,7 @@
   "meta": {
     "endpoint": "/assets?page=1&limit=1000",
     "method": "GET",
-    "date": "2026-10-12T11:45:47.305Z",
+    "date": "2026-10-22T12:35:11.927Z",
     "status": 200,
     "rateLimit": {
       "limit": "60",
@@ -15,6 +15,1028 @@
     "status": "success",
     "data": [
       {
+        "id": "46568",
+        "name": "Tower crane 5",
+        "created_at": "2026-10-21T05:35:29Z",
+        "lifecycle_status": "active",
+        "category_id": 135,
+        "category_name": "Tower Crane",
+        "asset_info": {
+          "make": null,
+          "model": null,
+          "sl_no": null,
+          "kva": null,
+          "capacity": null
+        },
+        "site_id": null,
+        "site_name": null,
+        "latitude": null,
+        "longitude": null,
+        "status": null
+      },
+      {
+        "id": "46566",
+        "name": "Tower crane 3",
+        "created_at": "2026-10-21T05:35:29Z",
+        "lifecycle_status": "active",
+        "category_id": 135,
+        "category_name": "Tower Crane",
+        "asset_info": {
+          "make": null,
+          "model": null,
+          "sl_no": null,
+          "kva": null,
+          "capacity": null
+        },
+        "site_id": null,
+        "site_name": null,
+        "latitude": null,
+        "longitude": null,
+        "status": null
+      },
+      {
+        "id": "46567",
+        "name": "Tower crane 4",
+        "created_at": "2026-10-21T05:35:29Z",
+        "lifecycle_status": "active",
+        "category_id": 135,
+        "category_name": "Tower Crane",
+        "asset_info": {
+          "make": null,
+          "model": null,
+          "sl_no": null,
+          "kva": null,
+          "capacity": null
+        },
+        "site_id": null,
+        "site_name": null,
+        "latitude": null,
+        "longitude": null,
+        "status": null
+      },
+      {
+        "id": "46565",
+        "name": "Tower crane 2",
+        "created_at": "2026-10-21T05:33:14Z",
+        "lifecycle_status": "active",
+        "category_id": 135,
+        "category_name": "Tower Crane",
+        "asset_info": {
+          "make": null,
+          "model": null,
+          "sl_no": null,
+          "kva": null,
+          "capacity": null
+        },
+        "site_id": null,
+        "site_name": null,
+        "latitude": null,
+        "longitude": null,
+        "status": null
+      },
+      {
+        "id": "46491",
+        "name": "FORKLIFT 3.5TON",
+        "created_at": "2026-10-16T14:42:27Z",
+        "lifecycle_status": "active",
+        "category_id": 133,
+        "category_name": "Construction Equipment",
+        "asset_info": {
+          "make": null,
+          "model": null,
+          "sl_no": null,
+          "kva": null,
+          "capacity": null
+        },
+        "site_id": null,
+        "site_name": null,
+        "latitude": null,
+        "longitude": null,
+        "status": null
+      },
+      {
+        "id": "46493",
+        "name": "PRADO 3",
+        "created_at": "2026-10-16T14:42:27Z",
+        "lifecycle_status": "active",
+        "category_id": 67,
+        "category_name": "Car",
+        "asset_info": {
+          "make": null,
+          "model": null,
+          "sl_no": null
+        },
+        "site_id": null,
+        "site_name": null,
+        "latitude": null,
+        "longitude": null,
+        "status": null
+      },
+      {
+        "id": "46495",
+        "name": "PRADO 1",
+        "created_at": "2026-10-16T14:42:27Z",
+        "lifecycle_status": "active",
+        "category_id": 67,
+        "category_name": "Car",
+        "asset_info": {
+          "make": null,
+          "model": null,
+          "sl_no": null
+        },
+        "site_id": null,
+        "site_name": null,
+        "latitude": null,
+        "longitude": null,
+        "status": null
+      },
+      {
+        "id": "46483",
+        "name": "3TON PICKUP 5",
+        "created_at": "2026-10-16T14:42:27Z",
+        "lifecycle_status": "active",
+        "category_id": 133,
+        "category_name": "Construction Equipment",
+        "asset_info": {
+          "make": null,
+          "model": null,
+          "sl_no": null,
+          "kva": null,
+          "capacity": null
+        },
+        "site_id": null,
+        "site_name": null,
+        "latitude": null,
+        "longitude": null,
+        "status": null
+      },
+      {
+        "id": "46500",
+        "name": "3TON PICKUP 3",
+        "created_at": "2026-10-16T14:42:27Z",
+        "lifecycle_status": "active",
+        "category_id": 133,
+        "category_name": "Construction Equipment",
+        "asset_info": {
+          "make": null,
+          "model": null,
+          "sl_no": null,
+          "kva": null,
+          "capacity": null
+        },
+        "site_id": null,
+        "site_name": null,
+        "latitude": null,
+        "longitude": null,
+        "status": null
+      },
+      {
+        "id": "46492",
+        "name": "Tower crane 1",
+        "created_at": "2026-10-16T14:42:27Z",
+        "lifecycle_status": "active",
+        "category_id": 135,
+        "category_name": "Tower Crane",
+        "asset_info": {
+          "make": null,
+          "model": null,
+          "sl_no": null,
+          "kva": null,
+          "capacity": null
+        },
+        "site_id": null,
+        "site_name": null,
+        "latitude": null,
+        "longitude": null,
+        "status": null
+      },
+      {
+        "id": "46487",
+        "name": "PRADO 2",
+        "created_at": "2026-10-16T14:42:27Z",
+        "lifecycle_status": "active",
+        "category_id": 67,
+        "category_name": "Car",
+        "asset_info": {
+          "make": null,
+          "model": null,
+          "sl_no": null
+        },
+        "site_id": null,
+        "site_name": null,
+        "latitude": null,
+        "longitude": null,
+        "status": null
+      },
+      {
+        "id": "46498",
+        "name": "PRADO 4",
+        "created_at": "2026-10-16T14:42:27Z",
+        "lifecycle_status": "active",
+        "category_id": 67,
+        "category_name": "Car",
+        "asset_info": {
+          "make": null,
+          "model": null,
+          "sl_no": null
+        },
+        "site_id": null,
+        "site_name": null,
+        "latitude": null,
+        "longitude": null,
+        "status": null
+      },
+      {
+        "id": "46484",
+        "name": "34SEATER BUS",
+        "created_at": "2026-10-16T14:42:27Z",
+        "lifecycle_status": "active",
+        "category_id": 132,
+        "category_name": "Bus",
+        "asset_info": {
+          "make": null,
+          "model": null,
+          "sl_no": null,
+          "kva": null,
+          "capacity": null
+        },
+        "site_id": null,
+        "site_name": null,
+        "latitude": null,
+        "longitude": null,
+        "status": null
+      },
+      {
+        "id": "46486",
+        "name": "3TON PICKUP 2",
+        "created_at": "2026-10-16T14:42:27Z",
+        "lifecycle_status": "active",
+        "category_id": 133,
+        "category_name": "Construction Equipment",
+        "asset_info": {
+          "make": null,
+          "model": null,
+          "sl_no": null,
+          "kva": null,
+          "capacity": null
+        },
+        "site_id": null,
+        "site_name": null,
+        "latitude": null,
+        "longitude": null,
+        "status": null
+      },
+      {
+        "id": "46482",
+        "name": "NISSAN PATROL",
+        "created_at": "2026-10-16T14:42:27Z",
+        "lifecycle_status": "active",
+        "category_id": 67,
+        "category_name": "Car",
+        "asset_info": {
+          "make": null,
+          "model": null,
+          "sl_no": null
+        },
+        "site_id": null,
+        "site_name": null,
+        "latitude": null,
+        "longitude": null,
+        "status": null
+      },
+      {
+        "id": "46481",
+        "name": "1TON PICKUP 1",
+        "created_at": "2026-10-16T14:42:27Z",
+        "lifecycle_status": "active",
+        "category_id": 133,
+        "category_name": "Construction Equipment",
+        "asset_info": {
+          "make": null,
+          "model": null,
+          "sl_no": null,
+          "kva": null,
+          "capacity": null
+        },
+        "site_id": null,
+        "site_name": null,
+        "latitude": null,
+        "longitude": null,
+        "status": null
+      },
+      {
+        "id": "46489",
+        "name": "FORTUNER 3",
+        "created_at": "2026-10-16T14:42:27Z",
+        "lifecycle_status": "active",
+        "category_id": 67,
+        "category_name": "Car",
+        "asset_info": {
+          "make": null,
+          "model": null,
+          "sl_no": null
+        },
+        "site_id": null,
+        "site_name": null,
+        "latitude": null,
+        "longitude": null,
+        "status": null
+      },
+      {
+        "id": "46494",
+        "name": "PRADO 5",
+        "created_at": "2026-10-16T14:42:27Z",
+        "lifecycle_status": "active",
+        "category_id": 67,
+        "category_name": "Car",
+        "asset_info": {
+          "make": null,
+          "model": null,
+          "sl_no": null
+        },
+        "site_id": null,
+        "site_name": null,
+        "latitude": null,
+        "longitude": null,
+        "status": null
+      },
+      {
+        "id": "46490",
+        "name": "FORTUNER 2",
+        "created_at": "2026-10-16T14:42:27Z",
+        "lifecycle_status": "active",
+        "category_id": 67,
+        "category_name": "Car",
+        "asset_info": {
+          "make": null,
+          "model": null,
+          "sl_no": null
+        },
+        "site_id": null,
+        "site_name": null,
+        "latitude": null,
+        "longitude": null,
+        "status": null
+      },
+      {
+        "id": "46499",
+        "name": "3TON PICKUP 1",
+        "created_at": "2026-10-16T14:42:27Z",
+        "lifecycle_status": "active",
+        "category_id": 133,
+        "category_name": "Construction Equipment",
+        "asset_info": {
+          "make": null,
+          "model": null,
+          "sl_no": null,
+          "kva": null,
+          "capacity": null
+        },
+        "site_id": null,
+        "site_name": null,
+        "latitude": null,
+        "longitude": null,
+        "status": null
+      },
+      {
+        "id": "46497",
+        "name": "FORTUNER 1",
+        "created_at": "2026-10-16T14:42:27Z",
+        "lifecycle_status": "active",
+        "category_id": 67,
+        "category_name": "Car",
+        "asset_info": {
+          "make": null,
+          "model": null,
+          "sl_no": null
+        },
+        "site_id": null,
+        "site_name": null,
+        "latitude": null,
+        "longitude": null,
+        "status": null
+      },
+      {
+        "id": "46480",
+        "name": "3TON PICKUP 4",
+        "created_at": "2026-10-16T14:42:27Z",
+        "lifecycle_status": "active",
+        "category_id": 133,
+        "category_name": "Construction Equipment",
+        "asset_info": {
+          "make": null,
+          "model": null,
+          "sl_no": null,
+          "kva": null,
+          "capacity": null
+        },
+        "site_id": null,
+        "site_name": null,
+        "latitude": null,
+        "longitude": null,
+        "status": null
+      },
+      {
+        "id": "46488",
+        "name": "HIAB TRUCK",
+        "created_at": "2026-10-16T14:42:27Z",
+        "lifecycle_status": "active",
+        "category_id": 98,
+        "category_name": "Truck",
+        "asset_info": {
+          "make": null,
+          "model": null,
+          "sl_no": null,
+          "kva": null,
+          "capacity": null
+        },
+        "site_id": null,
+        "site_name": null,
+        "latitude": null,
+        "longitude": null,
+        "status": null
+      },
+      {
+        "id": "46496",
+        "name": "SHOVEL 2",
+        "created_at": "2026-10-16T14:42:27Z",
+        "lifecycle_status": "active",
+        "category_id": 133,
+        "category_name": "Construction Equipment",
+        "asset_info": {
+          "make": null,
+          "model": null,
+          "sl_no": null,
+          "kva": null,
+          "capacity": null
+        },
+        "site_id": null,
+        "site_name": null,
+        "latitude": null,
+        "longitude": null,
+        "status": null
+      },
+      {
+        "id": "46485",
+        "name": "SHOVEL 1",
+        "created_at": "2026-10-16T14:42:27Z",
+        "lifecycle_status": "active",
+        "category_id": 133,
+        "category_name": "Construction Equipment",
+        "asset_info": {
+          "make": null,
+          "model": null,
+          "sl_no": null,
+          "kva": null,
+          "capacity": null
+        },
+        "site_id": null,
+        "site_name": null,
+        "latitude": null,
+        "longitude": null,
+        "status": null
+      },
+      {
+        "id": "46454",
+        "name": "MOBILE CRNAE 50T 1",
+        "created_at": "2026-10-16T14:32:14Z",
+        "lifecycle_status": "active",
+        "category_id": 133,
+        "category_name": "Construction Equipment",
+        "asset_info": {
+          "make": null,
+          "model": null,
+          "sl_no": null,
+          "kva": null,
+          "capacity": null
+        },
+        "site_id": null,
+        "site_name": null,
+        "latitude": null,
+        "longitude": null,
+        "status": null
+      },
+      {
+        "id": "46474",
+        "name": "BOOMLOADER-540 17 MTR 9",
+        "created_at": "2026-10-16T14:32:14Z",
+        "lifecycle_status": "active",
+        "category_id": 133,
+        "category_name": "Construction Equipment",
+        "asset_info": {
+          "make": null,
+          "model": null,
+          "sl_no": null,
+          "kva": null,
+          "capacity": null
+        },
+        "site_id": null,
+        "site_name": null,
+        "latitude": null,
+        "longitude": null,
+        "status": null
+      },
+      {
+        "id": "46463",
+        "name": "MOBILE CRNAE 100T 1",
+        "created_at": "2026-10-16T14:32:14Z",
+        "lifecycle_status": "active",
+        "category_id": 133,
+        "category_name": "Construction Equipment",
+        "asset_info": {
+          "make": null,
+          "model": null,
+          "sl_no": null,
+          "kva": null,
+          "capacity": null
+        },
+        "site_id": null,
+        "site_name": null,
+        "latitude": null,
+        "longitude": null,
+        "status": null
+      },
+      {
+        "id": "46453",
+        "name": "BOOMLOADER-540 17 MTR 2",
+        "created_at": "2026-10-16T14:32:14Z",
+        "lifecycle_status": "active",
+        "category_id": 133,
+        "category_name": "Construction Equipment",
+        "asset_info": {
+          "make": null,
+          "model": null,
+          "sl_no": null,
+          "kva": null,
+          "capacity": null
+        },
+        "site_id": null,
+        "site_name": null,
+        "latitude": null,
+        "longitude": null,
+        "status": null
+      },
+      {
+        "id": "46471",
+        "name": "BOBCAT 1",
+        "created_at": "2026-10-16T14:32:14Z",
+        "lifecycle_status": "active",
+        "category_id": 133,
+        "category_name": "Construction Equipment",
+        "asset_info": {
+          "make": null,
+          "model": null,
+          "sl_no": null,
+          "kva": null,
+          "capacity": null
+        },
+        "site_id": null,
+        "site_name": null,
+        "latitude": null,
+        "longitude": null,
+        "status": null
+      },
+      {
+        "id": "46460",
+        "name": "BOOMLOADER-540 17 MTR 10",
+        "created_at": "2026-10-16T14:32:14Z",
+        "lifecycle_status": "active",
+        "category_id": 133,
+        "category_name": "Construction Equipment",
+        "asset_info": {
+          "make": null,
+          "model": null,
+          "sl_no": null,
+          "kva": null,
+          "capacity": null
+        },
+        "site_id": null,
+        "site_name": null,
+        "latitude": null,
+        "longitude": null,
+        "status": null
+      },
+      {
+        "id": "46479",
+        "name": "BOOMLOADER-540 17 MTR 5",
+        "created_at": "2026-10-16T14:32:14Z",
+        "lifecycle_status": "active",
+        "category_id": 133,
+        "category_name": "Construction Equipment",
+        "asset_info": {
+          "make": null,
+          "model": null,
+          "sl_no": null,
+          "kva": null,
+          "capacity": null
+        },
+        "site_id": null,
+        "site_name": null,
+        "latitude": null,
+        "longitude": null,
+        "status": null
+      },
+      {
+        "id": "46457",
+        "name": "BOOMLOADER-540 17 MTR 7",
+        "created_at": "2026-10-16T14:32:14Z",
+        "lifecycle_status": "active",
+        "category_id": 133,
+        "category_name": "Construction Equipment",
+        "asset_info": {
+          "make": null,
+          "model": null,
+          "sl_no": null,
+          "kva": null,
+          "capacity": null
+        },
+        "site_id": null,
+        "site_name": null,
+        "latitude": null,
+        "longitude": null,
+        "status": null
+      },
+      {
+        "id": "46456",
+        "name": "BOBCAT 4",
+        "created_at": "2026-10-16T14:32:14Z",
+        "lifecycle_status": "active",
+        "category_id": 133,
+        "category_name": "Construction Equipment",
+        "asset_info": {
+          "make": null,
+          "model": null,
+          "sl_no": null,
+          "kva": null,
+          "capacity": null
+        },
+        "site_id": null,
+        "site_name": null,
+        "latitude": null,
+        "longitude": null,
+        "status": null
+      },
+      {
+        "id": "46477",
+        "name": "BOBCAT 2",
+        "created_at": "2026-10-16T14:32:14Z",
+        "lifecycle_status": "active",
+        "category_id": 133,
+        "category_name": "Construction Equipment",
+        "asset_info": {
+          "make": null,
+          "model": null,
+          "sl_no": null,
+          "kva": null,
+          "capacity": null
+        },
+        "site_id": null,
+        "site_name": null,
+        "latitude": null,
+        "longitude": null,
+        "status": null
+      },
+      {
+        "id": "46472",
+        "name": "JCB 1",
+        "created_at": "2026-10-16T14:32:14Z",
+        "lifecycle_status": "active",
+        "category_id": 133,
+        "category_name": "Construction Equipment",
+        "asset_info": {
+          "make": null,
+          "model": null,
+          "sl_no": null,
+          "kva": null,
+          "capacity": null
+        },
+        "site_id": null,
+        "site_name": null,
+        "latitude": null,
+        "longitude": null,
+        "status": null
+      },
+      {
+        "id": "46478",
+        "name": "BOOMLOADER-540 17 MTR 11",
+        "created_at": "2026-10-16T14:32:14Z",
+        "lifecycle_status": "active",
+        "category_id": 133,
+        "category_name": "Construction Equipment",
+        "asset_info": {
+          "make": null,
+          "model": null,
+          "sl_no": null,
+          "kva": null,
+          "capacity": null
+        },
+        "site_id": null,
+        "site_name": null,
+        "latitude": null,
+        "longitude": null,
+        "status": null
+      },
+      {
+        "id": "46464",
+        "name": "JCB 2",
+        "created_at": "2026-10-16T14:32:14Z",
+        "lifecycle_status": "active",
+        "category_id": 133,
+        "category_name": "Construction Equipment",
+        "asset_info": {
+          "make": null,
+          "model": null,
+          "sl_no": null,
+          "kva": null,
+          "capacity": null
+        },
+        "site_id": null,
+        "site_name": null,
+        "latitude": null,
+        "longitude": null,
+        "status": null
+      },
+      {
+        "id": "46461",
+        "name": "MOBILE CRNAE 100T 2",
+        "created_at": "2026-10-16T14:32:14Z",
+        "lifecycle_status": "active",
+        "category_id": 133,
+        "category_name": "Construction Equipment",
+        "asset_info": {
+          "make": null,
+          "model": null,
+          "sl_no": null,
+          "kva": null,
+          "capacity": null
+        },
+        "site_id": null,
+        "site_name": null,
+        "latitude": null,
+        "longitude": null,
+        "status": null
+      },
+      {
+        "id": "46458",
+        "name": "BOBCAT 6",
+        "created_at": "2026-10-16T14:32:14Z",
+        "lifecycle_status": "active",
+        "category_id": 133,
+        "category_name": "Construction Equipment",
+        "asset_info": {
+          "make": null,
+          "model": null,
+          "sl_no": null,
+          "kva": null,
+          "capacity": null
+        },
+        "site_id": null,
+        "site_name": null,
+        "latitude": null,
+        "longitude": null,
+        "status": null
+      },
+      {
+        "id": "46470",
+        "name": "BOOMLOADER-540 17 MTR 6",
+        "created_at": "2026-10-16T14:32:14Z",
+        "lifecycle_status": "active",
+        "category_id": 133,
+        "category_name": "Construction Equipment",
+        "asset_info": {
+          "make": null,
+          "model": null,
+          "sl_no": null,
+          "kva": null,
+          "capacity": null
+        },
+        "site_id": null,
+        "site_name": null,
+        "latitude": null,
+        "longitude": null,
+        "status": null
+      },
+      {
+        "id": "46475",
+        "name": "BOBCAT 5",
+        "created_at": "2026-10-16T14:32:14Z",
+        "lifecycle_status": "active",
+        "category_id": 133,
+        "category_name": "Construction Equipment",
+        "asset_info": {
+          "make": null,
+          "model": null,
+          "sl_no": null,
+          "kva": null,
+          "capacity": null
+        },
+        "site_id": null,
+        "site_name": null,
+        "latitude": null,
+        "longitude": null,
+        "status": null
+      },
+      {
+        "id": "46468",
+        "name": "BOOMLOADER-540 17 MTR 3",
+        "created_at": "2026-10-16T14:32:14Z",
+        "lifecycle_status": "active",
+        "category_id": 133,
+        "category_name": "Construction Equipment",
+        "asset_info": {
+          "make": null,
+          "model": null,
+          "sl_no": null,
+          "kva": null,
+          "capacity": null
+        },
+        "site_id": null,
+        "site_name": null,
+        "latitude": null,
+        "longitude": null,
+        "status": null
+      },
+      {
+        "id": "46467",
+        "name": "MOBILE CRNAE 50T 2",
+        "created_at": "2026-10-16T14:32:14Z",
+        "lifecycle_status": "active",
+        "category_id": 133,
+        "category_name": "Construction Equipment",
+        "asset_info": {
+          "make": null,
+          "model": null,
+          "sl_no": null,
+          "kva": null,
+          "capacity": null
+        },
+        "site_id": null,
+        "site_name": null,
+        "latitude": null,
+        "longitude": null,
+        "status": null
+      },
+      {
+        "id": "46473",
+        "name": "BOOMLOADER-540 17 MTR 1",
+        "created_at": "2026-10-16T14:32:14Z",
+        "lifecycle_status": "active",
+        "category_id": 133,
+        "category_name": "Construction Equipment",
+        "asset_info": {
+          "make": null,
+          "model": null,
+          "sl_no": null,
+          "kva": null,
+          "capacity": null
+        },
+        "site_id": null,
+        "site_name": null,
+        "latitude": null,
+        "longitude": null,
+        "status": null
+      },
+      {
+        "id": "46465",
+        "name": "BOBCAT 3",
+        "created_at": "2026-10-16T14:32:14Z",
+        "lifecycle_status": "active",
+        "category_id": 133,
+        "category_name": "Construction Equipment",
+        "asset_info": {
+          "make": null,
+          "model": null,
+          "sl_no": null,
+          "kva": null,
+          "capacity": null
+        },
+        "site_id": null,
+        "site_name": null,
+        "latitude": null,
+        "longitude": null,
+        "status": null
+      },
+      {
+        "id": "46469",
+        "name": "BOBCAT 7",
+        "created_at": "2026-10-16T14:32:14Z",
+        "lifecycle_status": "active",
+        "category_id": 133,
+        "category_name": "Construction Equipment",
+        "asset_info": {
+          "make": null,
+          "model": null,
+          "sl_no": null,
+          "kva": null,
+          "capacity": null
+        },
+        "site_id": null,
+        "site_name": null,
+        "latitude": null,
+        "longitude": null,
+        "status": null
+      },
+      {
+        "id": "46476",
+        "name": "BOOMLOADER-540 17 MTR 4",
+        "created_at": "2026-10-16T14:32:14Z",
+        "lifecycle_status": "active",
+        "category_id": 133,
+        "category_name": "Construction Equipment",
+        "asset_info": {
+          "make": null,
+          "model": null,
+          "sl_no": null,
+          "kva": null,
+          "capacity": null
+        },
+        "site_id": null,
+        "site_name": null,
+        "latitude": null,
+        "longitude": null,
+        "status": null
+      },
+      {
+        "id": "46462",
+        "name": "BOOMLOADER-540 17 MTR 12",
+        "created_at": "2026-10-16T14:32:14Z",
+        "lifecycle_status": "active",
+        "category_id": 133,
+        "category_name": "Construction Equipment",
+        "asset_info": {
+          "make": null,
+          "model": null,
+          "sl_no": null,
+          "kva": null,
+          "capacity": null
+        },
+        "site_id": null,
+        "site_name": null,
+        "latitude": null,
+        "longitude": null,
+        "status": null
+      },
+      {
+        "id": "46466",
+        "name": "BOOMLOADER-540 17 MTR 14",
+        "created_at": "2026-10-16T14:32:14Z",
+        "lifecycle_status": "active",
+        "category_id": 133,
+        "category_name": "Construction Equipment",
+        "asset_info": {
+          "make": null,
+          "model": null,
+          "sl_no": null,
+          "kva": null,
+          "capacity": null
+        },
+        "site_id": null,
+        "site_name": null,
+        "latitude": null,
+        "longitude": null,
+        "status": null
+      },
+      {
+        "id": "46459",
+        "name": "BOOMLOADER-540 17 MTR 8",
+        "created_at": "2026-10-16T14:32:14Z",
+        "lifecycle_status": "active",
+        "category_id": 133,
+        "category_name": "Construction Equipment",
+        "asset_info": {
+          "make": null,
+          "model": null,
+          "sl_no": null,
+          "kva": null,
+          "capacity": null
+        },
+        "site_id": null,
+        "site_name": null,
+        "latitude": null,
+        "longitude": null,
+        "status": null
+      },
+      {
+        "id": "46455",
+        "name": "BOOMLOADER-540 17 MTR 13",
+        "created_at": "2026-10-16T14:32:14Z",
+        "lifecycle_status": "active",
+        "category_id": 133,
+        "category_name": "Construction Equipment",
+        "asset_info": {
+          "make": null,
+          "model": null,
+          "sl_no": null,
+          "kva": null,
+          "capacity": null
+        },
+        "site_id": null,
+        "site_name": null,
+        "latitude": null,
+        "longitude": null,
+        "status": null
+      },
+      {
         "id": "43644",
         "name": "Fuel Tank Ghaf wood",
         "created_at": "2026-08-19T06:49:22Z",
@@ -26,7 +1048,12 @@
           "model": null,
           "sl_no": null,
           "capacity": 20000
-        }
+        },
+        "site_id": null,
+        "site_name": null,
+        "latitude": 25.07737159729004,
+        "longitude": 55.31012725830078,
+        "status": "connected"
       },
       {
         "id": "43514",
@@ -45,7 +1072,12 @@
           "rated_current": null,
           "load_power_factor": null,
           "system_capacity_kwp": 400
-        }
+        },
+        "site_id": "1270",
+        "site_name": "GHAFWOODS",
+        "latitude": 25.077390670776367,
+        "longitude": 55.3101577758789,
+        "status": "connected"
       },
       {
         "id": "43512",
@@ -74,7 +1106,12 @@
           "engine_make": null,
           "alias_name": null,
           "no_of_poles": null
-        }
+        },
+        "site_id": "1270",
+        "site_name": "GHAFWOODS",
+        "latitude": 25.077430725097656,
+        "longitude": 55.31017303466797,
+        "status": "running"
       },
       {
         "id": "43510",
@@ -103,7 +1140,12 @@
           "engine_make": null,
           "alias_name": null,
           "no_of_poles": null
-        }
+        },
+        "site_id": "1270",
+        "site_name": "GHAFWOODS",
+        "latitude": 25.077430725097656,
+        "longitude": 55.31017303466797,
+        "status": "running"
       },
       {
         "id": "43508",
@@ -132,7 +1174,12 @@
           "engine_make": null,
           "alias_name": null,
           "no_of_poles": null
-        }
+        },
+        "site_id": "1270",
+        "site_name": "GHAFWOODS",
+        "latitude": 25.077430725097656,
+        "longitude": 55.31017303466797,
+        "status": "running"
       },
       {
         "id": "43507",
@@ -161,7 +1208,12 @@
           "engine_make": null,
           "alias_name": null,
           "no_of_poles": null
-        }
+        },
+        "site_id": "1270",
+        "site_name": "GHAFWOODS",
+        "latitude": 25.077430725097656,
+        "longitude": 55.31017303466797,
+        "status": "running"
       },
       {
         "id": "42485",
@@ -190,7 +1242,12 @@
           "engine_make": null,
           "alias_name": null,
           "no_of_poles": null
-        }
+        },
+        "site_id": null,
+        "site_name": null,
+        "latitude": 25.07738494873047,
+        "longitude": 55.309974670410156,
+        "status": "offline"
       },
       {
         "id": "42484",
@@ -219,7 +1276,12 @@
           "engine_make": null,
           "alias_name": null,
           "no_of_poles": null
-        }
+        },
+        "site_id": null,
+        "site_name": null,
+        "latitude": 25.077247619628906,
+        "longitude": 55.310123443603516,
+        "status": "offline"
       },
       {
         "id": "42483",
@@ -248,7 +1310,12 @@
           "engine_make": null,
           "alias_name": null,
           "no_of_poles": null
-        }
+        },
+        "site_id": null,
+        "site_name": null,
+        "latitude": 25.077482223510742,
+        "longitude": 55.31013488769531,
+        "status": "stopped"
       },
       {
         "id": "42482",
@@ -277,7 +1344,12 @@
           "engine_make": null,
           "alias_name": null,
           "no_of_poles": null
-        }
+        },
+        "site_id": null,
+        "site_name": null,
+        "latitude": 25.077346801757812,
+        "longitude": 55.3101577758789,
+        "status": "stopped"
       },
       {
         "id": "42426",
@@ -291,7 +1363,12 @@
           "model": null,
           "sl_no": null,
           "max_current": null
-        }
+        },
+        "site_id": null,
+        "site_name": null,
+        "latitude": 25.072057723999023,
+        "longitude": 55.316925048828125,
+        "status": "connected"
       },
       {
         "id": "42425",
@@ -305,7 +1382,12 @@
           "model": null,
           "sl_no": null,
           "max_current": null
-        }
+        },
+        "site_id": "1270",
+        "site_name": "GHAFWOODS",
+        "latitude": 25.073345184326172,
+        "longitude": 55.31791305541992,
+        "status": "connected"
       },
       {
         "id": "42424",
@@ -319,7 +1401,12 @@
           "model": null,
           "sl_no": null,
           "max_current": null
-        }
+        },
+        "site_id": "1270",
+        "site_name": "GHAFWOODS",
+        "latitude": 25.07180404663086,
+        "longitude": 55.31415557861328,
+        "status": "connected"
       },
       {
         "id": "33902",
@@ -333,7 +1420,12 @@
           "model": null,
           "sl_no": null,
           "max_current": 2500
-        }
+        },
+        "site_id": "1270",
+        "site_name": "GHAFWOODS",
+        "latitude": 24.1029224395752,
+        "longitude": 52.460323333740234,
+        "status": "connected"
       },
       {
         "id": "33903",
@@ -347,7 +1439,12 @@
           "model": null,
           "sl_no": null,
           "max_current": 150
-        }
+        },
+        "site_id": null,
+        "site_name": null,
+        "latitude": 25.077533721923828,
+        "longitude": 55.31011962890625,
+        "status": "connected"
       },
       {
         "id": "33899",
@@ -361,7 +1458,12 @@
           "model": null,
           "sl_no": null,
           "max_current": 750
-        }
+        },
+        "site_id": null,
+        "site_name": null,
+        "latitude": 25.074438095092773,
+        "longitude": 55.31731414794922,
+        "status": "connected"
       },
       {
         "id": "33900",
@@ -375,7 +1477,12 @@
           "model": null,
           "sl_no": null,
           "max_current": 150
-        }
+        },
+        "site_id": null,
+        "site_name": null,
+        "latitude": 25.07464451071707,
+        "longitude": 55.313635819997586,
+        "status": "connected"
       },
       {
         "id": "33852",
@@ -389,7 +1496,12 @@
           "model": null,
           "sl_no": null,
           "max_current": 750
-        }
+        },
+        "site_id": null,
+        "site_name": null,
+        "latitude": 25.689193725585938,
+        "longitude": 55.7357177734375,
+        "status": "connected"
       },
       {
         "id": "33854",
@@ -403,7 +1515,12 @@
           "model": null,
           "sl_no": null,
           "max_current": 2500
-        }
+        },
+        "site_id": "1270",
+        "site_name": "GHAFWOODS",
+        "latitude": 25.069900512695312,
+        "longitude": 55.31592559814453,
+        "status": "connected"
       },
       {
         "id": "33853",
@@ -417,7 +1534,12 @@
           "model": null,
           "sl_no": null,
           "max_current": 2500
-        }
+        },
+        "site_id": "1270",
+        "site_name": "GHAFWOODS",
+        "latitude": 25.0728759765625,
+        "longitude": 55.318973541259766,
+        "status": "connected"
       },
       {
         "id": "33851",
@@ -431,7 +1553,12 @@
           "model": null,
           "sl_no": null,
           "max_current": 750
-        }
+        },
+        "site_id": "1270",
+        "site_name": "GHAFWOODS",
+        "latitude": 25.07734489440918,
+        "longitude": 55.3101921081543,
+        "status": "offline"
       },
       {
         "id": "33850",
@@ -445,11 +1572,16 @@
           "model": null,
           "sl_no": null,
           "max_current": 2500
-        }
+        },
+        "site_id": null,
+        "site_name": null,
+        "latitude": 25.077377319335938,
+        "longitude": 55.31017303466797,
+        "status": "connected"
       }
     ],
     "pagination": {
-      "total": 22,
+      "total": 74,
       "page": 1,
       "limit": 1000,
       "total_pages": 1
