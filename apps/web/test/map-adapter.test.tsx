@@ -1,4 +1,4 @@
-import { render, waitFor } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import { StrictMode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import type { MapSurface, SurfaceFactory } from '../src/components/map/arcgis/viewManager';
@@ -11,14 +11,20 @@ const sdk = vi.hoisted(() => ({
   created: [] as string[],
   destroyed: [] as string[],
   apiKeys: [] as string[],
+  basemap: 'loaded' as 'loaded' | 'failed',
 }));
 vi.mock('../src/components/map/arcgis/factory', () => ({
   configureArcgis: (key: string) => sdk.apiKeys.push(key),
-  createArcgisFactory: (): SurfaceFactory => ({
+  createArcgisFactory: (
+    getHandlers: () => {
+      onBasemapStatus?: ((s: 'loading' | 'loaded' | 'failed') => void) | undefined;
+    },
+  ): SurfaceFactory => ({
     create: async (mode: MapMode): Promise<MapSurface> => {
       const id = `${mode}#${sdk.created.length + 1}`;
       sdk.created.push(id);
       sdk.alive.add(id);
+      getHandlers().onBasemapStatus?.(sdk.basemap);
       return {
         setLayers: () => undefined,
         setFocus: () => undefined,
@@ -45,6 +51,7 @@ function reset() {
   sdk.created.length = 0;
   sdk.destroyed.length = 0;
   sdk.apiKeys.length = 0;
+  sdk.basemap = 'loaded';
 }
 
 describe('<ArcgisMap> adapter component', () => {
@@ -72,6 +79,33 @@ describe('<ArcgisMap> adapter component', () => {
     view.rerender(<ArcgisMap {...base} mode="2d" layers={[...layers]} />);
     expect(sdk.created).toHaveLength(1);
     expect(sdk.apiKeys).toEqual(['test-key']);
+    view.unmount();
+  });
+
+  it('exposes data-basemap-status=loaded and shows no notice when tiles load', async () => {
+    reset();
+    const view = render(<ArcgisMap {...base} mode="2d" />);
+    await waitFor(() =>
+      expect(view.container.querySelector('[data-basemap-status]')).toHaveAttribute(
+        'data-basemap-status',
+        'loaded',
+      ),
+    );
+    expect(screen.queryByText('Map tiles could not be loaded')).toBeNull();
+    view.unmount();
+  });
+
+  it('exposes data-basemap-status=failed and a quiet notice when tiles fail', async () => {
+    reset();
+    sdk.basemap = 'failed';
+    const view = render(<ArcgisMap {...base} mode="2d" />);
+    await waitFor(() =>
+      expect(view.container.querySelector('[data-basemap-status]')).toHaveAttribute(
+        'data-basemap-status',
+        'failed',
+      ),
+    );
+    expect(screen.getByText('Map tiles could not be loaded')).toBeInTheDocument();
     view.unmount();
   });
 

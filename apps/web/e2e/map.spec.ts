@@ -1,6 +1,7 @@
 import { fileURLToPath } from 'node:url';
-import { expect, test } from '@playwright/test';
+import { expect, test, type Locator, type Page } from '@playwright/test';
 import { loadEnv } from 'vite';
+import { expectBasemapLoaded } from './basemap';
 
 // The dev server (and its MSW /v1/config mock) reads the key from the git-ignored repo-root .env.
 // This process reads ONLY VITE_DEV_ARCGIS_API_KEY from it (never the whole file), just to decide
@@ -13,6 +14,27 @@ const viewports = {
   xl: { width: 1440, height: 900 },
   sm: { width: 390, height: 844 },
 } as const;
+
+// The zoom (and in 3D the navigation and compass widgets) must not sit under the mode switch, and
+// every ArcGIS button must be a 44 px touch target.
+async function expectWidgetsClear(page: Page, map: Locator) {
+  const modeBox = await page.getByRole('group', { name: 'Map mode' }).boundingBox();
+  const buttons = map.locator('.esri-ui .esri-widget--button');
+  const count = await buttons.count();
+  expect(count).toBeGreaterThan(0);
+  for (let i = 0; i < count; i++) {
+    const box = await buttons.nth(i).boundingBox();
+    if (!box || !modeBox) continue;
+    expect(box.width).toBeGreaterThanOrEqual(44);
+    expect(box.height).toBeGreaterThanOrEqual(44);
+    const overlaps =
+      box.x < modeBox.x + modeBox.width &&
+      box.x + box.width > modeBox.x &&
+      box.y < modeBox.y + modeBox.height &&
+      box.y + box.height > modeBox.y;
+    expect(overlaps, 'an ArcGIS widget overlaps the 2D/Satellite/3D switch').toBe(false);
+  }
+}
 
 test.describe('lazy loading (no key needed)', () => {
   test('/admin/users loads no ArcGIS code', async ({ page }) => {
@@ -68,6 +90,8 @@ test.describe('portfolio map with a real key', () => {
         await expect(map).toHaveAttribute('data-map-mode', mode);
         await expect(surface).toHaveCount(1); // the old view was destroyed
         await expect(surface).toBeVisible();
+        await expectBasemapLoaded(map); // a blank map (refused basemap) must fail here
+        await expectWidgetsClear(page, map);
         await page.waitForTimeout(5000); // let basemap tiles and elevation draw
         await page.screenshot({ path: `e2e/screenshots/map-${mode}-${name}.png` });
       }

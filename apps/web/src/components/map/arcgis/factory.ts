@@ -1,6 +1,7 @@
 // The ONLY file (with ArcgisMap.tsx) that imports @arcgis/core (CLAUDE.md hard rule 7, docs/09).
 // It is loaded lazily, so no other route pays for the SDK.
 import '@arcgis/core/assets/esri/themes/light/main.css';
+import './map.css';
 import esriConfig from '@arcgis/core/config';
 import type EsriExtent from '@arcgis/core/geometry/Extent';
 import type EsriFeatureLayer from '@arcgis/core/layers/FeatureLayer';
@@ -11,12 +12,34 @@ import { UAE_EXTENT, UAE_VIEW } from '../defaults';
 import { readTokenColor } from '../colors';
 import type { MapExtent, MapFocus, MapLayerSpec, MapMarker } from '../types';
 import { diffMarkers, toFeatureSpec } from './features';
-import { BASEMAP_BY_MODE, BUILDINGS_3D_URL, CLUSTER_RADIUS, GROUND_3D, TILT_3D } from './settings';
+import { isAbortError, basemapStatusFor, type BasemapStatus } from './basemapStatus';
+import {
+  BASEMAP_BY_MODE,
+  BUILDINGS_3D_URL,
+  CLUSTER_RADIUS,
+  GROUND_3D,
+  LABEL_HALO_SIZE,
+  LABEL_HALO_TOKEN,
+  TILT_3D,
+  WIDGET_CORNER,
+} from './settings';
 import type { MapSurface, SurfaceFactory } from './viewManager';
+
+type EsriMapViewClass = typeof EsriMapView;
+type EsriSceneViewClass = typeof EsriSceneView;
+
+/** Returned when a request went stale before anything was built. */
+const noopSurface: MapSurface = {
+  setLayers: () => undefined,
+  setFocus: () => undefined,
+  destroy: () => undefined,
+};
 
 export interface SurfaceHandlers {
   onMarkerClick?: ((marker: MapMarker) => void) | undefined;
   onViewChange?: ((extent: MapExtent) => void) | undefined;
+  /** Whether the basemap tiles loaded. Reported once per view. */
+  onBasemapStatus?: ((status: BasemapStatus) => void) | undefined;
 }
 
 /** Sets the browser key once. It is never logged, put in a URL by us, or stored. */
@@ -25,14 +48,14 @@ export function configureArcgis(apiKey: string): void {
 }
 
 const ignoreAbort = (error: unknown) => {
-  if (error instanceof Error && error.name === 'AbortError') return;
+  if (isAbortError(error)) return;
   console.warn('Map navigation failed', error instanceof Error ? error.name : 'unknown error');
 };
 
 /** Builds MapView (2D, satellite) or SceneView (3D). `getHandlers` is read at event time. */
 export function createArcgisFactory(getHandlers: () => SurfaceHandlers): SurfaceFactory {
   return {
-    async create(mode, container) {
+    async create(mode, container, isStale) {
       const is3d = mode === '3d';
       const [
         { default: EsriMap },
@@ -41,6 +64,8 @@ export function createArcgisFactory(getHandlers: () => SurfaceHandlers): Surface
         { default: Extent },
         reactiveUtils,
         webMercatorUtils,
+        viewModule,
+        sceneLayerModule,
       ] = await Promise.all([
         import('@arcgis/core/Map'),
         import('@arcgis/core/layers/FeatureLayer'),
@@ -48,13 +73,22 @@ export function createArcgisFactory(getHandlers: () => SurfaceHandlers): Surface
         import('@arcgis/core/geometry/Extent'),
         import('@arcgis/core/core/reactiveUtils'),
         import('@arcgis/core/geometry/support/webMercatorUtils'),
+        is3d
+          ? import('@arcgis/core/views/SceneView').then((m) => ({ SceneView: m.default }))
+          : import('@arcgis/core/views/MapView').then((m) => ({ MapView: m.default })),
+        is3d ? import('@arcgis/core/layers/SceneLayer') : Promise.resolve(undefined),
       ]);
+
+      // A newer request (or an unmount, such as the StrictMode double mount) replaced this one while
+      // the SDK was loading: build nothing, so no view is destroyed in the middle of its load.
+      if (isStale?.()) return noopSurface;
 
       // A fresh element per view, so destroying a view leaves the container clean.
       const element = document.createElement('div');
       element.style.cssText = 'width:100%;height:100%';
       container.appendChild(element);
 
+      let destroyed = false;
       const map = new EsriMap(
         is3d
           ? { basemap: BASEMAP_BY_MODE[mode], ground: GROUND_3D }
@@ -63,10 +97,8 @@ export function createArcgisFactory(getHandlers: () => SurfaceHandlers): Surface
 
       let view: EsriMapView | EsriSceneView;
       if (is3d) {
-        const [{ default: SceneView }, { default: SceneLayer }] = await Promise.all([
-          import('@arcgis/core/views/SceneView'),
-          import('@arcgis/core/layers/SceneLayer'),
-        ]);
+        const { SceneView } = viewModule as { SceneView: EsriSceneViewClass };
+        const SceneLayer = sceneLayerModule!.default;
         map.add(new SceneLayer({ url: BUILDINGS_3D_URL, popupEnabled: false }));
         view = new SceneView({
           container: element,
@@ -77,7 +109,7 @@ export function createArcgisFactory(getHandlers: () => SurfaceHandlers): Surface
         });
         void view.when(() => goTo({ tilt: TILT_3D }, { animate: false })).catch(ignoreAbort);
       } else {
-        const { default: MapView } = await import('@arcgis/core/views/MapView');
+        const { MapView } = viewModule as { MapView: EsriMapViewClass };
         view = new MapView({
           container: element,
           map,
@@ -96,6 +128,25 @@ export function createArcgisFactory(getHandlers: () => SurfaceHandlers): Surface
           target,
           options,
         );
+
+      // The mode switch sits top-left, so the zoom (and in 3D the navigation and compass widgets)
+      // go to another corner. move() ignores components the view does not have.
+      view.ui.move(['zoom', 'navigation-toggle', 'compass'], WIDGET_CORNER);
+
+      // Report whether the basemap tiles loaded. A referrer-restricted or invalid key fails here.
+      // An AbortError is our own destroy (mode switch or unmount), not a failure. Never log the
+      // error: its message can carry the request URL with the token.
+      const reportBasemap = (status: BasemapStatus) => {
+        if (!destroyed) getHandlers().onBasemapStatus?.(status);
+      };
+      reportBasemap('loading');
+      void map.basemap
+        ?.load()
+        .then(() => basemapStatusFor(undefined))
+        .catch((error: unknown) => basemapStatusFor(error))
+        .then((status) => {
+          if (status) reportBasemap(status);
+        });
 
       // Colours come from tokens.css at creation time (docs/09 section 2).
       const tok = (token: string) => readTokenColor(token);
@@ -202,11 +253,13 @@ export function createArcgisFactory(getHandlers: () => SurfaceHandlers): Surface
                   symbol: {
                     type: 'text',
                     color: tok('fg'),
-                    haloColor: tok('bg'),
-                    haloSize: 1.5,
+                    haloColor: tok(LABEL_HALO_TOKEN),
+                    haloSize: LABEL_HALO_SIZE,
                     font: { size: 11 },
                   },
                   labelPlacement: 'above-center',
+                  // Hide a label that would overlap another pin label instead of stacking them.
+                  deconflictionStrategy: 'static' as const,
                 },
               ],
           featureReduction: featureReduction(spec.cluster),
@@ -244,7 +297,6 @@ export function createArcgisFactory(getHandlers: () => SurfaceHandlers): Surface
       };
 
       let allMarkers = new Map<string, MapMarker>();
-      let destroyed = false;
 
       const fitToMarkers = async () => {
         const graphics = (

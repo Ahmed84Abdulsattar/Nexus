@@ -10,7 +10,8 @@ export interface MapSurface {
 
 /** Creates a surface for a mode. The real implementation is `factory.ts`; tests inject a fake. */
 export interface SurfaceFactory {
-  create(mode: MapMode, container: HTMLElement): Promise<MapSurface>;
+  /** `isStale()` turns true once a newer request or `destroy()` replaced this one. */
+  create(mode: MapMode, container: HTMLElement, isStale?: () => boolean): Promise<MapSurface>;
 }
 
 /**
@@ -41,7 +42,11 @@ export class ViewManager {
     this.surface?.destroy();
     this.surface = undefined;
     this.currentMode = mode;
-    const surface = await this.factory.create(mode, this.container);
+    const surface = await this.factory.create(
+      mode,
+      this.container,
+      () => this.destroyed || request !== this.requestId,
+    );
     if (this.destroyed || request !== this.requestId) {
       surface.destroy();
       return;
