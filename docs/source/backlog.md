@@ -6,6 +6,7 @@
 > Changed on 2026-10-14 (S0-09 security review, accepted by Ahmed): extra steps in S0-03, S0-07, S0-08 and S7-02.
 > Changed on 2026-10-14 (decisions by Ahmed on the S1/S2 sprint plans): new tasks S1-10, S3-08 and S3-09 added below. `Nexus_Phase1_Sprint_Plan.xlsx` needs the same three rows added by hand.
 > Changed on 2026-10-12 (DATOMS provisional test key, docs/07 section 3): the S2 sprint dependency and S2-02 (Steps, External blocker, Acceptance check) now show S2-02 as unblocked.
+> Changed on 2026-10-22 (decisions by Ahmed, branch `S3-03-decisions-docs`): new task S1-11; new steps in S3-03 (DATOMS key file), S4-01 (rollups and retention, I6; replaces a hand-written note) and S7-02 (ArcGIS asset self-hosting, L6). Made in the spreadsheet, then regenerated with `scripts/gen-backlog.py`.
 
 ## Sprints
 
@@ -311,6 +312,21 @@
 - **Estimate (days):** 1
 - **Acceptance check:** Tests: `/v1/me` returns the caller's permissions and nothing else; `/v1/config` needs a valid sign-in and never returns a secret other than the referrer-restricted ArcGIS key; both appear in the generated client
 
+### S1-11 · Web app on the typed API client: switch pendingClient.ts to the generated client, then remove the /v1/config MSW mock and VITE_DEV_ARCGIS_API_KEY
+- **Sprint:** S1
+- **Week:** W2
+- **Work package:** Foundation
+- **Steps (how to do it):** 1. Fix the base-URL mismatch first: the generated `schema.d.ts` paths include `/v1` (`/v1/me`, `/v1/config`) and `VITE_API_BASE_URL` also ends in `/v1`, so the typed client would call `/v1/v1/...`. Choose one fix (generate the paths without the `/v1` prefix, or give the typed client the API origin as its base URL), add a test for it, and record the choice in docs/10 "OpenAPI and the typed client".
+  2. Move `/v1/config` and `/v1/me` (useConfig, useCurrentUser) from `pendingClient.ts` to the typed client (`api` in apps/web/src/api/client.ts). `/v1/projects` stays in `pendingClient.ts` until S2-01 publishes it; then delete the file.
+  3. Remove the dev-mode MSW `/v1/config` mock and `VITE_DEV_ARCGIS_API_KEY` (main.tsx, test/handlers.ts, vite-env.d.ts, the env guards and the checkDist allow-list, .env.example, docs/04, docs/runbooks/arcgis-key.md section 4). Test-only MSW handlers stay. Locally the map key then comes from the API's `/v1/config` (S1-10).
+  (Added 2026-10-22 (decision by Ahmed).)
+- **Output when done:** The web app reads /v1/me and /v1/config through the generated client; no local ArcGIS key path is left in the web app
+- **Now done by:** Colleague (frontend)
+- **Requirement:** Foundation
+- **Depends on:** S1-10
+- **Estimate (days):** 1
+- **Acceptance check:** `pnpm typecheck` fails when the `/v1/me` or `/v1/config` contract changes; a test shows the typed client requests `/v1/config`, not `/v1/v1/config`; `VITE_DEV_ARCGIS_API_KEY` is gone from apps/web, .env.example and docs/04; with the API running locally the map gets its key from `/v1/config`
+
 ### S2-01 · Projects API: list, filter (status, type, district), search, scoped to user
 - **Sprint:** S2
 - **Week:** W1
@@ -441,6 +457,7 @@
   2. Write telemetry.packet (history) and telemetry.latest_packet (current); status, location and alerts on change only.
   3. Insert in batches. No per-poll bookkeeping writes (asset_parameter is insert-only; status observed_at only on change).
   4. Log how long each run takes and the credits used per window.
+  5. DATOMS key for local live runs (decided by Ahmed, 2026-10-22; not built yet): move it from the root `.env` to a git-ignored `packages/datoms-client/.env.datoms`. The same change adds the `.gitignore` entry, points the CLI and the local worker at that file, and updates docs/07 section 3.1 and .env.example.
 - **Output when done:** Live DATOMS data in Nexus within about 2 poll intervals
 - **Now done by:** You (backend)
 - **Requirement:** Brief: real-time visibility
@@ -536,8 +553,6 @@
 - **Acceptance check:** An admin creates a project and links an asset to it; a non-admin gets 403; the change is in the audit log
 
 ### S4-01 · Chart summaries (5-minute, 1-hour, 1-day) as Nexus rollup tables
-
-> Note (S3-08 review I6): `refresh_rollup_combine` must not run for an hour whose 5-minute rows were dropped (older than `retention.rollup_5m_days`); skip such hours. See docs/06 section 6a.
 - **Sprint:** S4
 - **Week:** W1
 - **Work package:** Project page
@@ -545,6 +560,7 @@
   2. Worker rollups job (ADR 0007): refresh_rollup_5m once per CLOSED 5-minute bucket, 2 poll intervals after it ends; re-run only for closed buckets that get late packets; 1 h after the hour's last bucket; 1 d after the Dubai day. No sliding window, no in-memory accumulators.
   3. Return data coverage (packets / expectedPackets) with each bucket.
   4. Check a 30-day query returns in under 1 second.
+  5. Note (S3-08 review I6): `refresh_rollup_combine` must not run for an hour whose 5-minute rows were already dropped by retention (older than `retention.rollup_5m_days`). Skip or refuse such hours, or a good hourly row is overwritten with an empty one. See docs/06 section 6a.
 - **Output when done:** Fast data for every chart
 - **Now done by:** You (backend)
 - **Requirement:** Brief: trends
@@ -869,6 +885,7 @@
   3. Firewall: only Container Apps can reach the database.
   4. Web app security headers and CSP (docs/08 §6) in staticwebapp.config.json: a CSP that allows only the MSAL (Entra) and ArcGIS domains plus the API and Web PubSub hosts; HSTS, X-Content-Type-Options, Referrer-Policy, frame-ancestors none. (Added by the S0 plan, 2026-10-09.)
   5. ArcGIS (security review of S0-09, PR #19, accepted by Ahmed 2026-10-14): the ArcGIS SDK puts the key in tile, style and elevation URLs (`token=`). Exclude `*.arcgis.com` and `*.arcgisonline.com` from App Insights automatic dependency tracking and strip `token=` in a telemetry initializer. CSP for the map (assets self-hosted, decision L6): `script-src 'self' 'wasm-unsafe-eval'`; `worker-src 'self' blob:`; `img-src 'self' data: blob: https://*.arcgis.com`; `connect-src` with `https://*.arcgis.com` (basemapstyles-api, ibasemaps-api, elevation3d, basemaps3d, static); `font-src 'self'`; check Calcite styles under `style-src`; no `unsafe-eval` (verify with a report-only CSP first). `Referrer-Policy: strict-origin-when-cross-origin`, never `no-referrer` (the ArcGIS key is referrer-restricted). Details in docs/09.
+  6. ArcGIS asset self-hosting (decision L6, Ahmed 2026-10-22) is a separate PR merged before this task: copy the needed `@arcgis/core` assets and set `esriConfig.assetsPath`, so the CSP in step 5 needs no Esri CDN (docs/09 section 1).
 - **Output when done:** Data not reachable from the internet; the web app sends a CSP and security headers
 - **Now done by:** You (backend)
 - **Requirement:** Innovo: security
