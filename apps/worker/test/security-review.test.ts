@@ -8,7 +8,7 @@ import { MAX_TIMER_MS, Scheduler, type ScheduledJob } from '../src/scheduler/sch
 const MIN = 60_000;
 
 describe('M1: the worker refuses the PgBouncer port', () => {
-  const base = { APP_ENV: 'local' };
+  const base = { APP_ENV: 'local', DATOMS_MAX_SHARE_CEILING: '0.1' };
   it('port 6432 in the URL', () => {
     expect(() =>
       loadWorkerConfig({ ...base, WORKER_DATABASE_URL: 'postgres://w@db.example:6432/nexus' }),

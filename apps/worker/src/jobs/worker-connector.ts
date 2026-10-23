@@ -32,7 +32,12 @@ export class WorkerConnector implements SourceConnector {
     private readonly readShare: () => Promise<unknown>,
     private readonly create: (share: number) => DatomsConnectorHandle,
     private readonly log: ShareLogger,
+    /** Hard upper bound from the environment (DATOMS_MAX_SHARE_CEILING). 1 = no extra limit (prod default). */
+    private readonly ceiling = 1,
+    /** Called once per change of a setting that is above the ceiling. Carries numbers only. */
+    private readonly onClamp?: (setting: number, ceiling: number) => void,
   ) {}
+  private lastClamped: number | undefined;
 
   get currentShare(): number | undefined {
     return this.lastValid;
@@ -45,8 +50,18 @@ export class WorkerConnector implements SourceConnector {
       .max(1)
       .safeParse(await this.readShare());
     if (parsed.success) {
-      this.lastValid = parsed.data;
-      if (this.handle) (await this.handle).setMaxShare(parsed.data);
+      // ADR 0005: the setting can be written through the API login, so the environment ceiling wins.
+      const effective = Math.min(parsed.data, this.ceiling);
+      if (parsed.data > this.ceiling) {
+        if (this.lastClamped !== parsed.data) {
+          this.lastClamped = parsed.data;
+          this.onClamp?.(parsed.data, this.ceiling);
+        }
+      } else {
+        this.lastClamped = undefined;
+      }
+      this.lastValid = effective;
+      if (this.handle) (await this.handle).setMaxShare(effective);
       return;
     }
     if (this.lastValid === undefined) {
